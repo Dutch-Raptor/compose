@@ -1,12 +1,10 @@
-[package]
-name = "compose-syntax"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "3"
+members = [
+    "compose-eval",
+    "compose-library",
+    "compose-syntax",
+]
 
-[dependencies]
-ecow = { workspace = true }
-unscanny = "0.1.0"
-extension-traits = "2.0.0"
-
-[dev-dependencies]
-sequential-test = "0.2.4"
+[workspace.dependencies]
+ecow = "0.2.4"

@@ -1,0 +1,8 @@
+[package]
+name = "compose-eval"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+compose-library = { path = "../compose-library" }
+compose-syntax = { path = "../compose-syntax" }
