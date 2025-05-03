@@ -1,7 +1,130 @@
-use crate::world::World;
 use compose_syntax::Span;
-use ecow::{eco_vec, EcoString, EcoVec};
+use ecow::{eco_vec, EcoVec};
 use std::fmt::{Display, Formatter};
+
+
+/// Early-return with a [`StrResult`] or [`SourceResult`].
+///
+/// If called with just a string and format args, returns with a
+/// `StrResult`. If called with a span, a string and format args, returns
+/// a `SourceResult`.
+///
+/// You can also emit hints with the `; hint: "..."` syntax.
+///
+/// ```ignore
+/// bail!("bailing with a {}", "string result");
+/// bail!(span, "bailing with a {}", "source result");
+/// bail!(
+///     span, "bailing with a {}", "source result";
+///     hint: "hint 1"
+/// );
+/// bail!(
+///     span, "bailing with a {}", "source result";
+///     hint: "hint 1";
+///     hint: "hint 2";
+/// );
+/// ```
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __bail {
+    // For bail!("just a {}", "string")
+    (
+        $fmt:literal $(, $arg:expr)*
+        $(; hint: $hint:literal $(, $hint_arg:expr)*)*
+        $(,)?
+    ) => {
+        return Err($crate::diag::error!(
+            $fmt $(, $arg)*
+            $(; hint: $hint $(, $hint_arg)*)*
+        ))
+    };
+
+    // For bail!(error!(..))
+    ($error:expr) => {
+        return Err(::ecow::eco_vec![$error])
+    };
+
+    // For bail(span, ...)
+    ($($tts:tt)*) => {
+        return Err(::ecow::eco_vec![$crate::diag::error!($($tts)*)])
+    };
+}
+
+
+/// Construct an [`EcoString`], [`HintedString`] or [`SourceDiagnostic`] with
+/// severity `Error`.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __error {
+    // For bail!("just a {}", "string").
+    ($fmt:literal $(, $arg:expr)* $(,)?) => {
+        $crate::diag::eco_format!($fmt, $($arg),*).into()
+    };
+
+    // For bail!("a hinted {}", "string"; hint: "some hint"; hint: "...")
+    (
+        $fmt:literal $(, $arg:expr)*
+        $(; hint: $hint:literal $(, $hint_arg:expr)*)*
+        $(,)?
+    ) => {
+        $crate::diag::HintedString::new(
+            $crate::diag::eco_format!($fmt, $($arg),*)
+        ) $(.with_hint($crate::diag::eco_format!($hint, $($hint_arg),*)))*
+    };
+
+    // For bail!(span, ...)
+    (
+        $span:expr, $fmt:literal $(, $arg:expr)*
+        $(; hint: $hint:literal $(, $hint_arg:expr)*)*
+        $(,)?
+    ) => {
+        $crate::diag::SourceDiagnostic::error(
+            $span,
+            $crate::diag::eco_format!($fmt, $($arg),*),
+        )  $(.with_hint($crate::diag::eco_format!($hint, $($hint_arg),*)))*
+    };
+}
+
+/// Construct a [`SourceDiagnostic`] with severity `Warning`.
+///
+/// You can also emit hints with the `; hint: "..."` syntax.
+///
+/// ```ignore
+/// warning!(span, "warning with a {}", "source result");
+/// warning!(
+///     span, "warning with a {}", "source result";
+///     hint: "hint 1"
+/// );
+/// warning!(
+///     span, "warning with a {}", "source result";
+///     hint: "hint 1";
+///     hint: "hint 2";
+/// );
+/// ```
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __warning {
+    (
+        $span:expr,
+        $fmt:literal $(, $arg:expr)*
+        $(; hint: $hint:literal $(, $hint_arg:expr)*)*
+        $(,)? $(;)?
+    ) => {
+        $crate::diag::SourceDiagnostic::warning(
+            $span,
+            $crate::diag::eco_format!($fmt, $($arg),*),
+        ) $(.with_hint($crate::diag::eco_format!($hint, $($hint_arg),*)))*
+    };
+}
+
+#[rustfmt::skip]
+#[doc(inline)]
+pub use {
+    crate::__bail as bail,
+    crate::__error as error,
+    crate::__warning as warning,
+    ecow::{eco_format, EcoString},
+};
 
 pub type SourceResult<T> = Result<T, EcoVec<SourceDiagnostic>>;
 pub type StrResult<T> = Result<T, EcoString>;
@@ -13,7 +136,22 @@ pub struct SourceDiagnostic {
     pub message: EcoString,
     pub trace: EcoVec<Spanned<TracePoint>>,
     pub hints: EcoVec<EcoString>,
-    pub notes: EcoVec<EcoString>,
+    pub labels: EcoVec<Label>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Label {
+    pub span: Span,
+    pub message: EcoString,
+}
+
+impl Label {
+    pub fn new(span: Span, message: impl Into<EcoString>) -> Self {
+        Self {
+            span,
+            message: message.into(),
+        }
+    }
 }
 
 impl SourceDiagnostic {
@@ -27,7 +165,18 @@ impl SourceDiagnostic {
             message: message.into(),
             trace: eco_vec!(),
             hints: eco_vec!(),
-            notes: eco_vec!(),
+            labels: eco_vec!(),
+        }
+    }
+    
+    pub fn warning(span: Span, message: impl Into<EcoString>) -> Self {
+        Self {
+            severity: Severity::Warning,
+            span,
+            message: message.into(),
+            trace: eco_vec!(),
+            hints: eco_vec!(),
+            labels: eco_vec!(),
         }
     }
     
@@ -38,6 +187,11 @@ impl SourceDiagnostic {
     
     pub fn with_hint(mut self, hint: impl Into<EcoString>) -> Self {
         self.hint(hint);
+        self
+    }
+    
+    pub fn with_label(mut self, span: Span, message: impl Into<EcoString>) -> Self {
+        self.labels.push(Label::new(span, message));
         self
     }
 }

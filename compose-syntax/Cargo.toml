@@ -1,0 +1,12 @@
+[package]
+name = "compose-syntax"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ecow = { workspace = true }
+unscanny = "0.1.0"
+extension-traits = "2.0.0"
+
+[dev-dependencies]
+sequential-test = "0.2.4"

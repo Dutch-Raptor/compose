@@ -8,3 +8,4 @@ members = [
 
 [workspace.dependencies]
 ecow = "0.2.4"
+indexmap = "2.9.0"

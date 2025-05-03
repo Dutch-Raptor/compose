@@ -1,5 +1,6 @@
 mod vm;
 mod expression;
+mod access;
 
 use compose_library::diag::SourceResult;
 use crate::vm::Vm;

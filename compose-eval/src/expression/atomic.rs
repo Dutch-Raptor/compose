@@ -6,21 +6,6 @@ use compose_syntax::ast::AstNode;
 use crate::Eval;
 use crate::vm::Vm;
 
-impl Eval for Expr<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
-        let span = self.span();
-        let v = match self {
-            Expr::Int(i) => i.eval(vm),
-            Expr::Binary(b) => b.eval(vm),
-            _ => unimplemented!()
-        }?;
-        
-        // todo: Attach span here
-        Ok(v)
-    }
-}
 
 impl Eval for ast::Int<'_> {
     type Output = Value;

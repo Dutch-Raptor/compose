@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "compose-library",
  "compose-syntax",
+ "ecow",
 ]
 
 [[package]]
@@ -16,6 +17,7 @@ version = "0.1.0"
 dependencies = [
  "compose-syntax",
  "ecow",
+ "indexmap",
 ]
 
 [[package]]
@@ -33,6 +35,12 @@ name = "ecow"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef5eeffa816451f3a6a4cce9cd796e3e5ba6018638d3ce5cc7f87b73bababf60"
+
+[[package]]
+name = "equivalent"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "ext-trait"
@@ -61,6 +69,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "360cbc11ebc403c8ebb731dfb4d3950835d40d3d9a20f0e89a27b17e991d0863"
 dependencies = [
  "ext-trait",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
+
+[[package]]
+name = "indexmap"
+version = "2.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
+dependencies = [
+ "equivalent",
+ "hashbrown",
 ]
 
 [[package]]

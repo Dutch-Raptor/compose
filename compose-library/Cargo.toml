@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 compose-syntax = { path = "../compose-syntax" }
 ecow = { workspace = true }
+indexmap = { workspace = true }
