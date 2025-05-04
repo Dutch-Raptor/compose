@@ -1,9 +1,9 @@
-use crate::diag::{SourceResult, StrResult, bail, error, warning};
-use crate::{__bail, __error, __warning, IntoValue, Sink, Value};
+use crate::diag::{error, warning, SourceResult, StrResult};
+use crate::{IntoValue, Sink, Value};
 use compose_syntax::Span;
-use ecow::{EcoString, eco_vec};
-use indexmap::IndexMap;
+use ecow::{eco_format, eco_vec, EcoString};
 use indexmap::map::Entry;
+use indexmap::IndexMap;
 use std::marker::PhantomData;
 
 #[derive(Debug, Default, Clone)]
@@ -128,8 +128,9 @@ impl Binding {
     pub fn read_checked(&self, access_span: Span, sink: &mut impl Sink) -> &Value {
         if self.is_uninitialized() {
             sink.warn(
-                warning!(access_span, "Was uninitialised when it was read."; 
+                warning!(access_span, "Read an uninitialised variable"; 
                 hint: "Uninitialised variables are always `()`.";)
+                    .with_label_message("was uninitialised here")
                 .with_label(self.span, "was defined here without an initial value"),
             )
         }
@@ -145,7 +146,8 @@ impl Binding {
     pub fn write(&mut self, access_span: Span) -> SourceResult<&mut Value> {
         match self.kind {
             BindingKind::Immutable => Err(eco_vec![
-                error!(access_span, "Cannot mutate an immutable variable")
+                error!(access_span, "Cannot assign to an immutable variable more than once")
+                .with_label_message("is immutable")
                     .with_label(self.span, "was defined as immutable here")
             ]),
             BindingKind::Mutable => Ok(&mut self.value),

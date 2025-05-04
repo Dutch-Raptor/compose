@@ -1,11 +1,11 @@
-use compose_library::diag::SourceResult;
-use compose_library::Value;
-use compose_syntax::ast::{AstNode, Expr};
 use crate::Eval;
 use crate::vm::Vm;
+use compose_library::Value;
+use compose_library::diag::SourceResult;
+use compose_syntax::ast::{AstNode, Expr};
 
-mod binary;
 mod atomic;
+mod binary;
 mod bindings;
 
 impl Eval for Expr<'_> {
@@ -18,7 +18,7 @@ impl Eval for Expr<'_> {
             Expr::Binary(b) => b.eval(vm),
             Expr::LetBinding(l) => l.eval(vm),
             Expr::Ident(i) => i.eval(vm),
-            v => unimplemented!("cannot eval {v:#?} as it is unimplemented")
+            v => unimplemented!("cannot eval {v:#?} as it is unimplemented"),
         }?;
 
         // todo: Attach span here
@@ -28,27 +28,31 @@ impl Eval for Expr<'_> {
 
 #[cfg(test)]
 pub mod test_utils {
-    use compose_library::diag::SourceResult;
-    use compose_library::Value;
-    use compose_syntax::ast::Expr;
-    use compose_syntax::FileId;
     use crate::Eval;
+    use crate::test_utils::test_world;
     use crate::vm::Vm;
+    use compose_library::Value;
+    use compose_library::diag::SourceResult;
+    use compose_syntax::FileId;
+    use compose_syntax::ast::Expr;
 
     pub fn eval_expr(code: &str) -> SourceResult<Value> {
-        eval_expr_with_vm(&mut Vm::empty(), code)
+        eval_expr_with_vm(&mut Vm::new(&test_world(code)), code)
     }
-    
+
     pub fn eval_expr_with_vm(vm: &mut Vm, code: &str) -> SourceResult<Value> {
         let file_id = FileId::new("test.comp");
         let nodes = compose_syntax::parse(code, file_id);
-        
+
         let mut value = Value::Unit;
-        
+
         for node in nodes {
-            value = node.cast::<Expr>().expect(&format!("{node:#?} is not a valid expression")).eval(vm)?;
+            value = node
+                .cast::<Expr>()
+                .expect(&format!("{node:#?} is not a valid expression"))
+                .eval(vm)?;
         }
-        
+
         Ok(value)
     }
 }

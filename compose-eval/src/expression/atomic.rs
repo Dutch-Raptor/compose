@@ -20,6 +20,7 @@ impl Eval for ast::Int<'_> {
 mod tests {
     use compose_syntax::{parse, FileId};
     use compose_syntax::ast::Int;
+    use crate::test_utils::{empty_world};
     use super::*;
     
     #[test]
@@ -32,6 +33,10 @@ mod tests {
         let as_int: Int = node.cast().unwrap();
         
         assert_eq!(as_int.get(), 124);
-        assert_eq!(as_int.eval(&mut Vm::empty()), Ok(Value::Int(124)))
+        
+        let world = empty_world();
+        let mut vm = Vm::new(&world);
+        
+        assert_eq!(as_int.eval(&mut vm), Ok(Value::Int(124)))
     }
 }

@@ -1,7 +1,10 @@
 use compose_syntax::Span;
 use ecow::{eco_vec, EcoVec};
 use std::fmt::{Display, Formatter};
-
+use std::path::{Path, PathBuf};
+use std::str::Utf8Error;
+use std::string::FromUtf8Error;
+use std::{fmt, io};
 
 /// Early-return with a [`StrResult`] or [`SourceResult`].
 ///
@@ -134,6 +137,7 @@ pub struct SourceDiagnostic {
     pub severity: Severity,
     pub span: Span,
     pub message: EcoString,
+    pub label_message: Option<EcoString>,
     pub trace: EcoVec<Spanned<TracePoint>>,
     pub hints: EcoVec<EcoString>,
     pub labels: EcoVec<Label>,
@@ -163,6 +167,7 @@ impl SourceDiagnostic {
             severity: Severity::Error,
             span,
             message: message.into(),
+            label_message: None,
             trace: eco_vec!(),
             hints: eco_vec!(),
             labels: eco_vec!(),
@@ -174,10 +179,16 @@ impl SourceDiagnostic {
             severity: Severity::Warning,
             span,
             message: message.into(),
+            label_message: None,
             trace: eco_vec!(),
             hints: eco_vec!(),
             labels: eco_vec!(),
         }
+    }
+    
+    pub fn with_label_message(mut self, message: impl Into<EcoString>) -> Self {
+        self.label_message = Some(message.into());
+        self
     }
     
     pub fn hint(&mut self, hint: impl Into<EcoString>)
@@ -200,6 +211,34 @@ impl SourceDiagnostic {
 pub enum Severity {
     Error,
     Warning,
+}
+
+pub struct Warned<T> {
+    pub value: T,
+    pub warnings: EcoVec<SourceDiagnostic>,
+}
+
+
+impl<T> Warned<T> {
+    pub fn new(value: T) -> Self {
+        Self {
+            value,
+            warnings: eco_vec!(),
+        }
+    }
+    
+    pub fn with_warning(mut self, warning: SourceDiagnostic) -> Self {
+        self.warnings.push(warning);
+        self
+    }
+    
+    pub fn extend_warnings(&mut self, warnings: EcoVec<SourceDiagnostic>) {
+        self.warnings.extend(warnings);
+    }
+    pub fn with_warnings(mut self, warnings: EcoVec<SourceDiagnostic>) -> Warned<T> {
+        self.extend_warnings(warnings);
+        self
+    }
 }
 
 pub trait Trace<T> {
@@ -295,5 +334,79 @@ where S: Into<EcoString>,
             let err = SourceDiagnostic::error(span, msg);
             eco_vec!(err)
         })
+    }
+}
+
+/// A result type with a file-related error.
+pub type FileResult<T> = Result<T, FileError>;
+
+/// An error that occurred while trying to load of a file.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum FileError {
+    /// A file was not found at this path.
+    NotFound(PathBuf),
+    /// A file could not be accessed.
+    AccessDenied,
+    /// A directory was found, but a file was expected.
+    IsDirectory,
+    /// The file is not a Compose source file, but should have been.
+    NotSource,
+    /// The file was not valid UTF-8, but should have been.
+    InvalidUtf8,
+    /// Another error.
+    ///
+    /// The optional string can give more details, if available.
+    Other(Option<EcoString>),
+}
+
+impl FileError {
+    /// Create a file error from an I/O error.
+    pub fn from_io(err: io::Error, path: &Path) -> Self {
+        match err.kind() {
+            io::ErrorKind::NotFound => Self::NotFound(path.into()),
+            io::ErrorKind::PermissionDenied => Self::AccessDenied,
+            io::ErrorKind::InvalidData
+            if err.to_string().contains("stream did not contain valid UTF-8") =>
+                {
+                    Self::InvalidUtf8
+                }
+            _ => Self::Other(Some(eco_format!("{err}"))),
+        }
+    }
+}
+
+impl std::error::Error for FileError {}
+
+impl Display for FileError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Self::NotFound(path) => {
+                write!(f, "file not found (searched at {})", path.display())
+            }
+            Self::AccessDenied => f.pad("failed to load file (access denied)"),
+            Self::IsDirectory => f.pad("failed to load file (is a directory)"),
+            Self::NotSource => f.pad("not a typst source file"),
+            Self::InvalidUtf8 => f.pad("file is not valid utf-8"),
+            Self::Other(Some(err)) => write!(f, "failed to load file ({err})"),
+            Self::Other(None) => f.pad("failed to load file"),
+        }
+    }
+}
+
+impl From<Utf8Error> for FileError {
+    fn from(_: Utf8Error) -> Self {
+        Self::InvalidUtf8
+    }
+}
+
+impl From<FromUtf8Error> for FileError {
+    fn from(_: FromUtf8Error) -> Self {
+        Self::InvalidUtf8
+    }
+}
+
+impl From<FileError> for EcoString {
+    fn from(err: FileError) -> Self {
+        eco_format!("{err}")
     }
 }

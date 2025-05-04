@@ -1,13 +1,11 @@
-use compose_library::{Binding, IntoValue, Scopes, Sink, Value};
-use std::marker::PhantomData;
-use ecow::EcoVec;
 use compose_library::diag::SourceDiagnostic;
-use compose_syntax::{ast, Span};
+use compose_library::{Binding, IntoValue, Scopes, Sink, Value, World};
 use compose_syntax::ast::AstNode;
+use compose_syntax::{ast, Span};
+use ecow::EcoVec;
 
-#[derive(Default, Debug)]
 pub struct Vm<'a> {
-    phantom_data: PhantomData<&'a ()>,
+    pub world: &'a dyn World,
     pub scopes: Scopes<'a>,
     pub flow: Option<FlowEvent>,
     pub sink: VmSink,
@@ -22,23 +20,28 @@ pub struct VmSink {
 pub enum FlowEvent {
     Continue(Span),
     Break(Span),
-    Return(Span, Option<Value>)
+    Return(Span, Option<Value>),
 }
 
 impl<'a> Vm<'a> {
-    pub fn empty() -> Self {
-        Default::default()   
+    pub fn new(world: &'a dyn World) -> Self {
+        Self {
+            world,
+            scopes: Default::default(),
+            flow: None,
+            sink: Default::default(),
+        }
     }
-    
+
     /// Defines an immutable variable in the current scope.
     pub fn define(&mut self, var: ast::Ident, value: impl IntoValue) {
         self.bind(var, Binding::new(value, var.span()))
     }
-    
+
     pub fn define_mutable(&mut self, var: ast::Ident, value: impl IntoValue) {
         self.bind(var, Binding::new_mutable(value, var.span()))
     }
-    
+
     pub fn bind(&mut self, var: ast::Ident, binding: Binding) {
         self.scopes.top.bind(var.get().clone(), binding);
     }
@@ -46,6 +49,6 @@ impl<'a> Vm<'a> {
 
 impl Sink for VmSink {
     fn warn(&mut self, warning: SourceDiagnostic) {
-        self.warnings.push(warning);   
+        self.warnings.push(warning);
     }
 }

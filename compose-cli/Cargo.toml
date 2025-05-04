@@ -1,0 +1,11 @@
+[package]
+name = "compose-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+compose-library = { path = "../compose-library" }
+compose-eval = { path = "../compose-eval" }
+compose-syntax = { path = "../compose-syntax" }
+rustyline = "15.0.0"
+codespan-reporting = "0.12.0"

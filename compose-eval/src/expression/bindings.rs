@@ -92,10 +92,12 @@ mod tests {
     use super::*;
     use crate::expression::test_utils::eval_expr_with_vm;
     use compose_library::BindingKind;
+    use crate::test_utils::test_world;
 
     #[test]
     fn test_let_binding() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         eval_expr_with_vm(&mut vm, "let a = 3").expect("failed to evaluate");
 
         let binding = vm.scopes.top.get("a").unwrap();
@@ -106,7 +108,8 @@ mod tests {
 
     #[test]
     fn test_let_mut_binding() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         eval_expr_with_vm(&mut vm, "let mut a = 3").expect("failed to evaluate");
 
         let binding = vm.scopes.top.get("a").unwrap();
@@ -117,7 +120,8 @@ mod tests {
 
     #[test]
     fn test_let_binding_without_value() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         eval_expr_with_vm(&mut vm, "let a").expect("failed to evaluate");
 
         let binding = vm.scopes.top.get("a").unwrap();
@@ -128,7 +132,8 @@ mod tests {
 
     #[test]
     fn test_let_mut_binding_without_value() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         eval_expr_with_vm(&mut vm, "let mut a").expect("failed to evaluate");
 
         let binding = vm.scopes.top.get("a").unwrap();
@@ -138,7 +143,8 @@ mod tests {
 
     #[test]
     fn test_read_ident() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         // define the variable
         eval_expr_with_vm(&mut vm, "let a = 3").expect("failed to evaluate");
         // read the variable
@@ -148,7 +154,8 @@ mod tests {
 
     #[test]
     fn test_read_uninitialised_variable() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         // setup the variable
         eval_expr_with_vm(&mut vm, "let a").expect("failed to evaluate");
         let result = eval_expr_with_vm(&mut vm, "a").expect("failed to evaluate");
@@ -165,7 +172,8 @@ mod tests {
     
     #[test]
     fn integration() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         let result = eval_expr_with_vm(&mut vm, r#"
             let a = 3
             let b = 4
@@ -178,7 +186,8 @@ mod tests {
     
     #[test]
     fn assign_mut() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         eval_expr_with_vm(&mut vm, "let mut a = 3").expect("failed to evaluate");
         
         let binding = vm.scopes.get("a").unwrap();
@@ -195,7 +204,8 @@ mod tests {
     
     #[test]
     fn assign_mut_uninitialised() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         eval_expr_with_vm(&mut vm, "let mut a").expect("failed to evaluate");
         
         let binding = vm.scopes.get("a").unwrap();
@@ -213,7 +223,8 @@ mod tests {
     
     #[test]
     fn assign_uninitialised() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         eval_expr_with_vm(&mut vm, "let a").expect("failed to evaluate");
         
         let binding = vm.scopes.get("a").unwrap();
@@ -231,7 +242,8 @@ mod tests {
     
     #[test]
     fn assign_immut_error() {
-        let mut vm = Vm::empty();
+        let world = test_world("");
+        let mut vm = Vm::new(&world);
         eval_expr_with_vm(&mut vm, "let a = 3").expect("failed to evaluate");
         let binding = vm.scopes.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::Immutable);

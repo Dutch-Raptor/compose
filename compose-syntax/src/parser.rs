@@ -10,15 +10,18 @@ use std::collections::HashSet;
 use std::ops::{Index, IndexMut};
 
 pub fn parse(text: &str, file_id: FileId) -> Vec<SyntaxNode> {
-    let mut p = Parser::new(text, 0, file_id);
+    parse_with_offset(text, file_id, 0)
+}
+
+/// Assumes that the text at offset begins with a valid expression (or whitespace).
+pub fn parse_with_offset(text: &str, file_id: FileId, offset: usize) -> Vec<SyntaxNode> {
+    let mut p = Parser::new(text, offset, file_id);
 
     while !p.end() {
         code_expression(&mut p);
-        
+
         p.skip_if(SyntaxKind::Semicolon);
     }
-
-    dbg!(&p);
 
     p.finish()
 }

@@ -34,7 +34,7 @@ type FileRef = &'static VirtualPath;
 
 /// An absolute path in the virtual file system of a project
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct VirtualPath(PathBuf);
+pub struct VirtualPath(pub PathBuf);
 
 impl<T> From<T> for VirtualPath 
 where T: Into<PathBuf>
@@ -92,14 +92,14 @@ impl FileId {
     ///
     /// Always returns a new file id, no matter if the file is already in the interner.
     #[track_caller]
-    pub fn fake(path: VirtualPath) -> Self {
+    pub fn fake(path: impl Into<VirtualPath>) -> Self {
         let mut interner = INTERNER.write().unwrap();
         let num = u16::try_from(interner.from_id.len() + 1)
             .and_then(NonZeroU16::try_from)
             .expect("out of file ids");
 
         let id = FileId(num);
-        let leaked = Box::leak(Box::new(path));
+        let leaked = Box::leak(Box::new(path.into()));
         interner.from_id.push(leaked);
         id
     }
