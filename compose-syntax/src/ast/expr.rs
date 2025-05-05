@@ -1,4 +1,4 @@
-use crate::ast::LetBinding;
+use crate::ast::{CodeBlock, LetBinding};
 use crate::ast::{AstNode, Binary, Ident, Int};
 use crate::ast::atomics::Unit;
 use crate::ast::unary::Unary;
@@ -23,6 +23,7 @@ pub enum Expr<'a> {
     Binary(Binary<'a>),
     Int(Int<'a>),
     LetBinding(LetBinding<'a>),   
+    CodeBlock(CodeBlock<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -34,6 +35,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::Binary => Some(Self::Binary(Binary::from_untyped(node)?)),       
             SyntaxKind::Int => Some(Self::Int(Int::from_untyped(node)?)),       
             SyntaxKind::LetBinding => Some(Self::LetBinding(LetBinding::from_untyped(node)?)),
+            SyntaxKind::CodeBlock => Some(Self::CodeBlock(CodeBlock::from_untyped(node)?)),       
             _ => None,
         }
     }
@@ -46,6 +48,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::Binary(binary) => binary.to_untyped(),       
             Self::Int(int) => int.to_untyped(),       
             Self::LetBinding(let_binding) => let_binding.to_untyped(),
+            Self::CodeBlock(code_block) => code_block.to_untyped(),       
         }
     }
 }

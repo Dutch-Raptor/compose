@@ -7,6 +7,7 @@ use compose_syntax::ast::{AstNode, Expr};
 mod atomic;
 mod binary;
 mod bindings;
+mod block;
 
 impl Eval for Expr<'_> {
     type Output = Value;
@@ -18,7 +19,9 @@ impl Eval for Expr<'_> {
             Expr::Binary(b) => b.eval(vm),
             Expr::LetBinding(l) => l.eval(vm),
             Expr::Ident(i) => i.eval(vm),
-            v => unimplemented!("cannot eval {v:#?} as it is unimplemented"),
+            Expr::CodeBlock(c) => c.eval(vm),
+            Expr::Unit(_) => Ok(Value::Unit),
+            Expr::Unary(u) => unimplemented!(),
         }?;
 
         // todo: Attach span here

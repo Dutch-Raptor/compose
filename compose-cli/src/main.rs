@@ -1,74 +1,46 @@
 use crate::world::SystemWorld;
+use clap::Parser;
 use codespan_reporting::diagnostic::Diagnostic;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::{diagnostic, term};
 use compose_eval::{Eval, Vm};
-use compose_library::diag::{Severity, SourceDiagnostic, SourceResult, Warned};
-use compose_library::{Value, World};
+use compose_library::{
+    diag::{Severity, SourceDiagnostic, SourceResult, Warned},
+    Value,
+};
 use compose_syntax::ast::Expr;
 use compose_syntax::{FileId, Source, Span};
-use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use std::cmp::min;
 use std::ops::Range;
 
+mod repl;
 mod world;
 
+#[derive(Debug, clap::Parser)]
+struct Args {
+    #[clap(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum Command {
+    Repl(ReplArgs),
+}
+
+#[derive(Debug, clap::Parser)]
+pub struct ReplArgs {
+    #[clap(long)]
+    pub print_ast: bool,
+}
+
 fn main() -> Result<(), ReadlineError> {
-    let world = SystemWorld::from_str("");
-    let mut vm = Vm::new(&world);
-
-    // `()` can be used when no completer is required
-    let mut rl = DefaultEditor::new()?;
-    loop {
-        let readline = rl.readline(">> ");
-        match readline {
-            Ok(line) => {
-                rl.add_history_entry(line.as_str())?;
-
-                eval_line(&mut vm, &world, line);
-            }
-            Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
-                break;
-            }
-            Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
-                break;
-            }
-            Err(err) => {
-                println!("Error: {:?}", err);
-                break;
-            }
-        }
+    let args = Args::parse();
+    match args.command {
+        Command::Repl(args) => repl::repl(args)?,
     }
 
     Ok(())
-}
-
-pub fn eval_line(vm: &mut Vm, world: &SystemWorld, line: String) {
-    let len_before_edit = world.source(world.entry_point()).unwrap().nodes().len();
-    world.edit_source(world.entry_point(), |s| {
-        s.append(format!("{}{line}", if !s.text().is_empty() { "\n" } else { "" }).as_str())
-    });
-
-    let source = world.source(world.entry_point()).unwrap();
-    let len_after_edit = source.nodes().len();
-
-    let Warned { value, warnings } = eval(source, len_before_edit..len_after_edit, vm);
-
-    match value {
-        Ok(value) => {
-            print_diagnostics(world, &[], &warnings).unwrap();
-
-            if value != Value::Unit {
-                println!("{value:?}")
-            }
-        }
-        Err(err) => {
-            print_diagnostics(world, &err, &warnings).unwrap();
-        }
-    }
 }
 
 pub fn print_diagnostics(
@@ -90,8 +62,6 @@ pub fn print_diagnostics(
                     .flat_map(|l| Some(secondary_label(l.span)?.with_message(l.message.clone()))),
             ),
         );
-
-        dbg!(&diag);
 
         let writer = StandardStream::stderr(ColorChoice::Always);
         let config = codespan_reporting::term::Config::default();

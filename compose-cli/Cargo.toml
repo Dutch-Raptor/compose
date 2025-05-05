@@ -7,5 +7,6 @@ edition = "2024"
 compose-library = { path = "../compose-library" }
 compose-eval = { path = "../compose-eval" }
 compose-syntax = { path = "../compose-syntax" }
-rustyline = "15.0.0"
+rustyline = { version = "15.0.0", features = ["derive"] }
 codespan-reporting = "0.12.0"
+clap = { version = "4.5.37", features = ["derive"] }
