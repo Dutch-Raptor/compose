@@ -4,10 +4,10 @@ use std::sync::Arc;
 use crate::{parse, SyntaxNode};
 use crate::parser::parse_with_offset;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Source(Arc<Repr>);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Repr {
     id: FileId,
     text: String,

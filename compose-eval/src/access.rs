@@ -22,7 +22,7 @@ impl Access for ast::Ident<'_> {
         let span = self.span();
         
         vm.scopes.get_mut(&self)
-            .at(span)
-            .and_then(|b| b.write(span))
+            .at(span)?
+            .write(span)
     }
 }

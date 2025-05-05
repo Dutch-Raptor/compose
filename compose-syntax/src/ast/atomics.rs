@@ -1,8 +1,9 @@
-use std::ops::Deref;
-use ecow::EcoString;
+use crate::SyntaxNode;
 use crate::ast::Expr;
 use crate::ast::macros::node;
-use crate::SyntaxNode;
+use ecow::EcoString;
+use std::ops::Deref;
+use unscanny::Scanner;
 
 node! {
     struct Ident
@@ -50,7 +51,6 @@ impl Int<'_> {
     }
 }
 
-
 node! {
     struct Unit
 }
@@ -65,12 +65,61 @@ impl<'a> CodeBlock<'a> {
     }
 }
 
+node! {
+    struct Str
+}
+
+impl<'a> Str<'a> {
+    ///  Get the string value with resolved escape sequences
+    pub fn get(self) -> EcoString {
+        let text = self.0.text();
+        let unquoted = &text[1..text.len() - 1];
+        if !unquoted.contains('\\') {
+            return unquoted.into();
+        }
+
+        let mut out = EcoString::with_capacity(unquoted.len());
+        let mut s = Scanner::new(unquoted);
+
+        while let Some(c) = s.eat() {
+            if c != '\\' {
+                out.push(c);
+                continue;
+            }
+
+            let start = s.locate(-1);
+            match s.eat() {
+                Some('n') => out.push('\n'),
+                Some('r') => out.push('\r'),
+                Some('"') => out.push('"'),
+                Some('t') => out.push('\t'),
+                Some('\\') => out.push('\\'),
+                Some('u') if s.eat_if('{') => {
+                    let sequence = s.eat_while(char::is_ascii_hexdigit);
+                    s.eat_if('}');
+
+                    match u32::from_str_radix(sequence, 16)
+                        .ok()
+                        .and_then(std::char::from_u32)
+                    {
+                        Some(c) => out.push(c),
+                        Option::None => out.push_str(s.from(start)),
+                    }
+                }
+                _ => out.push_str(s.from(start)),
+            }
+        }
+
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::kind::SyntaxKind;
     use crate::test_utils::test_parse;
-    use super::*;
-    
+
     #[test]
     fn parse_ident() {
         let parsed = test_parse("abc");
@@ -81,4 +130,3 @@ mod tests {
         assert_eq!(ident.get(), "abc");
     }
 }
-

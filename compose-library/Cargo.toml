@@ -7,3 +7,4 @@ edition = "2024"
 compose-syntax = { path = "../compose-syntax" }
 ecow = { workspace = true }
 indexmap = { workspace = true }
+strsim = "0.11.1"

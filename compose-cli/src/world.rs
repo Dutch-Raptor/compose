@@ -1,16 +1,36 @@
 use codespan_reporting::files::{Error, Files};
-use compose_library::diag::{eco_format, FileError, FileResult};
 use compose_library::World;
+use compose_library::diag::{FileError, FileResult, eco_format};
 use compose_syntax::{FileId, Source};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use tap::Pipe;
 
 pub struct SystemWorld {
     sources: Mutex<HashMap<FileId, Source>>,
     entrypoint: FileId,
     root: PathBuf,
+}
+
+impl Debug for SystemWorld {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // try to get the mutex lock
+
+        f.debug_struct("SystemWorld")
+            .field("entrypoint", &self.entrypoint)
+            .field("root", &self.root)
+            .pipe(|d| {
+                if let Ok(sources) = self.sources.try_lock() {
+                    d.field("sources", &sources)
+                } else {
+                    d.field("sources", &"<locked>")
+                }
+            })
+            .finish()
+    }
 }
 
 impl SystemWorld {
@@ -32,6 +52,10 @@ impl SystemWorld {
             entrypoint,
             root,
         })
+    }
+    
+    pub fn empty_entrypoint() -> Self {
+        Self::from_str("")
     }
 
     pub fn from_str(text: &str) -> Self {

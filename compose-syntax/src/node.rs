@@ -147,7 +147,7 @@ impl SyntaxNode {
 }
 
 impl SyntaxNode {
-    pub(crate) fn span(&self) -> Span {
+    pub fn span(&self) -> Span {
         match &self.0 {
             Repr::Leaf(l) => l.span,
             Repr::Inner(i) => i.span,

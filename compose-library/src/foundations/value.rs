@@ -1,8 +1,11 @@
+use crate::foundations::str::Str;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Int(i64),
     Bool(bool),
     Unit,
+    Str(Str),
 }
 
 impl Default for Value {

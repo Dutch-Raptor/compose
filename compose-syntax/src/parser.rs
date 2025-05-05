@@ -16,11 +16,19 @@ pub fn parse(text: &str, file_id: FileId) -> Vec<SyntaxNode> {
 /// Assumes that the text at offset begins with a valid expression (or whitespace).
 pub fn parse_with_offset(text: &str, file_id: FileId, offset: usize) -> Vec<SyntaxNode> {
     let mut p = Parser::new(text, offset, file_id);
-
+    
+    let mut pos = p.current_end();
     while !p.end() {
         code_expression(&mut p);
 
         p.skip_if(SyntaxKind::Semicolon);
+        
+        // If the parser is not progressing, then we have an error
+        if pos == p.current_end() {
+            // Eat the token and try again
+            p.unexpected();
+        }
+        pos = p.current_end();
     }
 
     p.finish()
@@ -347,6 +355,7 @@ impl<'s> Parser<'s> {
         lexer.jump(offset);
 
         let token = Self::lex(&mut lexer);
+        dbg!(&token);
         Self {
             text,
             lexer,

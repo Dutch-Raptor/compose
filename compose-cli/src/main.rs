@@ -10,12 +10,16 @@ use compose_library::{
 };
 use compose_syntax::ast::Expr;
 use compose_syntax::{FileId, Source, Span};
-use rustyline::error::ReadlineError;
 use std::cmp::min;
 use std::ops::Range;
+use std::path::PathBuf;
+use ecow::eco_vec;
+use compose_library::diag::error;
+use crate::error::CliError;
 
 mod repl;
 mod world;
+mod error;
 
 #[derive(Debug, clap::Parser)]
 struct Args {
@@ -32,9 +36,16 @@ enum Command {
 pub struct ReplArgs {
     #[clap(long)]
     pub print_ast: bool,
+
+    #[clap(long)]
+    pub debug: bool,
+
+    #[clap(long)]
+    /// Start REPL from this file.
+    pub from: Option<PathBuf>,
 }
 
-fn main() -> Result<(), ReadlineError> {
+fn main() -> Result<(), CliError> {
     let args = Args::parse();
     match args.command {
         Command::Repl(args) => repl::repl(args)?,
@@ -53,15 +64,15 @@ pub fn print_diagnostics(
             Severity::Error => Diagnostic::error(),
             Severity::Warning => Diagnostic::warning(),
         }
-        .with_message(diag.message.clone())
-        .with_notes(diag.hints.iter().map(|h| format!("hint: {h}")).collect())
-        .with_labels_iter(
-            primary_label(diag).into_iter().chain(
-                diag.labels
-                    .iter()
-                    .flat_map(|l| Some(secondary_label(l.span)?.with_message(l.message.clone()))),
-            ),
-        );
+            .with_message(diag.message.clone())
+            .with_notes(diag.hints.iter().map(|h| format!("hint: {h}")).collect())
+            .with_labels_iter(
+                primary_label(diag).into_iter().chain(
+                    diag.labels
+                        .iter()
+                        .flat_map(|l| Some(secondary_label(l.span)?.with_message(l.message.clone()))),
+                ),
+            );
 
         let writer = StandardStream::stderr(ColorChoice::Always);
         let config = codespan_reporting::term::Config::default();
@@ -77,10 +88,10 @@ pub fn primary_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId
         diag.span.id()?,
         diag.span.range()?,
     ))
-    .map(|l| match &diag.label_message {
-        Some(message) => l.with_message(message),
-        None => l,
-    })
+        .map(|l| match &diag.label_message {
+            Some(message) => l.with_message(message),
+            None => l,
+        })
 }
 
 pub fn secondary_label(span: Span) -> Option<diagnostic::Label<FileId>> {
@@ -90,14 +101,21 @@ pub fn secondary_label(span: Span) -> Option<diagnostic::Label<FileId>> {
 /// Eval a source file.
 ///
 /// eval_range: eval these nodes
-pub fn eval(source: Source, eval_range: Range<usize>, vm: &mut Vm) -> Warned<SourceResult<Value>> {
+pub fn eval(source: &Source, eval_range: Range<usize>, vm: &mut Vm) -> Warned<SourceResult<Value>> {
     let mut result = Value::Unit;
 
     let range_start = min(eval_range.start, source.nodes().len());
     let range_end = min(eval_range.end, source.nodes().len());
 
     for node in source.nodes().get(range_start..range_end).unwrap() {
-        let expr: Expr = node.cast().unwrap();
+        let expr: Expr = match node.cast() {
+            Some(expr) => expr,
+            None => {
+                let span = node.span();
+                let err = error!(span, "expected expression, found {:?}", node);
+                return Warned::new(Err(eco_vec![err])).with_warnings(std::mem::take(&mut vm.sink.warnings));
+            }
+        };
         result = match expr.eval(vm) {
             Ok(value) => value,
             Err(err) => {

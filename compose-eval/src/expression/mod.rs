@@ -21,6 +21,7 @@ impl Eval for Expr<'_> {
             Expr::Ident(i) => i.eval(vm),
             Expr::CodeBlock(c) => c.eval(vm),
             Expr::Unit(_) => Ok(Value::Unit),
+            Expr::Str(s) => s.eval(vm),
             Expr::Unary(u) => unimplemented!(),
         }?;
 

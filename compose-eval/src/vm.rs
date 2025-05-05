@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use compose_library::diag::SourceDiagnostic;
 use compose_library::{Binding, IntoValue, Scopes, Sink, Value, World};
 use compose_syntax::ast::AstNode;
@@ -9,6 +10,16 @@ pub struct Vm<'a> {
     pub scopes: Scopes<'a>,
     pub flow: Option<FlowEvent>,
     pub sink: VmSink,
+}
+
+impl Debug for Vm<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Vm")
+            .field("scopes", &self.scopes)
+            .field("flow", &self.flow)
+            .field("sink", &self.sink)
+            .finish()
+    }   
 }
 
 #[derive(Default, Debug)]

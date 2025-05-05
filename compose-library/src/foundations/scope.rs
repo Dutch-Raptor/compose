@@ -1,10 +1,13 @@
-use crate::diag::{error, warning, SourceResult, StrResult};
+use crate::diag::{error, warning, At, SourceResult};
 use crate::{IntoValue, Sink, Value};
 use compose_syntax::Span;
 use ecow::{eco_format, eco_vec, EcoString};
 use indexmap::map::Entry;
 use indexmap::IndexMap;
+use std::collections::HashSet;
+use std::iter;
 use std::marker::PhantomData;
+use strsim::jaro_winkler;
 
 #[derive(Debug, Default, Clone)]
 pub struct Scopes<'a> {
@@ -28,18 +31,81 @@ impl<'a> Scopes<'a> {
         self.top = self.stack.pop().expect("Scope stack underflow");
     }
 
-    pub fn get(&self, name: &str) -> StrResult<&Binding> {
-        std::iter::once(&self.top)
+    pub fn get(&self, name: &str) -> Result<&Binding, UnBoundError> {
+        iter::once(&self.top)
             .chain(self.stack.iter().rev())
             .find_map(|scope| scope.get(name))
-            .ok_or_else(|| error!("Unbound variable: {name}"))
+            .ok_or_else(|| self.unbound_error(name.into()))
     }
 
-    pub fn get_mut(&mut self, name: &str) -> StrResult<&mut Binding> {
-        std::iter::once(&mut self.top)
+    pub fn get_mut(&mut self, name: &str) -> Result<&mut Binding, UnBoundError> {
+        if let Err(err) = self.get(name) {
+            return Err(err);
+        }
+
+        Ok(iter::once(&mut self.top)
             .chain(self.stack.iter_mut().rev())
             .find_map(|scope| scope.get_mut(name))
-            .ok_or_else(|| error!("Unbound variable: {name}"))
+            .expect("Checked for existence above"))
+    }
+
+    fn unbound_error(&self, name: EcoString) -> UnBoundError {
+        let all_idents = iter::once(&self.top)
+            .chain(&self.stack)
+            .flat_map(|scope| scope.map.keys());
+
+        let mut seen = HashSet::new();
+        let mut similar_idents: Vec<_> = all_idents
+            .filter_map(|ident| {
+                if !seen.insert(ident) {
+                    return None;
+                }
+                let score = jaro_winkler(&name, ident);
+                (score > 0.8).then_some((ident, score))
+            })
+            .collect();
+
+        similar_idents.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        UnBoundError {
+            name,
+            possible_misspellings: similar_idents
+                .into_iter()
+                .map(|(ident, _)| ident.clone())
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UnBoundError {
+    pub name: EcoString,
+    pub possible_misspellings: Vec<EcoString>,
+}
+
+impl<T> At<T> for Result<T, UnBoundError> {
+    fn at(self, span: Span) -> SourceResult<T> {
+        self.map_err(|err| {
+            let mut diag = error!(span, "Unbound variable: {}", err.name)
+                .with_label_message("is unbound here");
+
+            if !err.possible_misspellings.is_empty() {
+                diag = diag.with_hint(eco_format!(
+                    "Did you mean{countable} {}?",
+                    err.possible_misspellings
+                        .iter()
+                        .map(|i| eco_format!("`{i}`"))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    countable = match err.possible_misspellings.len() {
+                        1 => "",
+                        _ => " one of",
+                    }
+                ))
+            }
+
+            eco_vec!(diag)
+        })
     }
 }
 
@@ -130,7 +196,7 @@ impl Binding {
             sink.warn(
                 warning!(access_span, "Read an uninitialised variable"; 
                 hint: "Uninitialised variables are always `()`.";)
-                    .with_label_message("was uninitialised here")
+                .with_label_message("was uninitialised here")
                 .with_label(self.span, "was defined here without an initial value"),
             )
         }
@@ -146,9 +212,12 @@ impl Binding {
     pub fn write(&mut self, access_span: Span) -> SourceResult<&mut Value> {
         match self.kind {
             BindingKind::Immutable => Err(eco_vec![
-                error!(access_span, "Cannot assign to an immutable variable more than once")
+                error!(
+                    access_span,
+                    "Cannot assign to an immutable variable more than once"
+                )
                 .with_label_message("is immutable")
-                    .with_label(self.span, "was defined as immutable here")
+                .with_label(self.span, "was defined as immutable here")
             ]),
             BindingKind::Mutable => Ok(&mut self.value),
             BindingKind::Uninitialized => {
