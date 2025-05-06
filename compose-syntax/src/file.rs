@@ -111,9 +111,6 @@ impl FileId {
     pub fn try_path(&self) -> Option<&'static VirtualPath> {
         let interner = INTERNER.try_read().ok()?;
         let id = usize::try_from(self.0.get() - 1)
-            .inspect_err(|e| {
-                dbg!(self.0.get(), e);
-            })
             .ok()?;
 
         interner.from_id.get(id).copied()

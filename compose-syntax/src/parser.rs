@@ -24,8 +24,8 @@ pub fn parse_with_offset(text: &str, file_id: FileId, offset: usize) -> Vec<Synt
         p.skip_if(SyntaxKind::Semicolon);
         
         // If the parser is not progressing, then we have an error
-        if pos == p.current_end() {
-            // Eat the token and try again
+        if pos == p.current_end() && !p.end() {
+            // Eat the token and continue trying to parse
             p.unexpected();
         }
         pos = p.current_end();
@@ -355,7 +355,7 @@ impl<'s> Parser<'s> {
         lexer.jump(offset);
 
         let token = Self::lex(&mut lexer);
-        dbg!(&token);
+        
         Self {
             text,
             lexer,
