@@ -1,10 +1,8 @@
-use crate::Eval;
 use crate::vm::Vm;
-use ast::Expr;
-use compose_library::Value;
+use crate::Eval;
 use compose_library::diag::SourceResult;
+use compose_library::Value;
 use compose_syntax::ast;
-use compose_syntax::ast::AstNode;
 
 impl Eval for ast::Int<'_> {
     type Output = Value;
@@ -22,12 +20,20 @@ impl Eval for ast::Str<'_> {
     }
 }
 
+impl Eval for ast::Bool<'_> {
+    type Output = Value;
+    
+    fn eval(self, _vm: &mut Vm) -> SourceResult<Self::Output> {
+        Ok(Value::Bool(self.get()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_utils::empty_world;
     use compose_syntax::ast::Int;
-    use compose_syntax::{FileId, parse};
+    use compose_syntax::{parse, FileId};
 
     #[test]
     fn test_int() {

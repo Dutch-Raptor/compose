@@ -1,24 +1,28 @@
 use minime::crossterm;
+use minime::crossterm::QueueableCommand;
 use minime::crossterm::event::{Event, KeyCode, KeyModifiers};
 use minime::crossterm::style::{Colorize, Styler};
 use minime::crossterm::terminal::{Clear, ClearType};
-use minime::crossterm::QueueableCommand;
 use minime::editor::keybindings::Keybinding;
-use minime::editor::Editor;
 use minime::renderer::styles::{Footer, Margin};
 use minime::renderer::{RenderData, Renderer};
 use std::io::Write;
+use std::sync::{Arc};
+use std::sync::atomic::AtomicUsize;
+use minime::editor::Editor;
+use parking_lot::Mutex;
 
 pub fn print_input(input: &str, line_offset: usize) {
     for (i, line) in input.lines().enumerate() {
         println!(
-            "{start_indicator}{line_no:>width$} {line}",
-            line_no = i + 1 + line_offset,
+            "{:^width$}{sep}{line}",
+            i + 1 + line_offset,
             width = MARGIN_WIDTH - 3,
-            start_indicator = if i == 0 {
-                ">>".to_string()
-            } else {
-                "  ".to_string()
+            sep = match (line_offset, i) {
+                // (1, 0) => "── ",
+                (0, 0) => "╭─ ",
+                (_, 0) => "├─ ",
+                (_, _) => "│  ",
             }
         );
     }
@@ -43,13 +47,13 @@ impl<W: Write> Margin<W> for EditorGutter {
         };
         write!(
             write,
-            "{start_indicator}{:>width$} ",
+            "{:^width$}{sep}",
             style((line_idx + 1 + self.line_offset).to_string()),
             width = MARGIN_WIDTH - 3,
-            start_indicator = style(if line_idx == 0 {
-                ">>".to_string()
-            } else {
-                "  ".to_string()
+            sep = style(match (line_idx, self.line_offset) {
+                (0, 0) => "╭─ ".to_string(),
+                (0, _) => "├─ ".to_string(),
+                (_, _) => "│  ".to_string()
             })
         )?;
 
@@ -69,9 +73,11 @@ impl<W: Write> Footer<W> for EditorFooter<'_> {
     fn draw(&mut self, write: &mut W, data: &RenderData) -> minime::Result<()> {
         write!(
             write,
-            " ╰──── [{}:{}] {message}",
+            "{:─<width$}╯ [{}:{}] {message}",
+            "─",
             data.focus().ln,
             data.focus().col.min(data.current_line().len()),
+            width = MARGIN_WIDTH - 3,
             message = self.message,
         )?;
         write.queue(Clear(ClearType::UntilNewLine))?;
@@ -79,9 +85,71 @@ impl<W: Write> Footer<W> for EditorFooter<'_> {
     }
 }
 
-pub struct KeyBindings;
+pub struct EditorHistory(Arc<Mutex<Vec<String>>>);
 
-impl Keybinding for KeyBindings {
+impl EditorHistory {
+    pub fn new() -> Self {
+        Self(Arc::new(Mutex::new(vec![])))
+    }
+    
+    pub fn add(&self, s: impl ToString) {
+        let mut history = self.0.lock();
+        history.push(s.to_string());
+    }
+    
+    pub fn clear(&self) {
+        let mut history = self.0.lock();
+        history.clear();
+    }
+    
+    pub fn len(&self) -> usize {
+        self.0.lock().len()
+    }
+    
+    pub fn get(&self, idx: usize) -> Option<String> {
+        self.0.lock().get(idx).cloned()
+    }
+}
+
+pub struct EditorReader<'a> {
+    pub history: &'a EditorHistory,
+    pub history_idx: AtomicUsize,
+}
+
+impl<'a> EditorReader<'a> {
+    pub fn new(history: &'a EditorHistory) -> Self {
+        Self {
+            history,
+            history_idx: AtomicUsize::new(history.len()),
+        }
+    }
+    
+    pub fn index(&self) -> usize {
+        self.history_idx.load(std::sync::atomic::Ordering::Relaxed)
+    }
+    
+    pub fn history_up(&self) {
+        if self.history_idx.load(std::sync::atomic::Ordering::Relaxed) > 0 {
+            self.history_idx.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+    
+    pub fn history_down(&self) {
+        if self.history_idx.load(std::sync::atomic::Ordering::Relaxed) < self.history.len() {
+            self.history_idx.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+    
+    pub fn get_history_item(&self) -> Option<String> {
+        self.history.get(self.index())
+    }
+    
+    pub fn add(&self, s: &str) {
+        self.history.add(s);
+    }
+}
+
+impl Keybinding for EditorReader<'_> {
     fn read(&self, editor: &mut Editor<impl Renderer>) -> minime::Result<bool> {
         let event = crossterm::event::read()?;
 
@@ -96,8 +164,30 @@ impl Keybinding for KeyBindings {
         match e.code {
             KeyCode::Enter if shifted => editor.type_char('\n'),
             KeyCode::Enter => return Ok(false),
-            KeyCode::Down => editor.move_down(shifted),
-            KeyCode::Up => editor.move_up(shifted),
+            KeyCode::Down => {
+                if editor.focus.ln != editor.line_count() - 1 {
+                    editor.move_down(shifted)
+                }
+                else {
+                    self.history_down();
+                    if let Some(s) = self.get_history_item() {
+                        editor.set_contents(s.as_bytes())?
+                    } else {
+                        editor.set_contents("".as_bytes())?;
+                    }
+                }
+            },
+            KeyCode::Up => {
+                if editor.focus.ln != 0 {
+                    editor.move_up(shifted)
+                } else {
+                    self.history_up();
+                    
+                    if let Some(s) = self.get_history_item() {
+                        editor.set_contents(s.as_bytes())?
+                    }
+                }
+            },
             KeyCode::Left => editor.move_left(shifted),
             KeyCode::Right => editor.move_right(shifted),
 

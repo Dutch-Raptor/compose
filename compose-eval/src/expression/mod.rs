@@ -8,6 +8,7 @@ mod atomic;
 mod binary;
 mod bindings;
 mod block;
+mod unary;
 
 impl Eval for Expr<'_> {
     type Output = Value;
@@ -22,7 +23,8 @@ impl Eval for Expr<'_> {
             Expr::CodeBlock(c) => c.eval(vm),
             Expr::Unit(_) => Ok(Value::Unit),
             Expr::Str(s) => s.eval(vm),
-            Expr::Unary(u) => unimplemented!(),
+            Expr::Unary(u) => u.eval(vm),
+            Expr::Bool(b) => b.eval(vm),
         }?;
 
         // todo: Attach span here

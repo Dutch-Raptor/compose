@@ -13,3 +13,4 @@ ecow = { workspace = true}
 minime = "0.2.0"
 indoc = "2.0.6"
 tap = "1.0.1"
+parking_lot = "0.12.3"

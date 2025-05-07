@@ -8,6 +8,17 @@ pub enum Value {
     Str(Str),
 }
 
+impl Value {
+    pub fn ty(&self) -> &'static str {
+        match self {
+            Value::Int(_) => "int",
+            Value::Bool(_) => "bool",
+            Value::Unit => "unit",
+            Value::Str(_) => "str",
+        }
+    }   
+}
+
 impl Default for Value {
     fn default() -> Self {
         Value::Unit

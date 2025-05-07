@@ -1,29 +1,22 @@
-use std::fs;
-use std::path::PathBuf;
-use crate::ReplArgs;
 use crate::error::CliError;
-use crate::repl::editor::{EditorFooter, EditorGutter, KeyBindings, print_input};
+use crate::repl::editor::{print_input, EditorFooter, EditorGutter, EditorHistory, EditorReader};
 use crate::world::SystemWorld;
+use crate::ReplArgs;
 use compose_eval::Vm;
-use compose_library::diag::{Warned, eco_format};
+use compose_library::diag::{eco_format, Warned};
 use compose_library::{Value, World};
 use compose_syntax::Source;
 use minime::editor::Editor;
 use minime::renderer::full::CrosstermRenderer;
+use std::fs;
 
 mod editor;
 
 pub fn repl(args: ReplArgs) -> Result<(), CliError> {
     let start_text = match &args.from {
-        Some(path) => {
-            fs::read_to_string(path)?
-        }
-        None => {
-            String::new()
-        }
+        Some(path) => fs::read_to_string(path)?,
+        None => String::new(),
     };
-
-
 
     let world = SystemWorld::from_str(&start_text);
     let mut vm = Vm::new(&world);
@@ -33,6 +26,11 @@ pub fn repl(args: ReplArgs) -> Result<(), CliError> {
         print_input(&start_text, 0);
         // evaluate the initial source
         eval_initial_pass(&mut vm, &world);
+    }
+
+    let history = EditorHistory::new();
+    if !start_text.is_empty() {
+        history.add(start_text);
     }
 
     println!("Welcome to the Compose REPL! Type :help for help.");
@@ -54,7 +52,7 @@ pub fn repl(args: ReplArgs) -> Result<(), CliError> {
             });
 
         let input = Editor::with_renderer(renderer)
-            .read(KeyBindings)
+            .read(EditorReader::new(&history))
             .map_err(|e| CliError::EditorError(eco_format!("{e}")))?;
 
         match handle_repl_commands(&mut vm, &world, &input) {
@@ -65,12 +63,13 @@ pub fn repl(args: ReplArgs) -> Result<(), CliError> {
 
         print_input(&input, line_count);
 
-        eval_repl_input(&mut vm, &world, input, &args);
+        eval_repl_input(&mut vm, &world, &input, &args);
+
+        history.add(input);
     }
 
     Ok(())
 }
-
 
 fn entrypoint(world: &SystemWorld) -> Source {
     world.source(world.entry_point()).expect("No entrypoint")
@@ -126,7 +125,9 @@ fn handle_repl_commands(vm: &mut Vm, world: &SystemWorld, input: &str) -> Option
                     message: "Please enter a filename to save to:",
                 });
 
-            let filename = match Editor::with_renderer(renderer).read(KeyBindings) {
+            let filename = match Editor::with_renderer(renderer)
+                .read(EditorReader::new(&EditorHistory::new()))
+            {
                 Ok(name) => name,
                 Err(e) => {
                     eprintln!("Error reading filename: {e}");
@@ -160,7 +161,7 @@ fn eval_initial_pass(vm: &mut Vm, world: &SystemWorld) {
     // Evaluate every node in the source, printing any diagnostics along the way.
     // Do not return early if there are any errors, as we want to print all diagnostics.
     for i in 0..source.nodes().len() {
-        let Warned { value, warnings } = crate::eval(&source, i..i+1, vm);
+        let Warned { value, warnings } = crate::eval(&source, i..i + 1, vm);
         crate::print_diagnostics(world, &[], &warnings).unwrap();
         if let Err(err) = value {
             crate::print_diagnostics(world, &err, &warnings).unwrap();
@@ -168,7 +169,7 @@ fn eval_initial_pass(vm: &mut Vm, world: &SystemWorld) {
     }
 }
 
-pub fn eval_repl_input(vm: &mut Vm, world: &SystemWorld, input: String, args: &ReplArgs) {
+pub fn eval_repl_input(vm: &mut Vm, world: &SystemWorld, input: &str, args: &ReplArgs) {
     if input.is_empty() {
         return;
     }

@@ -1,6 +1,6 @@
 use crate::vm::Vm;
 use crate::Eval;
-use compose_library::diag::{At, SourceResult, StrResult};
+use compose_library::diag::{bail, At, SourceResult, StrResult};
 use compose_library::{ops, Value};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
@@ -14,7 +14,7 @@ impl Eval for ast::Binary<'_> {
             BinOp::Add => apply_binary(self, vm, ops::add),
             BinOp::Mul => apply_binary(self, vm, ops::mul),
             BinOp::Assign => apply_assignment(self, vm, |_init, rhs| Ok(rhs)),
-            other => unimplemented!("{:?}", other),
+            other => bail!(self.span(), "unsupported binary operator: {:?}", other),
         }
     }
 }
