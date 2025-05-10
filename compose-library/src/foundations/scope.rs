@@ -1,5 +1,7 @@
 use crate::diag::{At, SourceResult, error, warning};
 use crate::{IntoValue, Sink, Value};
+use compose_library::diag::{StrResult, bail};
+use compose_library::{Func, NativeFunc};
 use compose_syntax::Span;
 use ecow::{EcoString, eco_format, eco_vec};
 use indexmap::IndexMap;
@@ -8,7 +10,6 @@ use std::collections::HashSet;
 use std::iter;
 use std::marker::PhantomData;
 use strsim::jaro_winkler;
-use compose_library::{Func, NativeFunc};
 
 #[derive(Debug, Default, Clone)]
 pub struct Scopes<'a> {
@@ -116,6 +117,19 @@ pub struct Scope {
 }
 
 impl Scope {
+    pub fn try_bind(&mut self, name: EcoString, binding: Binding) -> StrResult<&mut Binding> {
+        Ok(match self.map.entry(name) {
+            Entry::Occupied(mut entry) => {
+                if entry.get().kind == BindingKind::Constant {
+                    bail!("Cannot redefine a constant in the same scope");
+                }
+                entry.insert(binding);
+                entry.into_mut()
+            }
+            Entry::Vacant(entry) => entry.insert(binding),
+        })
+    }
+
     pub fn bind(&mut self, name: EcoString, binding: Binding) -> &mut Binding {
         match self.map.entry(name) {
             Entry::Occupied(mut entry) => {
@@ -125,15 +139,15 @@ impl Scope {
             Entry::Vacant(entry) => entry.insert(binding),
         }
     }
-    
+
     pub fn define_func<T: NativeFunc>(&mut self) -> &mut Binding {
         let data = T::data();
         self.define(data.name, Func::from(data))
     }
 
+    /// Define a variable as a constant value. It cannot be overwritten.
     pub fn define(&mut self, name: &'static str, value: impl IntoValue) -> &mut Binding {
-        let binding = Binding::new(value, Span::detached())
-            .with_kind(BindingKind::Immutable);
+        let binding = Binding::new(value, Span::detached()).with_kind(BindingKind::Constant);
         self.bind(name.into(), binding)
     }
 }
@@ -165,6 +179,7 @@ pub enum BindingKind {
     Mutable,
     Uninitialized,
     UninitializedMutable,
+    Constant,
 }
 
 impl Binding {
@@ -230,6 +245,11 @@ impl Binding {
                 )
                 .with_label_message("is immutable")
                 .with_label(self.span, "was defined as immutable here")
+            ]),
+            BindingKind::Constant => Err(eco_vec![
+                error!(access_span, "Cannot assign to a constant variable")
+                    .with_label_message("is constant")
+                    .with_label(self.span, "was defined as constant here")
             ]),
             BindingKind::Mutable => Ok(&mut self.value),
             BindingKind::Uninitialized => {

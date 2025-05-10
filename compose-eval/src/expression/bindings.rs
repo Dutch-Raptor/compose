@@ -57,10 +57,10 @@ fn destructure_pattern(
 ) -> SourceResult<()> {
     destructure_impl(vm, pattern, value, &mut |vm, expr, value| match expr {
         Expr::Ident(ident) => {
-            vm.bind(
+            vm.try_bind(
                 ident,
                 Binding::new(value, ident.span()).with_kind(binding_kind),
-            );
+            )?;
             Ok(())
         }
         _ => Err(eco_vec![diag::SourceDiagnostic::error(

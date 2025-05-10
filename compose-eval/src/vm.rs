@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use compose_library::diag::SourceDiagnostic;
+use compose_library::diag::{At, SourceDiagnostic, SourceResult};
 use compose_library::{Binding, IntoValue, Scopes, Sink, Value, World};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{ast, Span};
@@ -44,17 +44,10 @@ impl<'a> Vm<'a> {
         }
     }
 
-    /// Defines an immutable variable in the current scope.
-    pub fn define(&mut self, var: ast::Ident, value: impl IntoValue) {
-        self.bind(var, Binding::new(value, var.span()))
-    }
-
-    pub fn define_mutable(&mut self, var: ast::Ident, value: impl IntoValue) {
-        self.bind(var, Binding::new_mutable(value, var.span()))
-    }
-
-    pub fn bind(&mut self, var: ast::Ident, binding: Binding) {
-        self.scopes.top.bind(var.get().clone(), binding);
+    pub fn try_bind(&mut self, var: ast::Ident, binding: Binding) -> SourceResult<()> {
+        self.scopes.top.try_bind(var.get().clone(), binding).at(var.span())?;
+        
+        Ok(())
     }
 }
 
