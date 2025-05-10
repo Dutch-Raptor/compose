@@ -1,16 +1,16 @@
-use minime::crossterm;
-use minime::crossterm::QueueableCommand;
-use minime::crossterm::event::{Event, KeyCode, KeyModifiers};
-use minime::crossterm::style::{Colorize, Styler};
-use minime::crossterm::terminal::{Clear, ClearType};
-use minime::editor::keybindings::Keybinding;
-use minime::renderer::styles::{Footer, Margin};
-use minime::renderer::{RenderData, Renderer};
+use std::cell::RefCell;
 use std::io::Write;
 use std::sync::{Arc};
-use std::sync::atomic::AtomicUsize;
-use minime::editor::Editor;
 use parking_lot::Mutex;
+use compose_editor::crossterm;
+use compose_editor::crossterm::event::{Event, KeyCode, KeyModifiers};
+use compose_editor::crossterm::QueueableCommand;
+use compose_editor::crossterm::style::{Colorize, Styler};
+use compose_editor::crossterm::terminal::{Clear, ClearType};
+use compose_editor::editor::Editor;
+use compose_editor::editor::keybindings::Keybinding;
+use compose_editor::renderer::{RenderData, Renderer};
+use compose_editor::renderer::styles::{Footer, Margin};
 
 pub fn print_input(input: &str, line_offset: usize) {
     for (i, line) in input.lines().enumerate() {
@@ -39,7 +39,7 @@ impl<W: Write> Margin<W> for EditorGutter {
         MARGIN_WIDTH
     }
 
-    fn draw(&mut self, write: &mut W, line_idx: usize, data: &RenderData) -> minime::Result<()> {
+    fn draw(&mut self, write: &mut W, line_idx: usize, data: &RenderData) -> compose_editor::Result<()> {
         let style = if line_idx == data.focus().ln {
             |str: String| str.white().bold()
         } else {
@@ -70,7 +70,7 @@ impl<W: Write> Footer<W> for EditorFooter<'_> {
         1
     }
 
-    fn draw(&mut self, write: &mut W, data: &RenderData) -> minime::Result<()> {
+    fn draw(&mut self, write: &mut W, data: &RenderData) -> compose_editor::Result<()> {
         write!(
             write,
             "{:─<width$}╯ [{}:{}] {message}",
@@ -85,6 +85,7 @@ impl<W: Write> Footer<W> for EditorFooter<'_> {
     }
 }
 
+#[derive(Clone, Debug, Default)]
 pub struct EditorHistory(Arc<Mutex<Vec<String>>>);
 
 impl EditorHistory {
@@ -109,48 +110,62 @@ impl EditorHistory {
     pub fn get(&self, idx: usize) -> Option<String> {
         self.0.lock().get(idx).cloned()
     }
+    
+    pub fn pop(&self) -> Option<String> {
+        let mut history = self.0.lock();
+        history.pop()   
+    }
 }
 
 pub struct EditorReader<'a> {
     pub history: &'a EditorHistory,
-    pub history_idx: AtomicUsize,
+    pub history_idx: RefCell<usize>,
 }
 
 impl<'a> EditorReader<'a> {
     pub fn new(history: &'a EditorHistory) -> Self {
         Self {
             history,
-            history_idx: AtomicUsize::new(history.len()),
+            history_idx: RefCell::new(history.len()),       
         }
     }
     
-    pub fn index(&self) -> usize {
-        self.history_idx.load(std::sync::atomic::Ordering::Relaxed)
-    }
-    
-    pub fn history_up(&self) {
-        if self.history_idx.load(std::sync::atomic::Ordering::Relaxed) > 0 {
-            self.history_idx.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+    pub fn history_up(&self, get_current_content: impl Fn() -> String) -> Option<String> {
+        if self.history.len() == 0 {
+            return None;       
         }
-    }
-    
-    pub fn history_down(&self) {
-        if self.history_idx.load(std::sync::atomic::Ordering::Relaxed) < self.history.len() {
-            self.history_idx.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        
+        let mut idx = self.history_idx.borrow_mut();
+        if *idx == self.history.len() {
+            // Store the current content in the history so it can be restored later
+            self.history.add(get_current_content());
         }
+        
+        if *idx == 0 {
+            return None;
+        }
+        
+        *idx = (*idx).saturating_sub(1);
+        
+        self.history.get(*idx)
     }
     
-    pub fn get_history_item(&self) -> Option<String> {
-        self.history.get(self.index())
-    }
-    
-    pub fn add(&self, s: &str) {
-        self.history.add(s);
+    pub fn history_down(&self) -> Option<String> {
+        let mut idx = self.history_idx.borrow_mut();
+        *idx = (*idx + 1).clamp(0, self.history.len());
+        
+        
+        if *idx == self.history.len() - 1 {
+            // remove the current content from the history
+            self.history.pop()
+        } else {
+            self.history.get(*idx)
+        }
     }
 }
 
 impl Keybinding for EditorReader<'_> {
-    fn read(&self, editor: &mut Editor<impl Renderer>) -> minime::Result<bool> {
+    fn read(&self, editor: &mut Editor<impl Renderer>) -> compose_editor::Result<bool> {
         let event = crossterm::event::read()?;
 
         let e = match event {
@@ -158,8 +173,11 @@ impl Keybinding for EditorReader<'_> {
             _ => return Ok(true),
         };
 
+
         let shifted = e.modifiers.contains(KeyModifiers::SHIFT);
         let control = e.modifiers.contains(KeyModifiers::CONTROL);
+        
+        // dbg!(&event, &editor);
 
         match e.code {
             KeyCode::Enter if shifted => editor.type_char('\n'),
@@ -169,23 +187,21 @@ impl Keybinding for EditorReader<'_> {
                     editor.move_down(shifted)
                 }
                 else {
-                    self.history_down();
-                    if let Some(s) = self.get_history_item() {
+                    if let Some(s) = self.history_down() {
                         editor.set_contents(s.as_bytes())?
-                    } else {
-                        editor.set_contents("".as_bytes())?;
                     }
+                    
+                    editor.move_to_line_end(false)
                 }
             },
             KeyCode::Up => {
                 if editor.focus.ln != 0 {
                     editor.move_up(shifted)
                 } else {
-                    self.history_up();
-                    
-                    if let Some(s) = self.get_history_item() {
+                    if let Some(s) = self.history_up(|| editor.contents()) {
                         editor.set_contents(s.as_bytes())?
                     }
+                    editor.move_to_line_end(false)
                 }
             },
             KeyCode::Left => editor.move_left(shifted),

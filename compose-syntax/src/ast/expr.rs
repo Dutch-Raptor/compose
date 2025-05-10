@@ -1,4 +1,4 @@
-use crate::ast::{Bool, CodeBlock, LetBinding, Str};
+use crate::ast::{Bool, CodeBlock, FuncCall, LetBinding, Str};
 use crate::ast::{AstNode, Binary, Ident, Int};
 use crate::ast::atomics::Unit;
 use crate::ast::unary::Unary;
@@ -26,6 +26,7 @@ pub enum Expr<'a> {
     CodeBlock(CodeBlock<'a>),
     Str(Str<'a>),
     Bool(Bool<'a>),
+    FuncCall(FuncCall<'a>)
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -40,6 +41,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::CodeBlock => Some(Self::CodeBlock(CodeBlock::from_untyped(node)?)),       
             SyntaxKind::Str => Some(Self::Str(Str::from_untyped(node)?)),
             SyntaxKind::Bool => Some(Self::Bool(Bool::from_untyped(node)?)),       
+            SyntaxKind::FuncCall => Some(Self::FuncCall(FuncCall::from_untyped(node)?)),       
             _ => None,
         }
     }
@@ -55,6 +57,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::CodeBlock(code_block) => code_block.to_untyped(),       
             Self::Str(str) => str.to_untyped(),       
             Self::Bool(bool) => bool.to_untyped(),       
+            Self::FuncCall(func_call) => func_call.to_untyped(),       
         }
     }
 }

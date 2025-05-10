@@ -126,3 +126,37 @@ pub fn eval(source: &Source, eval_range: Range<usize>, vm: &mut Vm) -> Warned<So
 
     Warned::new(Ok(result)).with_warnings(std::mem::take(&mut vm.sink.warnings))
 }
+
+
+pub struct RepeatIter<T: Clone> {
+    item: T,
+    count: usize,
+}
+
+impl<T: Clone> Iterator for RepeatIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.count == 0 {
+            None
+        } else {
+            self.count -= 1;
+            Some(self.item.clone())
+        }
+    }
+}
+
+impl<T> RepeatIter<T> 
+where T: Clone {
+    pub fn new(item: T, count: usize) -> Self {
+        Self { item, count }
+    }
+}
+
+#[test]
+fn test_repeat_iter() {
+    let mut iter = RepeatIter::new(1, 3);
+    assert_eq!(iter.next(), Some(1));
+    assert_eq!(iter.next(), Some(1));
+    assert_eq!(iter.next(), Some(1));
+    assert_eq!(iter.next(), None);
+}

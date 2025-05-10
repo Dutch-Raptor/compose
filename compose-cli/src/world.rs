@@ -4,6 +4,7 @@ use compose_library::diag::{FileError, FileResult, eco_format};
 use compose_syntax::{FileId, Source};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::io::{Read, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -92,6 +93,14 @@ impl World for SystemWorld {
             Some(s) => Ok(s.clone()),
             None => Err(FileError::NotFound(file_id.path().0.clone())),
         }
+    }
+
+    fn write(&self, f: &dyn Fn(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
+        f(&mut std::io::stdout())
+    }
+
+    fn read(&self, f: &dyn Fn(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()> {
+        f(&mut std::io::stdin())
     }
 }
 

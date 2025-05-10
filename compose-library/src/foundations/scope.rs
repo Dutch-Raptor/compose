@@ -1,13 +1,14 @@
-use crate::diag::{error, warning, At, SourceResult};
+use crate::diag::{At, SourceResult, error, warning};
 use crate::{IntoValue, Sink, Value};
 use compose_syntax::Span;
-use ecow::{eco_format, eco_vec, EcoString};
-use indexmap::map::Entry;
+use ecow::{EcoString, eco_format, eco_vec};
 use indexmap::IndexMap;
+use indexmap::map::Entry;
 use std::collections::HashSet;
 use std::iter;
 use std::marker::PhantomData;
 use strsim::jaro_winkler;
+use compose_library::{Func, NativeFunc};
 
 #[derive(Debug, Default, Clone)]
 pub struct Scopes<'a> {
@@ -123,6 +124,17 @@ impl Scope {
             }
             Entry::Vacant(entry) => entry.insert(binding),
         }
+    }
+    
+    pub fn define_func<T: NativeFunc>(&mut self) -> &mut Binding {
+        let data = T::data();
+        self.define(data.name, Func::from(data))
+    }
+
+    pub fn define(&mut self, name: &'static str, value: impl IntoValue) -> &mut Binding {
+        let binding = Binding::new(value, Span::detached())
+            .with_kind(BindingKind::Immutable);
+        self.bind(name.into(), binding)
     }
 }
 

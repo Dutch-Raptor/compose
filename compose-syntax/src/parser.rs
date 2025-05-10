@@ -16,13 +16,13 @@ pub fn parse(text: &str, file_id: FileId) -> Vec<SyntaxNode> {
 /// Assumes that the text at offset begins with a valid expression (or whitespace).
 pub fn parse_with_offset(text: &str, file_id: FileId, offset: usize) -> Vec<SyntaxNode> {
     let mut p = Parser::new(text, offset, file_id);
-    
+
     let mut pos = p.current_end();
     while !p.end() {
         code_expression(&mut p);
 
         p.skip_if(SyntaxKind::Semicolon);
-        
+
         // If the parser is not progressing, then we have an error
         if pos == p.current_end() && !p.end() {
             // Eat the token and continue trying to parse
@@ -51,17 +51,29 @@ fn code_expr_prec(p: &mut Parser, atomic: bool, min_prec: Precedence) {
 
     loop {
         if p.at(SyntaxKind::LeftParen) {
-            todo!("Implement function calls");
             args(p);
+            p.wrap(m, SyntaxKind::FuncCall);
+            continue;
         }
 
+        let at_field_or_index = p.at(SyntaxKind::Dot) || p.at(SyntaxKind::LeftBracket);
+
+        if atomic && !at_field_or_index {
+            break;
+        }
+
+        // Handle field access
         if p.eat_if(SyntaxKind::Dot) {
             p.expect(SyntaxKind::Ident);
-            p.wrap(m, SyntaxKind::FieldAccess)
+            p.wrap(m, SyntaxKind::FieldAccess);
+            continue;
         }
 
-        if atomic {
-            break;
+        // Handle index access
+        if p.eat_if(SyntaxKind::LeftBracket) {
+            code_expression(p);
+            p.expect(SyntaxKind::RightBracket);
+            p.wrap(m, SyntaxKind::IndexAccess)
         }
 
         let bin_op = BinOp::from_kind(p.current());
@@ -82,7 +94,27 @@ fn code_expr_prec(p: &mut Parser, atomic: bool, min_prec: Precedence) {
     }
 }
 
-fn args(p: &mut Parser) {}
+fn args(p: &mut Parser) {
+    let m = p.marker();
+    p.expect(SyntaxKind::LeftParen);
+
+    let m_delim = p.marker();
+    while !p.current().is_terminator() {
+        arg(p);
+
+        if !p.current().is_terminator() {
+            p.expect(SyntaxKind::Comma);
+        }
+    }
+
+    p.expect_closing_delimiter(m_delim, SyntaxKind::RightParen);
+
+    p.wrap(m, SyntaxKind::Args);
+}
+
+fn arg(p: &mut Parser) {
+    code_expression(p);
+}
 
 /// Parse a primary expression.
 ///
@@ -311,7 +343,6 @@ struct Parser<'s> {
     nodes: Vec<SyntaxNode>,
 }
 
-
 impl<'s> Parser<'s> {
     /// Consume the given syntax kind or produce an error. Returns whether the expected token was found.
     pub(crate) fn expect(&mut self, kind: SyntaxKind) -> bool {
@@ -355,7 +386,7 @@ impl<'s> Parser<'s> {
         lexer.jump(offset);
 
         let token = Self::lex(&mut lexer);
-        
+
         Self {
             text,
             lexer,
@@ -415,12 +446,11 @@ impl<'s> Parser<'s> {
         }
         at
     }
-    
+
     /// Move the parser forward without adding the node to the nodes vec
     pub(crate) fn skip(&mut self) {
         self.token = Self::lex(&mut self.lexer);
     }
-
 
     /// Move the parser forward without adding the node to the nodes vec
     /// if the current kind == `kind`

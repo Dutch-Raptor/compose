@@ -14,6 +14,8 @@ impl Eval for ast::Binary<'_> {
             BinOp::Add => apply_binary(self, vm, ops::add),
             BinOp::Mul => apply_binary(self, vm, ops::mul),
             BinOp::Assign => apply_assignment(self, vm, |_init, rhs| Ok(rhs)),
+            BinOp::AddAssign => apply_assignment(self, vm, ops::add),
+            BinOp::MulAssign => apply_assignment(self, vm, ops::mul),
             other => bail!(self.span(), "unsupported binary operator: {:?}", other),
         }
     }

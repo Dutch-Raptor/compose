@@ -7,10 +7,10 @@ edition = "2024"
 compose-library = { path = "../compose-library" }
 compose-eval = { path = "../compose-eval" }
 compose-syntax = { path = "../compose-syntax" }
+compose-editor = { path = "../compose-editor" }
 codespan-reporting = "0.12.0"
 clap = { version = "4.5.37", features = ["derive"] }
 ecow = { workspace = true}
-minime = "0.2.0"
 indoc = "2.0.6"
 tap = "1.0.1"
 parking_lot = "0.12.3"

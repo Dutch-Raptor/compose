@@ -8,6 +8,7 @@ mod atomic;
 mod binary;
 mod bindings;
 mod block;
+mod call;
 mod unary;
 
 impl Eval for Expr<'_> {
@@ -25,7 +26,9 @@ impl Eval for Expr<'_> {
             Expr::Str(s) => s.eval(vm),
             Expr::Unary(u) => u.eval(vm),
             Expr::Bool(b) => b.eval(vm),
-        }?;
+            Expr::FuncCall(f) => f.eval(vm),
+        }?
+        .spanned(span);
 
         // todo: Attach span here
         Ok(v)

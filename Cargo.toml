@@ -4,8 +4,15 @@ members = [ "compose-cli",
     "compose-eval",
     "compose-library",
     "compose-syntax",
-]
+    "compose-editor"
+, "compose-macros", "compose-utils"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
 
 [workspace.dependencies]
 ecow = "0.2.4"
 indexmap = "2.9.0"
+
+[workspace.lints]

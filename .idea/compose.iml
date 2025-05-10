@@ -6,6 +6,10 @@
       <sourceFolder url="file://$MODULE_DIR$/compose-library/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/compose-syntax/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/compose-cli/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-editor/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-editor/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-macros/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-utils/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -87,6 +87,8 @@ pub enum SyntaxKind {
     Dot,
     FuncCall,
     FieldAccess,
+    IndexAccess,
+    Args,
 }
 
 impl SyntaxKind {

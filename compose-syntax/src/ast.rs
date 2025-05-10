@@ -5,6 +5,7 @@ mod atomics;
 mod closure;
 mod binary;
 mod bindings;
+mod call;
 
 use crate::node::SyntaxNode;
 use crate::span::Span;
@@ -16,6 +17,7 @@ pub use atomics::*;
 pub use binary::*;
 pub use bindings::*;
 pub use closure::*;
+pub use call::*;
 
 pub trait AstNode<'a>: Sized {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self>;
