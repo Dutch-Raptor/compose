@@ -4,11 +4,11 @@ use crate::world::SystemWorld;
 use crate::ReplArgs;
 use compose_eval::Vm;
 use compose_library::diag::{eco_format, Warned};
-use compose_library::{add, assert_eq, assert_even, assert_ne, panic, str_add, NativeFunc, Value, World};
 use compose_syntax::Source;
 use std::fs;
 use compose_editor::editor::Editor;
 use compose_editor::renderer::full::CrosstermRenderer;
+use compose_library::{Value, World};
 
 mod editor;
 
@@ -20,15 +20,6 @@ pub fn repl(args: ReplArgs) -> Result<(), CliError> {
 
     let world = SystemWorld::from_str(&start_text);
     let mut vm = Vm::new(&world);
-    
-    let scope = &mut vm.scopes.top;
-    scope.define_func::<assert_eq>();
-    scope.define_func::<assert_ne>();
-    scope.define_func::<panic>();
-    scope.define_func::<add>();
-    scope.define_func::<assert_even>();
-    scope.define_func::<str_add>();
-    
 
     if !start_text.is_empty() {
         // Show the initial source

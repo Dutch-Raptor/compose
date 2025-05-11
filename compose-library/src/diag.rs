@@ -1,4 +1,4 @@
-use compose_syntax::Span;
+use compose_syntax::{Span, SyntaxError};
 use ecow::{eco_vec, EcoVec};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
@@ -204,6 +204,20 @@ impl SourceDiagnostic {
     pub fn with_label(mut self, span: Span, message: impl Into<EcoString>) -> Self {
         self.labels.push(Label::new(span, message));
         self
+    }
+}
+
+impl From<SyntaxError> for SourceDiagnostic {
+    fn from(error: SyntaxError) -> Self {
+        Self {
+            severity: Severity::Error,
+            span: error.span,
+            message: error.message,
+            label_message: None,
+            trace: eco_vec![],
+            hints: error.hints,
+            labels: eco_vec![],
+        }
     }
 }
 

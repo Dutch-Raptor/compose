@@ -1,9 +1,9 @@
-use std::fmt::Debug;
 use compose_library::diag::{At, SourceDiagnostic, SourceResult};
-use compose_library::{Binding, IntoValue, Scopes, Sink, Value, World};
+use compose_library::{Binding, Library, Scopes, Sink, Value, World};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{ast, Span};
 use ecow::EcoVec;
+use std::fmt::Debug;
 
 pub struct Vm<'a> {
     pub world: &'a dyn World,
@@ -38,7 +38,7 @@ impl<'a> Vm<'a> {
     pub fn new(world: &'a dyn World) -> Self {
         Self {
             world,
-            scopes: Default::default(),
+            scopes: Scopes::new(Some(world.library())),
             flow: None,
             sink: Default::default(),
         }

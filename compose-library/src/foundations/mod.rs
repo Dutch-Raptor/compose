@@ -6,6 +6,7 @@ mod func;
 mod args;
 mod cast;
 mod global_funcs;
+mod module;
 
 pub use value::*;
 pub use scope::*;
@@ -13,3 +14,4 @@ pub use func::*;
 pub use cast::*;
 pub use args::*;
 pub use global_funcs::*;
+pub use module::*;

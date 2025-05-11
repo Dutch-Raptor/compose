@@ -108,6 +108,10 @@ pub fn eval(source: &Source, eval_range: Range<usize>, vm: &mut Vm) -> Warned<So
     let range_end = min(eval_range.end, source.nodes().len());
 
     for node in source.nodes().get(range_start..range_end).unwrap() {
+        let errors = node.errors();
+        if !errors.is_empty() {
+            return Warned::new(Err(errors.into_iter().map(Into::into).collect()))
+        }
         let expr: Expr = match node.cast() {
             Some(expr) => expr,
             None => {

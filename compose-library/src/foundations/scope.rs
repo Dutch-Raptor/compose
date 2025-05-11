@@ -1,5 +1,5 @@
 use crate::diag::{At, SourceResult, error, warning};
-use crate::{IntoValue, Sink, Value};
+use crate::{IntoValue, Library, Sink, Value};
 use compose_library::diag::{StrResult, bail};
 use compose_library::{Func, NativeFunc};
 use compose_syntax::Span;
@@ -8,21 +8,24 @@ use indexmap::IndexMap;
 use indexmap::map::Entry;
 use std::collections::HashSet;
 use std::iter;
-use std::marker::PhantomData;
 use strsim::jaro_winkler;
 
 #[derive(Debug, Default, Clone)]
 pub struct Scopes<'a> {
-    phantom_data: PhantomData<&'a ()>,
     /// The current scope.
     pub top: Scope,
     /// The rest of the scopes.
     pub stack: Vec<Scope>,
+    pub lib: Option<&'a Library>,
 }
 
 impl<'a> Scopes<'a> {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(lib: Option<&'a Library>) -> Self {
+        Self {
+            top: Scope::new(),
+            stack: Vec::new(),
+            lib,
+        }
     }
 
     pub fn enter(&mut self) {
@@ -33,27 +36,40 @@ impl<'a> Scopes<'a> {
         self.top = self.stack.pop().expect("Scope stack underflow");
     }
 
-    pub fn get(&self, name: &str) -> Result<&Binding, UnBoundError> {
+    pub fn get(&self, name: &str) -> Result<&Binding, VariableAccessError> {
         iter::once(&self.top)
             .chain(self.stack.iter().rev())
+            .chain(self.lib.iter().map(|lib| lib.global.scope()))
             .find_map(|scope| scope.get(name))
             .ok_or_else(|| self.unbound_error(name.into()))
     }
 
-    pub fn get_mut(&mut self, name: &str) -> Result<&mut Binding, UnBoundError> {
+    pub fn get_mut(&mut self, name: &str) -> Result<&mut Binding, VariableAccessError> {
         if let Err(err) = self.get(name) {
             return Err(err);
         }
 
-        Ok(iter::once(&mut self.top)
+        iter::once(&mut self.top)
             .chain(self.stack.iter_mut().rev())
             .find_map(|scope| scope.get_mut(name))
-            .expect("Checked for existence above"))
+            .ok_or_else(
+                || match self.lib.and_then(|base| base.global.scope().get(name)) {
+                    Some(_) => VariableAccessError::MutateConstant(name.into()),
+                    None => {
+                        debug_assert!(false, "This should have been caught by the get() call");
+                        VariableAccessError::Unbound(UnBoundError {
+                            name: name.into(),
+                            possible_misspellings: Vec::new(),
+                        })
+                    }
+                },
+            )
     }
 
-    fn unbound_error(&self, name: EcoString) -> UnBoundError {
+    fn unbound_error(&self, name: EcoString) -> VariableAccessError {
         let all_idents = iter::once(&self.top)
             .chain(&self.stack)
+            .chain(self.lib.iter().map(|lib| lib.global.scope()))
             .flat_map(|scope| scope.map.keys());
 
         let mut seen = HashSet::new();
@@ -69,13 +85,53 @@ impl<'a> Scopes<'a> {
 
         similar_idents.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
-        UnBoundError {
+        VariableAccessError::Unbound(UnBoundError {
             name,
             possible_misspellings: similar_idents
                 .into_iter()
                 .map(|(ident, _)| ident.clone())
                 .collect(),
-        }
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum VariableAccessError {
+    Unbound(UnBoundError),
+    /// Attempted to mutate a constant. Contains the name of the constant that was attempted to mutate.
+    MutateConstant(EcoString),
+}
+
+impl<T> At<T> for Result<T, VariableAccessError> {
+    fn at(self, span: Span) -> SourceResult<T> {
+        self.map_err(|err| match err {
+            VariableAccessError::Unbound(err) => {
+                let mut diag = error!(span, "Unbound variable: {}", err.name)
+                    .with_label_message("is unbound here");
+
+                if !err.possible_misspellings.is_empty() {
+                    diag = diag.with_hint(eco_format!(
+                        "Did you mean{countable} {}?",
+                        err.possible_misspellings
+                            .iter()
+                            .map(|i| eco_format!("`{i}`"))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        countable = match err.possible_misspellings.len() {
+                            1 => "",
+                            _ => " one of",
+                        }
+                    ))
+                }
+
+                eco_vec!(diag)
+            }
+            VariableAccessError::MutateConstant(name) => eco_vec![
+                error!(span, "Cannot mutate constant `{name}`")
+                    .with_label_message("is a constant from the standard library")
+                    .with_hint("Constants can be shadowed, but not mutated.")
+            ],
+        })
     }
 }
 
@@ -83,32 +139,6 @@ impl<'a> Scopes<'a> {
 pub struct UnBoundError {
     pub name: EcoString,
     pub possible_misspellings: Vec<EcoString>,
-}
-
-impl<T> At<T> for Result<T, UnBoundError> {
-    fn at(self, span: Span) -> SourceResult<T> {
-        self.map_err(|err| {
-            let mut diag = error!(span, "Unbound variable: {}", err.name)
-                .with_label_message("is unbound here");
-
-            if !err.possible_misspellings.is_empty() {
-                diag = diag.with_hint(eco_format!(
-                    "Did you mean{countable} {}?",
-                    err.possible_misspellings
-                        .iter()
-                        .map(|i| eco_format!("`{i}`"))
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    countable = match err.possible_misspellings.len() {
-                        1 => "",
-                        _ => " one of",
-                    }
-                ))
-            }
-
-            eco_vec!(diag)
-        })
-    }
 }
 
 #[derive(Debug, Default, Clone)]

@@ -98,7 +98,6 @@ fn args(p: &mut Parser) {
     let m = p.marker();
     p.expect(SyntaxKind::LeftParen);
 
-    let m_delim = p.marker();
     while !p.current().is_terminator() {
         arg(p);
 
@@ -107,7 +106,7 @@ fn args(p: &mut Parser) {
         }
     }
 
-    p.expect_closing_delimiter(m_delim, SyntaxKind::RightParen);
+    p.expect_closing_delimiter(m, SyntaxKind::RightParen);
 
     p.wrap(m, SyntaxKind::Args);
 }

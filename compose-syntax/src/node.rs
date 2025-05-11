@@ -16,6 +16,20 @@ impl SyntaxNode {
             Repr::Error(_) => true,
         }
     }
+    pub fn errors(&self) -> Vec<SyntaxError> {
+        if !self.erroneous() {
+            return vec![];
+        }
+
+        if let Repr::Error(node) = &self.0 {
+            vec![node.error.clone()]
+        } else {
+            self.children()
+                .filter(|node| node.erroneous())
+                .flat_map(|node| node.errors())
+                .collect()
+        }
+    }
 }
 
 impl SyntaxNode {
@@ -139,7 +153,7 @@ impl SyntaxNode {
             Repr::Error(e) => e.text.clone(),
         }
     }
-    
+
     pub(crate) fn expected(&mut self, expected: impl Into<EcoString>) {
         let kind = self.kind();
         self.convert_to_error(format!("expected {}, found {:?}", expected.into(), kind));
@@ -265,7 +279,14 @@ impl InnerNode {
             }
         };
 
-        Self { kind, len, span, erroneous, children, descendents }
+        Self {
+            kind,
+            len,
+            span,
+            erroneous,
+            children,
+            descendents,
+        }
     }
 }
 

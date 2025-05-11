@@ -1,5 +1,5 @@
 use codespan_reporting::files::{Error, Files};
-use compose_library::World;
+use compose_library::{library, Library, World};
 use compose_library::diag::{FileError, FileResult, eco_format};
 use compose_syntax::{FileId, Source};
 use std::collections::HashMap;
@@ -14,6 +14,7 @@ pub struct SystemWorld {
     sources: Mutex<HashMap<FileId, Source>>,
     entrypoint: FileId,
     root: PathBuf,
+    library: Library,
 }
 
 impl Debug for SystemWorld {
@@ -52,6 +53,7 @@ impl SystemWorld {
             sources: Mutex::new(sources),
             entrypoint,
             root,
+            library: library(),
         })
     }
     
@@ -69,6 +71,7 @@ impl SystemWorld {
             sources: Mutex::new(sources),
             entrypoint,
             root: PathBuf::new(),
+            library: library(),
         }
     }
 
@@ -93,6 +96,10 @@ impl World for SystemWorld {
             Some(s) => Ok(s.clone()),
             None => Err(FileError::NotFound(file_id.path().0.clone())),
         }
+    }
+
+    fn library(&self) -> &Library {
+        &self.library
     }
 
     fn write(&self, f: &dyn Fn(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
