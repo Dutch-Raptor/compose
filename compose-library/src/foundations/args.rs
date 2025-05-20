@@ -1,8 +1,9 @@
-use crate::diag::{At, SourceDiagnostic, SourceResult, Spanned, bail, error};
+use crate::diag::{bail, error, At, SourceDiagnostic, SourceResult, Spanned};
 use crate::foundations::cast::FromValue;
-use crate::{IntoValue, Value};
+use crate::Value;
 use compose_syntax::Span;
 use ecow::EcoVec;
+use crate::foundations::IntoValue;
 
 pub struct Args {
     pub span: Span,
@@ -26,7 +27,7 @@ impl Args {
         }
         self   
     }
-
+    
     pub fn eat<T>(&mut self) -> SourceResult<Option<T>>
     where
         T: FromValue<Spanned<Value>>,

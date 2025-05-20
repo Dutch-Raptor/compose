@@ -1,10 +1,12 @@
+use compose_macros::{cast, ty};
 use crate::diag::SourceResult;
 use crate::foundations::args::Args;
-use crate::{__warning, Value};
+use crate::Value;
 use compose_syntax::Span;
 use compose_utils::Static;
 
 #[derive(Clone, Debug, PartialEq)]
+#[ty(cast)]
 pub struct Func {
     repr: Repr,
     span: Span,
@@ -40,10 +42,11 @@ pub trait NativeFunc {
     fn data() -> &'static NativeFuncData;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub struct NativeFuncData {
     pub closure: fn(&mut Args) -> SourceResult<Value>,
     pub name: &'static str,
+    // pub params: LazyLock<Vec<ParamInfo>>
 }
 
 impl From<Repr> for Func {
@@ -59,4 +62,16 @@ impl From<&'static NativeFuncData> for Func {
     fn from(data: &'static NativeFuncData) -> Self {
         Repr::Native(Static(data)).into()
     }
+}
+
+
+#[derive(Debug)]
+pub struct ParamInfo {
+    pub name: &'static str,
+}
+
+
+cast! {
+    &'static NativeFuncData,
+    self => Func::from(self).into_value(),
 }

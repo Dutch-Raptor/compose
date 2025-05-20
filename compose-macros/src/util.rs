@@ -1,3 +1,6 @@
+use syn::{Attribute, Result};
+
+
 /// Return an error at the given item.
 macro_rules! bail {
     (callsite, $($tts:tt)*) => {
@@ -15,3 +18,170 @@ macro_rules! bail {
 }
 
 pub(crate) use bail;
+use proc_macro2::{Ident, TokenStream};
+use quote::quote;
+use syn::parse::{Parse, ParseStream};
+use syn::Token;
+use syn::token::Token;
+
+/// Extract documentation comments from an attribute list.
+pub fn documentation(attrs: &[syn::Attribute]) -> String {
+    let mut doc = String::new();
+
+    // Parse doc comments.
+    for attr in attrs {
+        if let syn::Meta::NameValue(meta) = &attr.meta {
+            if meta.path.is_ident("doc") {
+                if let syn::Expr::Lit(lit) = &meta.value {
+                    if let syn::Lit::Str(string) = &lit.lit {
+                        let full = string.value();
+                        let line = full.strip_prefix(' ').unwrap_or(&full);
+                        doc.push_str(line);
+                        doc.push('\n');
+                    }
+                }
+            }
+        }
+    }
+
+    doc.trim().into()
+}
+
+/// Determine the normal and title case name of a function, type, or element.
+pub fn determine_name_and_title(
+    specified_name: Option<String>,
+    specified_title: Option<String>,
+    ident: &syn::Ident,
+    trim: Option<fn(&str) -> &str>,
+) -> Result<(String, String)> {
+    let name = {
+        let trim = trim.unwrap_or(|s| s);
+        let default = trim(&ident.to_string()).to_string();
+        if specified_name.as_ref() == Some(&default) {
+            bail!(ident, "name was specified unnecessarily");
+        }
+        specified_name.unwrap_or(default)
+    };
+
+    let title = {
+        let default = name.clone();
+        if specified_title.as_ref() == Some(&default) {
+            bail!(ident, "title was specified unnecessarily");
+        }
+        specified_title.unwrap_or(default)
+    };
+
+    Ok((name, title))
+}
+
+/// Shorthand for `::compose_library::foundations`.
+#[allow(non_camel_case_types)]
+pub struct foundations;
+
+impl quote::ToTokens for foundations {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        quote! { ::compose_library::foundations }.to_tokens(tokens);
+    }
+}
+
+
+
+/// Parse a metadata key-value pair, separated by `=`.
+pub fn parse_key_value<K: Token + Default + Parse, V: Parse>(
+    input: ParseStream,
+) -> Result<Option<V>> {
+    if !input.peek(|_| K::default()) {
+        return Ok(None);
+    }
+
+    let _: K = input.parse()?;
+    let _: Token![=] = input.parse()?;
+    let value: V = input.parse::<V>()?;
+    eat_comma(input);
+    Ok(Some(value))
+}
+
+/// Parse a metadata key-array pair, separated by `=`.
+pub fn parse_key_value_array<K: Token + Default + Parse, V: Parse>(
+    input: ParseStream,
+) -> Result<Vec<V>> {
+    Ok(parse_key_value::<K, Array<V>>(input)?.map_or(vec![], |array| array.0))
+}
+
+/// Parse a metadata key-string pair, separated by `=`.
+pub fn parse_string<K: Token + Default + Parse>(
+    input: ParseStream,
+) -> Result<Option<String>> {
+    Ok(parse_key_value::<K, syn::LitStr>(input)?.map(|s| s.value()))
+}
+
+/// Parse a metadata key-string pair, separated by `=`.
+pub fn parse_string_array<K: Token + Default + Parse>(
+    input: ParseStream,
+) -> Result<Vec<String>> {
+    Ok(parse_key_value_array::<K, syn::LitStr>(input)?
+        .into_iter()
+        .map(|lit| lit.value())
+        .collect())
+}
+
+/// Parse a metadata flag that can be present or not.
+pub fn parse_flag<K: Token + Default + Parse>(input: ParseStream) -> Result<bool> {
+    if input.peek(|_| K::default()) {
+        let _: K = input.parse()?;
+        eat_comma(input);
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+
+/// Parse a comma if there is one.
+pub fn eat_comma(input: ParseStream) {
+    if input.peek(Token![,]) {
+        let _: Token![,] = input.parse().unwrap();
+    }
+}
+
+
+/// A generic parseable array.
+struct Array<T>(Vec<T>);
+
+impl<T: Parse> Parse for Array<T> {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        syn::bracketed!(content in input);
+
+        let mut elems = Vec::new();
+        while !content.is_empty() {
+            let first: T = content.parse()?;
+            elems.push(first);
+            if !content.is_empty() {
+                let _: Token![,] = content.parse()?;
+            }
+        }
+
+        Ok(Self(elems))
+    }
+}
+
+
+/// Parse a bare `type Name;` item.
+#[allow(dead_code)]
+pub struct BareType {
+    pub attrs: Vec<Attribute>,
+    pub type_token: Token![type],
+    pub ident: Ident,
+    pub semi_token: Token![;],
+}
+
+impl Parse for BareType {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self {
+            attrs: input.call(Attribute::parse_outer)?,
+            type_token: input.parse()?,
+            ident: input.parse()?,
+            semi_token: input.parse()?,
+        })
+    }
+}

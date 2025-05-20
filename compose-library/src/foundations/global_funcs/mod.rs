@@ -12,6 +12,11 @@ pub fn assert(cond: bool) -> StrResult<()> {
 }
 
 #[func]
+pub fn add_one(x: i64) -> i64 {
+    x + 1
+}
+
+#[func]
 pub fn assert_eq(a: Value, b: Value) -> StrResult<()> {
     if a != b {
         bail!("assertion failed: {:?} != {:?}", a, b)

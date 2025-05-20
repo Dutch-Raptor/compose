@@ -1,9 +1,11 @@
+use crate::Type;
+use crate::Reflect;
+use crate::IntoValue;
+use crate::CastInfo;
 use crate::foundations::str::Str;
-use crate::{FromValue, Func, NativeFuncData};
+use crate::{FromValue, Func};
 use compose_library::diag::StrResult;
 use compose_syntax::Span;
-use ecow::EcoString;
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Int(i64),
@@ -11,6 +13,7 @@ pub enum Value {
     Unit,
     Str(Str),
     Func(Func),
+    Type(Type),
 }
 
 impl Value {
@@ -21,6 +24,7 @@ impl Value {
             Value::Unit => "unit",
             Value::Str(_) => "str",
             Value::Func(_) => "func",
+            Value::Type(_) => "type",       
         }
     }
 
@@ -42,60 +46,52 @@ impl Default for Value {
     }
 }
 
-pub trait IntoValue {
-    fn into_value(self) -> Value;
-}
 
-impl IntoValue for Value {
-    fn into_value(self) -> Value {
-        self
-    }
-}
+/// Implements traits for primitives (Value enum variants).
+macro_rules! primitive {
+    (
+        $ty:ty: $name:literal, $variant:ident
+        $(, $other:ident$(($binding:ident))? => $out:expr)*
+    ) => {
+        impl Reflect for $ty {
+            fn input() -> CastInfo {
+                CastInfo::Type(Type::of::<Self>())
+            }
 
-macro_rules! impl_into_value {
-    ($($t:ty => $i:ident,)+ $(,)?) => {
-        $(
-            impl IntoValue for $t {
-                fn into_value(self) -> Value {
-                    Value::$i(self)
+            fn output() -> CastInfo {
+                CastInfo::Type(Type::of::<Self>())
+            }
+
+            fn castable(value: &Value) -> bool {
+                matches!(value, Value::$variant(_)
+                    $(|  primitive!(@$other $(($binding))?))*)
+            }
+        }
+
+        impl IntoValue for $ty {
+            fn into_value(self) -> Value {
+                Value::$variant(self)
+            }
+        }
+
+        impl FromValue for $ty {
+            fn from_value(value: Value) -> StrResult<Self> {
+                match value {
+                    Value::$variant(v) => Ok(v),
+                    $(Value::$other$(($binding))? => Ok($out),)*
+                    v => Err(<Self as Reflect>::error(&v)),
                 }
             }
-        )*
-    }
+        }
+    };
+
+    (@$other:ident($binding:ident)) => { Value::$other(_) };
+    (@$other:ident) => { Value::$other };
 }
 
-impl IntoValue for () {
-    fn into_value(self) -> Value {
-        Value::Unit
-    }
-}
+primitive!(i64: "int", Int);
+primitive!(bool: "bool", Bool);
+primitive!(Str: "str", Str);
+primitive!(Func: "func", Func);
+primitive!(Type: "type", Type);
 
-impl IntoValue for &'static NativeFuncData {
-    fn into_value(self) -> Value {
-        Value::Func(self.into())
-    }
-}
-
-impl IntoValue for &'static str {
-    fn into_value(self) -> Value {
-        Value::Str(EcoString::from(self).into())
-    }
-}
-
-impl IntoValue for String {
-    fn into_value(self) -> Value {
-        Value::Str(EcoString::from(self).into())
-    }
-}
-
-impl IntoValue for EcoString {
-    fn into_value(self) -> Value {
-        Value::Str(self.into())
-    }
-}
-
-impl_into_value!(
-    i64 => Int,
-    bool => Bool,
-    Func => Func,
-);

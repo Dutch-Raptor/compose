@@ -2,10 +2,12 @@ pub mod diag;
 mod world;
 mod foundations;
 mod sink;
+mod repr;
 
 pub use foundations::*;
 pub use sink::*;
 pub use world::*;
+pub use foundations::ty::*;
 
 // Workaround to refer to self as compose_library instead of crate. Needed for some macros
 extern crate self as compose_library;
@@ -24,6 +26,7 @@ pub fn library() -> Library {
     global.define_func::<assert_eq>();
     global.define_func::<assert_ne>();
     global.define_func::<panic>();
+    global.define_func::<add_one>();
     
     Library {
         global: Module::new("global", global),

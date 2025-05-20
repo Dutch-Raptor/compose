@@ -7,6 +7,9 @@ mod args;
 mod cast;
 mod global_funcs;
 mod module;
+pub mod ty;
+mod int;
+mod bool;
 
 pub use value::*;
 pub use scope::*;
@@ -15,3 +18,5 @@ pub use cast::*;
 pub use args::*;
 pub use global_funcs::*;
 pub use module::*;
+pub use cast::*;
+pub use ty::*;

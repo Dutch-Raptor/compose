@@ -11,6 +11,7 @@ use compose_editor::renderer::full::CrosstermRenderer;
 use compose_library::{Value, World};
 
 mod editor;
+mod command;
 
 pub fn repl(args: ReplArgs) -> Result<(), CliError> {
     let start_text = match &args.from {

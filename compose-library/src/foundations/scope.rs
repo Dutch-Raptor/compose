@@ -1,14 +1,15 @@
-use crate::diag::{At, SourceResult, error, warning};
-use crate::{IntoValue, Library, Sink, Value};
-use compose_library::diag::{StrResult, bail};
+use crate::diag::{error, warning, At, SourceResult};
+use crate::{Library, Sink, Value};
+use compose_library::diag::{bail, StrResult};
 use compose_library::{Func, NativeFunc};
 use compose_syntax::Span;
-use ecow::{EcoString, eco_format, eco_vec};
+use ecow::{eco_format, eco_vec, EcoString};
 use indexmap::IndexMap;
 use indexmap::map::Entry;
 use std::collections::HashSet;
 use std::iter;
 use strsim::jaro_winkler;
+use crate::IntoValue;
 
 #[derive(Debug, Default, Clone)]
 pub struct Scopes<'a> {
