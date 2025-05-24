@@ -1,4 +1,4 @@
-use crate::ast::{Bool, CodeBlock, FuncCall, LetBinding, Str};
+use crate::ast::{Bool, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
 use crate::ast::{AstNode, Binary, Ident, Int};
 use crate::ast::atomics::Unit;
 use crate::ast::unary::Unary;
@@ -26,7 +26,9 @@ pub enum Expr<'a> {
     CodeBlock(CodeBlock<'a>),
     Str(Str<'a>),
     Bool(Bool<'a>),
-    FuncCall(FuncCall<'a>)
+    FuncCall(FuncCall<'a>),
+    FieldAccess(FieldAccess<'a>),
+    PathAccess(PathAccess<'a>),   
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -42,6 +44,8 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::Str => Some(Self::Str(Str::from_untyped(node)?)),
             SyntaxKind::Bool => Some(Self::Bool(Bool::from_untyped(node)?)),       
             SyntaxKind::FuncCall => Some(Self::FuncCall(FuncCall::from_untyped(node)?)),       
+            SyntaxKind::FieldAccess => Some(Self::FieldAccess(FieldAccess::from_untyped(node)?)),           
+            SyntaxKind::PathAccess => Some(Self::PathAccess(PathAccess::from_untyped(node)?)),           
             _ => None,
         }
     }
@@ -58,6 +62,8 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::Str(str) => str.to_untyped(),       
             Self::Bool(bool) => bool.to_untyped(),       
             Self::FuncCall(func_call) => func_call.to_untyped(),       
+            Self::FieldAccess(field_access) => field_access.to_untyped(),           
+            Self::PathAccess(path_access) => path_access.to_untyped(),           
         }
     }
 }

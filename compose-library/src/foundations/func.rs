@@ -1,7 +1,9 @@
+use std::sync::LazyLock;
+use compose_library::Scope;
 use compose_macros::{cast, ty};
-use crate::diag::SourceResult;
+use crate::diag::{bail, SourceResult, StrResult};
 use crate::foundations::args::Args;
-use crate::Value;
+use crate::{Sink, Value};
 use compose_syntax::Span;
 use compose_utils::Static;
 
@@ -36,6 +38,38 @@ impl Func {
             }
         }
     }
+
+    pub fn scope(&self) -> Option<&'static Scope> {
+        match &self.repr {
+            Repr::Native(native) => Some(&native.0.scope)
+        }
+    }
+    
+    pub fn name(&self) -> Option<&str> {
+        match &self.repr {
+            Repr::Native(native) => Some(native.0.name)
+        }
+    }
+
+    pub fn field(&self, field: &str, access_span: Span, sink: &mut impl Sink) -> StrResult<&Value> {
+        let scope = self.scope().ok_or("Cannot access fields on user-defined functions")?;
+        match scope.get(field) {
+            Some(binding) => Ok(binding.read_checked(access_span, sink)),
+            None => match self.name() {
+                Some(name) => bail!("function `{name}` does not contain field `{field}`"),
+                None => bail!("Function does not contain field `{field}`"),
+            }
+        }
+    }
+    
+    pub fn is_associated_function(&self) -> bool {
+        match self.repr {
+            Repr::Native(n) => match n.fn_type {
+                FuncType::Method => false,
+                FuncType::Associated => true,
+            }
+        }
+    }
 }
 
 pub trait NativeFunc {
@@ -46,7 +80,14 @@ pub trait NativeFunc {
 pub struct NativeFuncData {
     pub closure: fn(&mut Args) -> SourceResult<Value>,
     pub name: &'static str,
-    // pub params: LazyLock<Vec<ParamInfo>>
+    pub scope: LazyLock<Scope>,
+    pub fn_type: FuncType,
+}
+
+#[derive(Debug)]
+pub enum FuncType {
+    Method,
+    Associated,
 }
 
 impl From<Repr> for Func {

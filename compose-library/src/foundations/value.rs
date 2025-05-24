@@ -1,31 +1,36 @@
-use crate::Type;
-use crate::Reflect;
+use crate::diag::{At, SourceResult};
 use crate::IntoValue;
-use crate::CastInfo;
-use crate::foundations::str::Str;
+use crate::Reflect;
+use crate::{CastInfo, Str, UnitValue};
 use crate::{FromValue, Func};
-use compose_library::diag::StrResult;
+use crate::{Sink, Type};
+use compose_library::diag::{bail, StrResult};
 use compose_syntax::Span;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Int(i64),
     Bool(bool),
-    Unit,
+    Unit(UnitValue),
     Str(Str),
     Func(Func),
     Type(Type),
 }
 
 impl Value {
-    pub fn ty(&self) -> &'static str {
+    pub fn ty(&self) -> Type {
         match self {
-            Value::Int(_) => "int",
-            Value::Bool(_) => "bool",
-            Value::Unit => "unit",
-            Value::Str(_) => "str",
-            Value::Func(_) => "func",
-            Value::Type(_) => "type",       
+            Value::Int(_) => Type::of::<i64>(),
+            Value::Bool(_) => Type::of::<bool>(),
+            Value::Unit(_) => Type::of::<UnitValue>(),
+            Value::Str(_) => Type::of::<Str>(),
+            Value::Func(_) => Type::of::<Func>(),
+            Value::Type(_) => Type::of::<Type>(),
         }
+    }
+    
+    pub fn unit() -> Value {
+        Value::Unit(UnitValue)
     }
 
     pub fn cast<T: FromValue>(self) -> StrResult<T> {
@@ -38,14 +43,41 @@ impl Value {
             _ => self,
         }
     }
+
+    /// Access a field on this value (with dot syntax) `a.b`
+    pub fn field(&self, field: &str, access_span: Span, sink: &mut impl Sink) -> StrResult<Value> {
+        let field_value = match self {
+            Self::Func(func) => func.field(field, access_span, sink).cloned(),
+            Self::Type(ty) => ty.field(field, access_span, sink).cloned(),
+            _ => bail!("no field or method named `{}` on `{}`", field, self.ty()),
+        };
+
+        field_value.or_else(|e| {
+            // Try to get the field from the type
+            self.ty()
+                .scope()
+                .get(field)
+                .map(|b| b.read_checked(access_span, sink))
+                .cloned()
+                // Return the original error if that failed
+                .ok_or(e)
+        })
+    }
+
+    /// Access an associated value of this value by path syntax `a::b`
+    pub fn path(&self, path: &str, access_span: Span, sink: &mut impl Sink) -> SourceResult<Value> {
+        match self {
+            Self::Type(ty) => ty.path(path, access_span, sink).cloned().at(access_span),
+            _ => bail!(access_span, "no associated field or method named `{}` on `{}`", path, self.ty()),
+        }
+    }
 }
 
 impl Default for Value {
     fn default() -> Self {
-        Value::Unit
+        Value::Unit(UnitValue)
     }
 }
-
 
 /// Implements traits for primitives (Value enum variants).
 macro_rules! primitive {
@@ -94,4 +126,4 @@ primitive!(bool: "bool", Bool);
 primitive!(Str: "str", Str);
 primitive!(Func: "func", Func);
 primitive!(Type: "type", Type);
-
+primitive!(UnitValue: "unit", Unit);

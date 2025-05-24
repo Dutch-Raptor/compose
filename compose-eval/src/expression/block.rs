@@ -1,7 +1,7 @@
+use crate::{Eval, Vm};
 use compose_library::diag::SourceResult;
 use compose_library::Value;
 use compose_syntax::ast::CodeBlock;
-use crate::{Eval, Vm};
 
 impl Eval for CodeBlock<'_> {
     type Output = Value;
@@ -9,7 +9,7 @@ impl Eval for CodeBlock<'_> {
     fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
         let flow = vm.flow.take();
         vm.scopes.enter();
-        let mut result = Value::Unit;
+        let mut result = Value::unit();
         
         let exprs = self.exprs();
         
@@ -29,10 +29,9 @@ impl Eval for CodeBlock<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::expression::test_utils::eval_expr;
-    use crate::test_utils::test_world;
     use super::*;
-    
+    use crate::expression::test_utils::eval_expr;
+
     #[test]
     fn test_block() {
         let result = eval_expr(r#"

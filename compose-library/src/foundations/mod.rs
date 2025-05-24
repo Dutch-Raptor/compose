@@ -10,6 +10,7 @@ mod module;
 pub mod ty;
 mod int;
 mod bool;
+mod unit;
 
 pub use value::*;
 pub use scope::*;
@@ -20,3 +21,5 @@ pub use global_funcs::*;
 pub use module::*;
 pub use cast::*;
 pub use ty::*;
+pub use unit::*;
+pub use str::*;

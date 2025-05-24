@@ -34,7 +34,7 @@ fn apply_assignment(
     
     *value_ref = op(lhs, rhs).at(binary.span())?;
     
-    Ok(Value::Unit)
+    Ok(Value::default())
 }
 
 fn apply_binary(

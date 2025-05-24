@@ -141,6 +141,7 @@ pub struct SourceDiagnostic {
     pub trace: EcoVec<Spanned<TracePoint>>,
     pub hints: EcoVec<EcoString>,
     pub labels: EcoVec<Label>,
+    pub notes: EcoVec<EcoString>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -171,6 +172,7 @@ impl SourceDiagnostic {
             trace: eco_vec!(),
             hints: eco_vec!(),
             labels: eco_vec!(),
+            notes: eco_vec!(),
         }
     }
     
@@ -183,6 +185,7 @@ impl SourceDiagnostic {
             trace: eco_vec!(),
             hints: eco_vec!(),
             labels: eco_vec!(),
+            notes: eco_vec!(),
         }
     }
     
@@ -198,6 +201,16 @@ impl SourceDiagnostic {
     
     pub fn with_hint(mut self, hint: impl Into<EcoString>) -> Self {
         self.hint(hint);
+        self
+    }
+    
+    pub fn note(&mut self, note: impl Into<EcoString>)
+    {
+        self.notes.push(note.into());
+    }
+    
+    pub fn with_note(mut self, note: impl Into<EcoString>) -> Self {
+        self.note(note);
         self
     }
     
@@ -217,6 +230,7 @@ impl From<SyntaxError> for SourceDiagnostic {
             trace: eco_vec![],
             hints: error.hints,
             labels: eco_vec![],
+            notes: eco_vec![],       
         }
     }
 }

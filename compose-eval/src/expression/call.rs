@@ -1,30 +1,88 @@
-use ecow::EcoVec;
-use compose_library::diag::{At, SourceResult, Spanned};
-use compose_library::{Arg, Args, Func, Value};
-use compose_syntax::{ast, Span};
-use compose_syntax::ast::{AstNode};
 use crate::{Eval, Vm};
+use compose_library::diag::{error, At, SourceResult, Spanned};
+use compose_library::{Arg, Args, Func, Type, UnboundItem, Value};
+use compose_syntax::ast::AstNode;
+use compose_syntax::{ast, Span};
+use ecow::{eco_vec, EcoVec};
+use extension_traits::extension;
 
 impl Eval for ast::FuncCall<'_> {
     type Output = Value;
 
     fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
-        let span = self.span();
-        
-        let callee = self.callee();
-        let callee_span = callee.span();
-        
-        let args = self.args();
-        
-        // Handle field access later
-        
-        let callee = callee.eval(vm)?;
-        let args = args.eval(vm)?.spanned(span);
-        
+        let callee_span = self.callee().span();
+
+        let (callee, args) = self.eval_callee_and_args(vm)?;
+
         let func = callee.cast::<Func>().at(callee_span)?;
-        
-        return func.call(args)
+
+        func.call(args)
     }
+}
+
+#[extension(trait FuncCalExt)]
+impl ast::FuncCall<'_> {
+    fn eval_callee_and_args(&self, vm: &mut Vm) -> SourceResult<(Value, Args)> {
+        if let ast::Expr::FieldAccess(field_access) = self.callee() {
+            self.eval_method_call(&field_access, vm)
+        } else {
+            self.eval_regular_call(vm)
+        }
+    }
+
+    fn eval_method_call(
+        &self,
+        field_access: &ast::FieldAccess,
+        vm: &mut Vm,
+    ) -> SourceResult<(Value, Args)> {
+        let target_expr = field_access.target();
+        let field = field_access.field();
+
+        let target = target_expr.eval(vm)?;
+        let mut args = self.args().eval(vm)?;
+
+        let callee_binding = target.ty().scope().try_get(&field).map_err(|e| {
+            e.with_item(UnboundItem::FieldOrMethod(Some(target.ty().name().into())))
+        }).at(field.span())?;
+
+        let target_ty = target.ty();
+
+        args.insert(0, target_expr.span(), target);
+
+        let callee = callee_binding.read_checked(target_expr.span(), &mut vm.sink).clone();
+
+        if let Value::Func(func) = &callee {
+            if func.is_associated_function() {
+                return err_call_associated_function_as_method(&target_ty, field.as_str(), field.span());
+            }
+        }
+
+        Ok((callee, args))
+    }
+
+    fn eval_regular_call(&self, vm: &mut Vm) -> SourceResult<(Value, Args)> {
+        let callee = self.callee().eval(vm)?;
+        let args = self.args().eval(vm)?.spanned(self.span());
+        Ok((callee, args))
+    }
+}
+
+fn err_call_associated_function_as_method<T>(
+    target_ty: &Type,
+    field: &str,
+    span: Span,
+) -> SourceResult<T> {
+    Err(eco_vec![
+        error!(
+            span,
+            "cannot call associated function `{}::{}` as a method",
+            target_ty.name(),
+            field,
+        )
+        .with_label_message(format!("not a method on `{}`", target_ty.name()))
+        .with_note(format!("`{}` is an associated function of `{}`, not a method", field, target_ty.name()))
+        .with_hint(format!("use path syntax instead: `{}::{}(args)`", target_ty.name(), field))
+    ])
 }
 
 impl Eval for ast::Args<'_> {
@@ -32,25 +90,21 @@ impl Eval for ast::Args<'_> {
 
     fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
         let mut items = EcoVec::with_capacity(self.items().count());
-        
+
         for arg in self.items() {
             let span = arg.span();
             match arg {
-                ast::Arg::Pos(expr) => {
-                    items.push(Arg {
-                        span,
-                        value: Spanned::new(expr.eval(vm)?, expr.span()),
-                    })
-                    
-                }
+                ast::Arg::Pos(expr) => items.push(Arg {
+                    span,
+                    value: Spanned::new(expr.eval(vm)?, expr.span()),
+                }),
             }
         }
-        
+
         // Do not assign a span here, we want to assign the span at the callsite (the whole call)
         Ok(Args {
             span: Span::detached(),
             items,
         })
-        
     }
 }

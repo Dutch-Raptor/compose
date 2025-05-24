@@ -243,6 +243,7 @@ dependencies = [
  "compose-library",
  "compose-syntax",
  "ecow",
+ "extension-traits",
 ]
 
 [[package]]
@@ -255,6 +256,7 @@ dependencies = [
  "ecow",
  "indexmap",
  "strsim",
+ "tap",
 ]
 
 [[package]]

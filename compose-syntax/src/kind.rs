@@ -89,6 +89,7 @@ pub enum SyntaxKind {
     FieldAccess,
     IndexAccess,
     Args,
+    PathAccess,
 }
 
 impl SyntaxKind {

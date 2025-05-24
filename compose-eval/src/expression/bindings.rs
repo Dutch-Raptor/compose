@@ -28,30 +28,30 @@ impl<'a> Eval for ast::LetBinding<'a> {
 
         let binding_kind = match (self.is_mut(), init) {
             (true, Some(_)) => compose_library::BindingKind::Mutable,
-            (false, Some(_)) => compose_library::BindingKind::Immutable,
+            (false, Some(_)) => compose_library::BindingKind::Immutable { first_assign: None },
             (true, None) => compose_library::BindingKind::UninitializedMutable,
             (false, None) => compose_library::BindingKind::Uninitialized,
         };
 
         let value = match init {
             Some(expr) => expr.eval(vm)?,
-            None => Value::Unit,
+            None => Value::unit(),
         };
 
         // handle control flow
         if vm.flow.is_some() {
-            return Ok(Value::Unit);
+            return Ok(Value::unit());
         }
 
         destructure_pattern(vm, self.pattern(), value, binding_kind)?;
 
-        Ok(Value::Unit)
+        Ok(Value::unit())
     }
 }
 
 fn destructure_pattern(
     vm: &mut Vm,
-    pattern: ast::Pattern,
+    pattern: Pattern,
     value: Value,
     binding_kind: compose_library::BindingKind,
 ) -> SourceResult<()> {
@@ -74,7 +74,7 @@ fn destructure_impl(
     vm: &mut Vm,
     pattern: Pattern,
     value: Value,
-    bind: &mut impl Fn(&mut Vm, ast::Expr, Value) -> SourceResult<()>,
+    bind: &mut impl Fn(&mut Vm, Expr, Value) -> SourceResult<()>,
 ) -> SourceResult<()> {
     match pattern {
         Pattern::Single(expr) => bind(vm, expr, value)?,
@@ -91,7 +91,7 @@ fn destructure_impl(
 mod tests {
     use super::*;
     use crate::expression::test_utils::eval_expr_with_vm;
-    use compose_library::BindingKind;
+    use compose_library::{BindingKind, UnitValue};
     use crate::test_utils::test_world;
 
     #[test]
@@ -103,7 +103,7 @@ mod tests {
         let binding = vm.scopes.top.get("a").unwrap();
 
         assert_eq!(binding.read(), &Value::Int(3));
-        assert_eq!(binding.kind(), BindingKind::Immutable);
+        assert_eq!(binding.kind(), BindingKind::Immutable { first_assign: None });
     }
 
     #[test]
@@ -126,7 +126,7 @@ mod tests {
 
         let binding = vm.scopes.top.get("a").unwrap();
 
-        assert_eq!(binding.read(), &Value::Unit);
+        assert_eq!(binding.read(), &Value::unit());
         assert_eq!(binding.kind(), BindingKind::Uninitialized);
     }
 
@@ -137,7 +137,7 @@ mod tests {
         eval_expr_with_vm(&mut vm, "let mut a").expect("failed to evaluate");
 
         let binding = vm.scopes.top.get("a").unwrap();
-        assert_eq!(binding.read(), &Value::Unit);
+        assert_eq!(binding.read(), &Value::unit());
         assert_eq!(binding.kind(), BindingKind::UninitializedMutable);
     }
 
@@ -156,10 +156,10 @@ mod tests {
     fn test_read_uninitialised_variable() {
         let world = test_world("");
         let mut vm = Vm::new(&world);
-        // setup the variable
+        // set up the variable
         eval_expr_with_vm(&mut vm, "let a").expect("failed to evaluate");
         let result = eval_expr_with_vm(&mut vm, "a").expect("failed to evaluate");
-        assert_eq!(result, Value::Unit);
+        assert_eq!(result, Value::unit());
 
         // should have emitted a warning
         assert_eq!(vm.sink.warnings.len(), 1);
@@ -210,7 +210,7 @@ mod tests {
         
         let binding = vm.scopes.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::UninitializedMutable);
-        assert_eq!(binding.read(), &Value::Unit);
+        assert_eq!(binding.read(), &Value::Unit(UnitValue));
         
         eval_expr_with_vm(&mut vm, "a = 4").expect("failed to evaluate");
         let result = eval_expr_with_vm(&mut vm, "a").expect("failed to evaluate");
@@ -229,7 +229,7 @@ mod tests {
         
         let binding = vm.scopes.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::Uninitialized);
-        assert_eq!(binding.read(), &Value::Unit);
+        assert_eq!(binding.read(), &Value::unit());
         
         eval_expr_with_vm(&mut vm, "a = 4").expect("failed to evaluate");
         let result = eval_expr_with_vm(&mut vm, "a").expect("failed to evaluate");
@@ -237,7 +237,7 @@ mod tests {
         
         // should now be immutable
         let binding = vm.scopes.get("a").unwrap();
-        assert_eq!(binding.kind(), BindingKind::Immutable);
+        assert!(matches!(binding.kind(), BindingKind::Immutable {..}));
     }
     
     #[test]
@@ -246,7 +246,7 @@ mod tests {
         let mut vm = Vm::new(&world);
         eval_expr_with_vm(&mut vm, "let a = 3").expect("failed to evaluate");
         let binding = vm.scopes.get("a").unwrap();
-        assert_eq!(binding.kind(), BindingKind::Immutable);
+        assert_eq!(binding.kind(), BindingKind::Immutable { first_assign: None });
         assert_eq!(binding.read(), &Value::Int(3));
         
         let errs = eval_expr_with_vm(&mut vm, "a = 4").expect_err("expected error");

@@ -1,31 +1,44 @@
+use crate::kw;
+use crate::util::{bail, foundations, parse_flag, parse_key_value, parse_string};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use syn::{parse_quote, FnArg, ItemFn, Pat, Result, ReturnType};
-use syn::token::Token;
-use crate::util::bail;
+use syn::parse::{Parse, ParseStream};
+use syn::spanned::Spanned;
+use syn::{parse_quote, FnArg, ItemFn, Result, ReturnType, Type};
 
-pub fn func(stream: TokenStream, item: &syn::ItemFn) -> Result<TokenStream> {
+pub fn func(stream: TokenStream, item: &ItemFn) -> Result<TokenStream> {
     let func = parse(stream, item)?;
     Ok(create(&func, item))
 }
 
 fn create(func: &Func, item: &ItemFn) -> TokenStream {
-    let Func { rust_name, .. } = func;
+    let Func { rust_name, vis, .. } = func;
     let definition = item;
 
     // Create a type to which the func data will be attached
     let function_type = create_func_ty(func);
     let data = create_func_data(func);
-    
-    let data_impl = quote! {
-        impl ::compose_library::foundations::NativeFunc for #rust_name {
-            fn data() -> &'static ::compose_library::foundations::NativeFuncData {
-                static DATA: ::compose_library::foundations::NativeFuncData = #data;
-                &DATA
+
+    let data_impl = match function_type {
+        Some(_) => quote! {
+            impl ::compose_library::foundations::NativeFunc for #rust_name {
+                fn data() -> &'static ::compose_library::foundations::NativeFuncData {
+                    static DATA: ::compose_library::foundations::NativeFuncData = #data;
+                    &DATA
+                }
+            }
+        },
+        None => {
+            let ident_data = quote::format_ident!("{rust_name}_data");
+            quote! {
+                #vis fn #ident_data() -> &'static #foundations::NativeFuncData {
+                    static DATA: #foundations::NativeFuncData = #data;
+                    &DATA
+                }
             }
         }
     };
-    
+
     quote! {
         #definition
         #function_type
@@ -37,53 +50,82 @@ fn create_func_data(func: &Func) -> TokenStream {
     let Func {
         name,
         rust_name,
-        params,
-        return_type,
+        params: _params,
+        return_type: _return_type,
+        scope,
+        parent: _parent,
+        vis: _vis,
+        special,
     } = func;
+
+    let scope = if *scope {
+        quote! { <#rust_name as #foundations::NativeScope>::scope() }
+    } else {
+        quote! { #foundations::Scope::default() }
+    };
 
     let closure = create_wrapper_closure(func);
     
+    let fn_type = if special.self_.is_some() {
+        quote! { #foundations::FuncType::Method }
+    } else {
+        quote! { #foundations::FuncType::Associated }       
+    };
+
     let name = quote! { #name };
-    
+
     quote! {
         ::compose_library::foundations::NativeFuncData {
             name: #name,
             closure: #closure,
+            scope: ::std::sync::LazyLock::new(|| #scope),
+            fn_type: #fn_type
         }
     }
 }
 
 fn create_wrapper_closure(func: &Func) -> TokenStream {
     let arg_handlers = {
-        let args = func.params.iter()
-            .map(create_param_parser);
-        
+        let args = func.params.iter().map(create_param_parser);
+
+        let self_handler = func
+            .special
+            .self_
+            .as_ref()
+            .map(|param| create_param_parser(param));
+
         quote! {
+            #self_handler
             #(#args)*
         }
     };
-    
+
     let finish = Some(quote! {args.take().finish()?;  });
-    
+
     let call = {
-        let forwarded = func.params.iter()
-            .map(bind);
-        
+        let self_ = func
+            .special
+            .self_
+            .as_ref()
+            .map(bind)
+            .map(|tokens| quote! { #tokens, });
+        let forwarded = func.params.iter().map(bind);
+
         quote! {
-            __func(#(#forwarded,)*)
+            __func(#self_ #(#forwarded,)*)
         }
     };
-    
+
+    let parent = func.parent.as_ref().map(|ty| quote! { #ty:: });
     let ident = &func.rust_name;
     quote! {
         |args| {
-            let __func = #ident;
+            let __func = #parent #ident;
             #arg_handlers
             #finish
             let ret = #call;
             ::compose_library::foundations::IntoResult::into_result(ret, args.span)
         }
-        
     }
 }
 
@@ -97,24 +139,29 @@ fn bind(param: &Param) -> TokenStream {
 }
 
 fn create_param_parser(param: &Param) -> TokenStream {
-    let Param { ident, ty, name, .. } = param;
-    
+    let Param {
+        ident, ty, name, ..
+    } = param;
+
     let value = quote! {
         args.expect(#name)?
     };
-    
+
     quote! {
         let mut #ident: #ty = #value;
     }
 }
 
-fn create_func_ty(func: &Func) -> TokenStream {
+fn create_func_ty(func: &Func) -> Option<TokenStream> {
+    if func.parent.is_some() {
+        return None;
+    }
     let ident = &func.rust_name;
-    quote! {
+    Some(quote! {
         #[doc(hidden)]
         #[allow(non_camel_case_types)]
         pub enum #ident {}
-    }
+    })
 }
 
 struct Func {
@@ -123,7 +170,11 @@ struct Func {
     /// The rust name of this function
     rust_name: Ident,
     params: Vec<Param>,
-    return_type: syn::Type,
+    return_type: Type,
+    scope: bool,
+    parent: Option<Type>,
+    vis: syn::Visibility,
+    special: SpecialParams,
 }
 
 struct Param {
@@ -141,11 +192,17 @@ enum Binding {
 }
 
 fn parse(stream: TokenStream, item: &syn::ItemFn) -> Result<Func> {
-    let name = determine_name(&item.sig.ident);
+    let meta: Meta = syn::parse2(stream)?;
+    let name = determine_name(&item.sig.ident, meta.name);
 
     let mut params = Vec::new();
+    let mut special = SpecialParams::default();
     for input_param in &item.sig.inputs {
-        parse_param(&mut params, input_param)?;
+        parse_param(&mut special, &mut params, meta.parent.as_ref(), input_param)?;
+    }
+
+    if meta.parent.is_some() && meta.scope {
+        bail!(item, "A function in a scope cannot have a scope")
     }
 
     let return_type = match &item.sig.output {
@@ -160,18 +217,77 @@ fn parse(stream: TokenStream, item: &syn::ItemFn) -> Result<Func> {
         rust_name,
         params,
         return_type,
+        special,
+        scope: meta.scope,
+        parent: meta.parent,
+        vis: item.vis.clone(),
     })
 }
 
-fn parse_param(params: &mut Vec<Param>, input: &FnArg) -> Result<()> {
+/// The `..` in `#[func(..)]`.
+pub struct Meta {
+    /// Whether this function has an associated scope defined by the `#[scope]` macro.
+    pub scope: bool,
+    /// The function's name as exposed to Typst.
+    pub name: Option<String>,
+    /// The parent type of this function.
+    ///
+    /// Used for functions in a scope.
+    pub parent: Option<syn::Type>,
+}
+
+impl Parse for Meta {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self {
+            scope: parse_flag::<kw::scope>(input)?,
+            name: parse_string::<kw::name>(input)?,
+            parent: parse_key_value::<kw::parent, _>(input)?,
+        })
+    }
+}
+
+#[derive(Default)]
+struct SpecialParams {
+    self_: Option<Param>,
+}
+
+fn parse_param(
+    special_params: &mut SpecialParams,
+    params: &mut Vec<Param>,
+    parent: Option<&Type>,
+    input: &FnArg,
+) -> Result<()> {
     let typed = match input {
-        FnArg::Receiver(_) => bail!(input, "receiver is not supported yet"),
+        FnArg::Receiver(recv) => {
+            let binding = match (&recv.reference, &recv.mutability) {
+                (None, None) => Binding::Owned,
+                (Some(_), None) => Binding::Ref,
+                (_, Some(_)) => Binding::RefMut,
+            };
+
+            special_params.self_ = Some(Param {
+                binding,
+                ident: syn::Ident::new("self_", recv.self_token.span()),
+                ty: match parent {
+                    Some(ty) => ty.clone(),
+                    None => bail!(
+                        recv,
+                        "explicit parent type is required for functions with a self parameter"
+                    ),
+                },
+                name: "self".to_string(),
+            });
+            return Ok(());
+        }
         FnArg::Typed(typed) => typed,
     };
 
     let ident = match typed.pat.as_ref() {
         syn::Pat::Ident(syn::PatIdent { ident, .. }) => ident,
-        _ => bail!(typed.pat, "expected identifier. Destructuring is not supported"),
+        _ => bail!(
+            typed.pat,
+            "expected identifier. Destructuring is not supported"
+        ),
     };
 
     params.push(Param {
@@ -184,7 +300,6 @@ fn parse_param(params: &mut Vec<Param>, input: &FnArg) -> Result<()> {
     Ok(())
 }
 
-fn determine_name(ident: &Ident) -> String {
-    let name = ident.to_string();
-    name
+fn determine_name(ident: &Ident, name: Option<String>) -> String {
+    name.unwrap_or_else(|| ident.to_string())
 }

@@ -1,6 +1,6 @@
 use crate::Eval;
 use crate::vm::Vm;
-use compose_library::Value;
+use compose_library::{UnitValue, Value};
 use compose_library::diag::SourceResult;
 use compose_syntax::ast::{AstNode, Expr};
 
@@ -10,6 +10,8 @@ mod bindings;
 mod block;
 mod call;
 mod unary;
+mod field_access;
+mod path_access;
 
 impl Eval for Expr<'_> {
     type Output = Value;
@@ -22,11 +24,13 @@ impl Eval for Expr<'_> {
             Expr::LetBinding(l) => l.eval(vm),
             Expr::Ident(i) => i.eval(vm),
             Expr::CodeBlock(c) => c.eval(vm),
-            Expr::Unit(_) => Ok(Value::Unit),
+            Expr::Unit(_) => Ok(Value::Unit(UnitValue)),
             Expr::Str(s) => s.eval(vm),
             Expr::Unary(u) => u.eval(vm),
             Expr::Bool(b) => b.eval(vm),
             Expr::FuncCall(f) => f.eval(vm),
+            Expr::FieldAccess(f) => f.eval(vm),
+            Expr::PathAccess(p) => p.eval(vm),
         }?
         .spanned(span);
 
@@ -40,7 +44,7 @@ pub mod test_utils {
     use crate::Eval;
     use crate::test_utils::test_world;
     use crate::vm::Vm;
-    use compose_library::Value;
+    use compose_library::{UnitValue, Value};
     use compose_library::diag::SourceResult;
     use compose_syntax::FileId;
     use compose_syntax::ast::Expr;
@@ -53,7 +57,7 @@ pub mod test_utils {
         let file_id = FileId::new("test.comp");
         let nodes = compose_syntax::parse(code, file_id);
 
-        let mut value = Value::Unit;
+        let mut value = Value::Unit(UnitValue);
 
         for node in nodes {
             value = node

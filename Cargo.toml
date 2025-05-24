@@ -14,5 +14,7 @@ edition = "2024"
 [workspace.dependencies]
 ecow = "0.2.4"
 indexmap = "2.9.0"
+tap = "1.0.1"
+extension-traits = "2.0.0"
 
 [workspace.lints]

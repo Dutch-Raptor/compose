@@ -65,7 +65,8 @@ pub fn print_diagnostics(
             Severity::Warning => Diagnostic::warning(),
         }
             .with_message(diag.message.clone())
-            .with_notes(diag.hints.iter().map(|h| format!("hint: {h}")).collect())
+            .with_notes(diag.notes.iter().map(|n| format!("note: {n}")).collect())
+            .with_notes(diag.hints.iter().map(|h| format!("help: {h}")).collect())
             .with_labels_iter(
                 primary_label(diag).into_iter().chain(
                     diag.labels
@@ -75,7 +76,7 @@ pub fn print_diagnostics(
             );
 
         let writer = StandardStream::stderr(ColorChoice::Always);
-        let config = codespan_reporting::term::Config::default();
+        let config = term::Config::default();
 
         term::emit(&mut writer.lock(), &config, &world, &diagnostic)?;
     }
@@ -102,7 +103,7 @@ pub fn secondary_label(span: Span) -> Option<diagnostic::Label<FileId>> {
 ///
 /// eval_range: eval these nodes
 pub fn eval(source: &Source, eval_range: Range<usize>, vm: &mut Vm) -> Warned<SourceResult<Value>> {
-    let mut result = Value::Unit;
+    let mut result = Value::unit();
 
     let range_start = min(eval_range.start, source.nodes().len());
     let range_end = min(eval_range.end, source.nodes().len());

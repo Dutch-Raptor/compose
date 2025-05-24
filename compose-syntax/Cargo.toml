@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 ecow = { workspace = true }
 unscanny = "0.1.0"
-extension-traits = "2.0.0"
+extension-traits = { workspace = true }
 
 [dev-dependencies]
 sequential-test = "0.2.4"

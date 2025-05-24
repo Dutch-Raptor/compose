@@ -3,12 +3,11 @@ mod into_value;
 mod into_result;
 
 use crate::diag::{At, Spanned, StrResult};
-use crate::Value;
-use compose_library::Func;
+use crate::{UnitValue, Value};
 use compose_macros::cast;
-pub use reflect::*;
-pub use into_value::*;
 pub use into_result::*;
+pub use into_value::*;
+pub use reflect::*;
 
 
 pub trait FromValue<V = Value>: Sized {
@@ -36,7 +35,7 @@ impl<T: FromValue> FromValue<Spanned<Value>> for Spanned<T> {
 impl<T: FromValue> FromValue for Option<T> {
     fn from_value(value: Value) -> StrResult<Self> {
         match value {
-            Value::Unit => Ok(None),
+            Value::Unit(_) => Ok(None),
             _ => Ok(Some(T::from_value(value)?)),
         }
     }
@@ -44,6 +43,6 @@ impl<T: FromValue> FromValue for Option<T> {
 
 cast! {
     (),
-    self => Value::Unit,
+    self => Value::Unit(UnitValue),
     v: () => v,
 }

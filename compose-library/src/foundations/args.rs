@@ -1,9 +1,9 @@
-use crate::diag::{bail, error, At, SourceDiagnostic, SourceResult, Spanned};
-use crate::foundations::cast::FromValue;
 use crate::Value;
+use crate::diag::{At, SourceDiagnostic, SourceResult, Spanned, bail, error};
+use crate::foundations::IntoValue;
+use crate::foundations::cast::FromValue;
 use compose_syntax::Span;
 use ecow::EcoVec;
-use crate::foundations::IntoValue;
 
 pub struct Args {
     pub span: Span,
@@ -19,15 +19,22 @@ impl Args {
                 value: Spanned::new(value.into_value(), span),
             })
             .collect();
-        Self { span, items }
+        Self {
+            span,
+            items,
+        }
     }
+    pub fn insert(&mut self, index: i32, span: Span, value: Value) {
+        self.items.insert(index as usize, Arg { span, value: Spanned::new(value, span) });
+    }
+
     pub fn spanned(mut self, span: Span) -> Args {
         if self.span.is_detached() {
             self.span = span;
         }
-        self   
+        self
     }
-    
+
     pub fn eat<T>(&mut self) -> SourceResult<Option<T>>
     where
         T: FromValue<Spanned<Value>>,
@@ -40,7 +47,7 @@ impl Args {
 
         let value = self.items.remove(0).value;
         let span = value.span;
-        return T::from_value(value).at(span).map(Some);
+        T::from_value(value).at(span).map(Some)
     }
 
     pub fn expect<T>(&mut self, what: &str) -> SourceResult<T>

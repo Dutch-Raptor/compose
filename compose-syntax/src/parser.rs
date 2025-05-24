@@ -61,15 +61,22 @@ fn code_expr_prec(p: &mut Parser, atomic: bool, min_prec: Precedence) {
         if atomic && !at_field_or_index {
             break;
         }
+        
+        // handle path access `a::b::c`
+        if p.eat_if(SyntaxKind::ColonColon) {
+            p.expect(SyntaxKind::Ident);
+            p.wrap(m, SyntaxKind::PathAccess);
+            continue;
+        }
 
-        // Handle field access
+        // Handle field access `a.b.c`
         if p.eat_if(SyntaxKind::Dot) {
             p.expect(SyntaxKind::Ident);
             p.wrap(m, SyntaxKind::FieldAccess);
             continue;
         }
 
-        // Handle index access
+        // Handle index access `a[2]`
         if p.eat_if(SyntaxKind::LeftBracket) {
             code_expression(p);
             p.expect(SyntaxKind::RightBracket);
@@ -146,26 +153,40 @@ fn primary_expr(p: &mut Parser, atomic: bool) {
             }
         }
         SyntaxKind::LeftBrace => block(p),
+        SyntaxKind::LeftParen if at_unit_literal(p) => {
+            p.assert(SyntaxKind::LeftParen);
+            p.assert(SyntaxKind::RightParen);
+            p.wrap(m, SyntaxKind::Unit)
+        }
         SyntaxKind::LeftParen => closure(p, m),
         SyntaxKind::Let => let_binding(p),
-        SyntaxKind::Int
-        | SyntaxKind::Float
-        | SyntaxKind::Bool
-        | SyntaxKind::Str
-        | SyntaxKind::Unit => p.eat(),
+        // Already fully handled in the lexer
+        SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str => p.eat(),
         _ => p.expected("expression"),
     }
 }
 
 fn closure(p: &mut Parser, m: Marker) {
     debug_assert_eq!(p.current(), SyntaxKind::LeftParen);
+
     params(p);
 
-    p.assert(SyntaxKind::Arrow);
+    p.expect(SyntaxKind::Arrow);
 
     code_expression(p);
 
     p.wrap(m, SyntaxKind::Closure)
+}
+
+fn at_unit_literal(p: &Parser) -> bool {
+    let mut peeker = p.peeker();
+    let cur = p.current();
+    let next = peeker.next().unwrap_or(SyntaxKind::End);
+    let next_next = peeker.next().unwrap_or(SyntaxKind::End);
+
+    matches!(cur, SyntaxKind::LeftParen)
+        && matches!(next, SyntaxKind::RightParen)
+        && !matches!(next_next, SyntaxKind::Arrow)
 }
 
 /// Parse closure parameters.
@@ -342,6 +363,35 @@ struct Parser<'s> {
     nodes: Vec<SyntaxNode>,
 }
 
+struct SyntaxKindIter<'s> {
+    lexer: Lexer<'s>,
+    yielded_at_end: bool,
+}
+
+impl<'a> SyntaxKindIter<'a> {
+    pub fn new(lexer: Lexer<'a>) -> Self {
+        Self {
+            lexer,
+            yielded_at_end: false,
+        }
+    }
+}
+
+impl<'s> Iterator for SyntaxKindIter<'s> {
+    type Item = SyntaxKind;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.yielded_at_end {
+            return None;
+        }
+        let (kind, _) = self.lexer.next();
+        if kind == SyntaxKind::End {
+            self.yielded_at_end = true;
+        }
+        Some(kind)
+    }
+}
+
 impl<'s> Parser<'s> {
     /// Consume the given syntax kind or produce an error. Returns whether the expected token was found.
     pub(crate) fn expect(&mut self, kind: SyntaxKind) -> bool {
@@ -415,6 +465,15 @@ impl<'s> Parser<'s> {
 
     fn current_end(&self) -> usize {
         self.lexer.cursor()
+    }
+
+    // Peeks the token kind after current
+    fn peek(&self) -> SyntaxKind {
+        let (kind, _) = self.lexer.clone().next();
+        kind
+    }
+    fn peeker(&self) -> SyntaxKindIter {
+        SyntaxKindIter::new(self.lexer.clone())
     }
 
     fn at(&self, kind: SyntaxKind) -> bool {

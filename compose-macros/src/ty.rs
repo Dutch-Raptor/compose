@@ -41,12 +41,19 @@ fn create(ty: &Type, item: Option<&syn::Item>) -> TokenStream {
             type #ident,
         }
     });
+    
+    let scope = if meta.scope {
+        quote! { <#ident as #foundations::NativeScope>::scope() }
+    } else {
+        quote! { #foundations::Scope::new() }
+    };
 
     let data = quote! {
         #foundations::NativeTypeData {
             name: #name,
             title: #title,
             docs: #docs,
+            scope: ::std::sync::LazyLock::new(|| #scope),
         }
     };
 
@@ -105,10 +112,10 @@ pub struct Meta {
 impl Parse for Meta {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
+            scope: parse_flag::<kw::scope>(input)?,
             cast: parse_flag::<kw::cast>(input)?,
             title: parse_string::<kw::title>(input)?,
             name: parse_string::<kw::name>(input)?,
-            scope: parse_flag::<kw::scope>(input)?,
         })
     }
 }

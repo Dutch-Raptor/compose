@@ -7,3 +7,4 @@ edition = "2024"
 compose-library = { path = "../compose-library" }
 compose-syntax = { path = "../compose-syntax" }
 ecow = { workspace = true }
+extension-traits = { workspace = true}

@@ -10,3 +10,4 @@ compose-utils = { path = "../compose-utils" }
 ecow = { workspace = true }
 indexmap = { workspace = true }
 strsim = "0.11.1"
+tap = { workspace = true }

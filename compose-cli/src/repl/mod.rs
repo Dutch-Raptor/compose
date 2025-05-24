@@ -197,7 +197,7 @@ pub fn eval_repl_input(vm: &mut Vm, world: &SystemWorld, input: &str, args: &Rep
         Ok(value) => {
             crate::print_diagnostics(world, &[], &warnings).unwrap();
 
-            if value != Value::Unit {
+            if value != Value::unit() {
                 println!("{value:?}")
             }
         }

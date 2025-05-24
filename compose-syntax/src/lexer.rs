@@ -8,7 +8,6 @@ use unscanny::Scanner;
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'s> {
-    
     /// Scanner: Contains the source text and a cursor in the source text
     s: Scanner<'s>,
     newline: bool,
@@ -106,6 +105,7 @@ impl Lexer<'_> {
         (kind, node)
     }
 
+
     fn kind(&mut self, start: usize, c: char) -> SyntaxKind {
         match c {
             '=' if self.s.eat_if('=') => SyntaxKind::EqEq,
@@ -136,9 +136,7 @@ impl Lexer<'_> {
             ':' if self.s.eat_if(':') => SyntaxKind::ColonColon,
 
             '=' if self.s.eat_if('>') => SyntaxKind::Arrow,
-
-            '(' if self.s.eat_if(')') => SyntaxKind::Unit,
-
+            
             '{' => SyntaxKind::LeftBrace,
             '}' => SyntaxKind::RightBrace,
             '[' => SyntaxKind::LeftBracket,
@@ -186,15 +184,23 @@ impl Lexer<'_> {
         // Read until we find a non-digit (. or something else).
         self.s.eat_while(char::is_ascii_digit);
 
-        // Read the fractional part.
-        if self.s.eat_if('.') {
-            self.s.eat_while(char::is_ascii_digit);
-        }
+        let is_fractional = {
+            let dot = self.s.at('.');
+            let number = matches!(self.s.scout(1), Some('0'..='9' | 'e' | 'E'));
+            dot && number
+        };
+        
+        if is_fractional {
+            // Read the fractional part.
+            if self.s.eat_if('.') {
+                self.s.eat_while(char::is_ascii_digit);
+            }
 
-        // Read the exponent.
-        if self.s.eat_if('e') || self.s.eat_if('E') {
-            self.s.eat_if(['+', '-']);
-            self.s.eat_while(char::is_ascii_digit);
+            // Read the exponent.
+            if self.s.eat_if('e') || self.s.eat_if('E') {
+                self.s.eat_if(['+', '-']);
+                self.s.eat_while(char::is_ascii_digit);
+            }
         }
 
         let number = self.s.from(start);
@@ -364,6 +370,30 @@ mod tests {
         let mut lexer = Lexer::new("1.0", file_id);
         lexer.assert_next(SyntaxKind::Float, "1.0", 0..3);
         lexer.assert_end(3);
+    }
+    
+    #[test]
+    fn test_integer_methods_disambiguation() {
+        let file_id = test_file_id();
+        let mut lexer = Lexer::new("1.method()", file_id);
+        lexer.assert_next(SyntaxKind::Int, "1", 0..1);
+        lexer.assert_next(SyntaxKind::Dot, ".", 1..2);
+        lexer.assert_next(SyntaxKind::Ident, "method", 2..8);
+        lexer.assert_next(SyntaxKind::LeftParen, "(", 8..9);
+        lexer.assert_next(SyntaxKind::RightParen, ")", 9..10);
+        lexer.assert_end(10)
+    }
+    
+    #[test]
+    fn test_float_methods_disambiguation() {
+        let file_id = test_file_id();
+        let mut lexer = Lexer::new("1.0.method()", file_id);
+        lexer.assert_next(SyntaxKind::Float, "1.0", 0..3);
+        lexer.assert_next(SyntaxKind::Dot, ".", 3..4);
+        lexer.assert_next(SyntaxKind::Ident, "method", 4..10);
+        lexer.assert_next(SyntaxKind::LeftParen, "(", 10..11);
+        lexer.assert_next(SyntaxKind::RightParen, ")", 11..12);
+        lexer.assert_end(12)
     }
 
     #[test]
