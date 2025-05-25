@@ -8,6 +8,10 @@ node! {
 }
 
 impl<'a> LetBinding<'a> {
+    pub fn has_initial_value(self) -> bool {
+        self.0.children().any(|n| n.kind() == SyntaxKind::Eq)
+    }
+    
     pub fn initial_value(self) -> Option<Expr<'a>> {
         self.0.children().filter_map(SyntaxNode::cast).nth(1)
     }

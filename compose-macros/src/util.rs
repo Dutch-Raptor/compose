@@ -185,3 +185,35 @@ impl Parse for BareType {
         })
     }
 }
+
+/// Whether an attribute list has a specified attribute.
+pub fn has_attr(attrs: &mut Vec<syn::Attribute>, target: &str) -> bool {
+    take_attr(attrs, target).is_some()
+}
+
+/// Whether an attribute list has a specified attribute.
+pub fn parse_attr<T: Parse>(
+    attrs: &mut Vec<syn::Attribute>,
+    target: &str,
+) -> Result<Option<Option<T>>> {
+    take_attr(attrs, target)
+        .map(|attr| {
+            Ok(match attr.meta {
+                syn::Meta::Path(_) => None,
+                syn::Meta::List(list) => Some(list.parse_args()?),
+                syn::Meta::NameValue(meta) => bail!(meta, "not valid here"),
+            })
+        })
+        .transpose()
+}
+
+/// Whether an attribute list has a specified attribute.
+pub fn take_attr(
+    attrs: &mut Vec<syn::Attribute>,
+    target: &str,
+) -> Option<syn::Attribute> {
+    attrs
+        .iter()
+        .position(|attr| attr.path().is_ident(target))
+        .map(|i| attrs.remove(i))
+}

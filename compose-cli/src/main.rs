@@ -1,35 +1,50 @@
+use crate::error::CliError;
 use crate::world::SystemWorld;
 use clap::Parser;
 use codespan_reporting::diagnostic::Diagnostic;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::{diagnostic, term};
 use compose_eval::{Eval, Vm};
+use compose_library::diag::error;
 use compose_library::{
-    diag::{Severity, SourceDiagnostic, SourceResult, Warned},
     Value,
+    diag::{Severity, SourceDiagnostic, SourceResult, Warned},
 };
 use compose_syntax::ast::Expr;
 use compose_syntax::{FileId, Source, Span};
+use ecow::{eco_vec, EcoVec};
 use std::cmp::min;
 use std::ops::Range;
 use std::path::PathBuf;
-use ecow::eco_vec;
-use compose_library::diag::error;
-use crate::error::CliError;
 
+mod error;
+mod file;
 mod repl;
 mod world;
-mod error;
+use compose_utils::ENABLE_TRACE;
 
 #[derive(Debug, clap::Parser)]
 struct Args {
     #[clap(subcommand)]
     pub command: Command,
+
+    #[clap(long)]
+    pub trace: bool,
 }
 
 #[derive(Debug, clap::Subcommand)]
 enum Command {
     Repl(ReplArgs),
+    File(FileArgs),
+}
+
+#[derive(Debug, clap::Parser)]
+pub struct FileArgs {
+    pub file: PathBuf,
+
+    #[clap(long)]
+    /// Print the ast of the file before executing
+    pub print_ast: bool,
 }
 
 #[derive(Debug, clap::Parser)]
@@ -47,8 +62,12 @@ pub struct ReplArgs {
 
 fn main() -> Result<(), CliError> {
     let args = Args::parse();
+
+    ENABLE_TRACE.store(args.trace, std::sync::atomic::Ordering::Relaxed);
+
     match args.command {
         Command::Repl(args) => repl::repl(args)?,
+        Command::File(args) => file::file(args)?,
     }
 
     Ok(())
@@ -64,16 +83,16 @@ pub fn print_diagnostics(
             Severity::Error => Diagnostic::error(),
             Severity::Warning => Diagnostic::warning(),
         }
-            .with_message(diag.message.clone())
-            .with_notes(diag.notes.iter().map(|n| format!("note: {n}")).collect())
-            .with_notes(diag.hints.iter().map(|h| format!("help: {h}")).collect())
-            .with_labels_iter(
-                primary_label(diag).into_iter().chain(
-                    diag.labels
-                        .iter()
-                        .flat_map(|l| Some(secondary_label(l.span)?.with_message(l.message.clone()))),
-                ),
-            );
+        .with_message(diag.message.clone())
+        .with_notes(diag.notes.iter().map(|n| format!("note: {n}")).collect())
+        .with_notes(diag.hints.iter().map(|h| format!("help: {h}")).collect())
+        .with_labels_iter(
+            primary_label(diag).into_iter().chain(
+                diag.labels
+                    .iter()
+                    .flat_map(|l| Some(secondary_label(l.span)?.with_message(l.message.clone()))),
+            ),
+        );
 
         let writer = StandardStream::stderr(ColorChoice::Always);
         let config = term::Config::default();
@@ -89,10 +108,10 @@ pub fn primary_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId
         diag.span.id()?,
         diag.span.range()?,
     ))
-        .map(|l| match &diag.label_message {
-            Some(message) => l.with_message(message),
-            None => l,
-        })
+    .map(|l| match &diag.label_message {
+        Some(message) => l.with_message(message),
+        None => l,
+    })
 }
 
 pub fn secondary_label(span: Span) -> Option<diagnostic::Label<FileId>> {
@@ -108,17 +127,23 @@ pub fn eval(source: &Source, eval_range: Range<usize>, vm: &mut Vm) -> Warned<So
     let range_start = min(eval_range.start, source.nodes().len());
     let range_end = min(eval_range.end, source.nodes().len());
 
-    for node in source.nodes().get(range_start..range_end).unwrap() {
-        let errors = node.errors();
-        if !errors.is_empty() {
-            return Warned::new(Err(errors.into_iter().map(Into::into).collect()))
-        }
+    let nodes = source.nodes().get(range_start..range_end).unwrap();
+    let errors = nodes
+        .iter()
+        .flat_map(|n| n.errors())
+        .map(|e| e.into())
+        .collect::<EcoVec<SourceDiagnostic>>();
+    if !errors.is_empty() {
+        return Warned::new(Err(errors));
+    }
+    for node in nodes {
         let expr: Expr = match node.cast() {
             Some(expr) => expr,
             None => {
                 let span = node.span();
                 let err = error!(span, "expected expression, found {:?}", node);
-                return Warned::new(Err(eco_vec![err])).with_warnings(std::mem::take(&mut vm.sink.warnings));
+                return Warned::new(Err(eco_vec![err]))
+                    .with_warnings(std::mem::take(&mut vm.sink.warnings));
             }
         };
         result = match expr.eval(vm) {
@@ -131,7 +156,6 @@ pub fn eval(source: &Source, eval_range: Range<usize>, vm: &mut Vm) -> Warned<So
 
     Warned::new(Ok(result)).with_warnings(std::mem::take(&mut vm.sink.warnings))
 }
-
 
 pub struct RepeatIter<T: Clone> {
     item: T,
@@ -150,8 +174,10 @@ impl<T: Clone> Iterator for RepeatIter<T> {
     }
 }
 
-impl<T> RepeatIter<T> 
-where T: Clone {
+impl<T> RepeatIter<T>
+where
+    T: Clone,
+{
     pub fn new(item: T, count: usize) -> Self {
         Self { item, count }
     }

@@ -1,0 +1,6 @@
+let a = 4;
+let b = 16
+
+let val = a * 16 + b * -a + a * 2 * b
+
+print(val, "\n")

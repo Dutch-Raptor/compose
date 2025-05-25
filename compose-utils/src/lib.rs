@@ -1,5 +1,9 @@
+mod trace;
+
 use std::hash::Hash;
 use std::ops::Deref;
+
+pub use trace::*;
 
 #[derive(Debug)]
 pub struct Static<T: 'static>(pub &'static T);

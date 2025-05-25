@@ -12,6 +12,9 @@ mod call;
 mod unary;
 mod field_access;
 mod path_access;
+mod closure;
+
+pub use closure::eval_closure;
 
 impl Eval for Expr<'_> {
     type Output = Value;
@@ -31,6 +34,7 @@ impl Eval for Expr<'_> {
             Expr::FuncCall(f) => f.eval(vm),
             Expr::FieldAccess(f) => f.eval(vm),
             Expr::PathAccess(p) => p.eval(vm),
+            Expr::Closure(c) => c.eval(vm),
         }?
         .spanned(span);
 

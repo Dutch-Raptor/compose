@@ -40,6 +40,11 @@ pub(crate) use syntax_set;
 
 pub const STMT: SyntaxSet = syntax_set![LetBinding, Import, Return,];
 
+pub const ARG_RECOVER: SyntaxSet = syntax_set![
+    Comma,
+    RightParen,
+];
+
 pub const UNARY_OP: SyntaxSet = syntax_set![Plus, Minus, Bang, Tilde];
 
 pub const BINARY_OP: SyntaxSet = syntax_set![

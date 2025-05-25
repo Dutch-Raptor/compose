@@ -1,10 +1,12 @@
 use crate::kw;
-use crate::util::{bail, foundations, parse_flag, parse_key_value, parse_string};
+use crate::util::{
+    bail, documentation, foundations, has_attr, parse_flag, parse_key_value, parse_string,
+};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{parse_quote, FnArg, ItemFn, Result, ReturnType, Type};
+use syn::{FnArg, ItemFn, Result, ReturnType, Type, parse_quote};
 
 pub fn func(stream: TokenStream, item: &ItemFn) -> Result<TokenStream> {
     let func = parse(stream, item)?;
@@ -13,7 +15,7 @@ pub fn func(stream: TokenStream, item: &ItemFn) -> Result<TokenStream> {
 
 fn create(func: &Func, item: &ItemFn) -> TokenStream {
     let Func { rust_name, vis, .. } = func;
-    let definition = item;
+    let definition = rewrite_fn_item(item);
 
     // Create a type to which the func data will be attached
     let function_type = create_func_ty(func);
@@ -46,6 +48,22 @@ fn create(func: &Func, item: &ItemFn) -> TokenStream {
     }
 }
 
+fn rewrite_fn_item(item: &ItemFn) -> syn::ItemFn {
+    let inputs = item.sig.inputs.iter().cloned().filter_map(|mut input| {
+        if let syn::FnArg::Typed(typed) = &mut input {
+            if typed.attrs.iter().any(|attr| attr.path().is_ident("external")) {
+                return None;
+            }
+            typed.attrs.clear();
+        }
+        Some(input)
+    });
+    let mut item = item.clone();
+    item.attrs.clear();
+    item.sig.inputs = parse_quote! { #(#inputs),* };
+    item
+}
+
 fn create_func_data(func: &Func) -> TokenStream {
     let Func {
         name,
@@ -65,11 +83,11 @@ fn create_func_data(func: &Func) -> TokenStream {
     };
 
     let closure = create_wrapper_closure(func);
-    
+
     let fn_type = if special.self_.is_some() {
         quote! { #foundations::FuncType::Method }
     } else {
-        quote! { #foundations::FuncType::Associated }       
+        quote! { #foundations::FuncType::Associated }
     };
 
     let name = quote! { #name };
@@ -143,8 +161,18 @@ fn create_param_parser(param: &Param) -> TokenStream {
         ident, ty, name, ..
     } = param;
 
-    let value = quote! {
-        args.expect(#name)?
+    let value = if param.variadic {
+        quote! {
+            args.all()?
+        }
+    } else if param.named {
+        quote! {
+            args.named(#name)?
+        }
+    } else {
+        quote! {
+            args.expect(#name)?
+        }
     };
 
     quote! {
@@ -180,9 +208,12 @@ struct Func {
 struct Param {
     binding: Binding,
     ident: Ident,
-    ty: syn::Type,
+    ty: Type,
     /// The name of the param as defined in Compose
     name: String,
+    variadic: bool,
+    named: bool,
+    docs: String,
 }
 
 enum Binding {
@@ -275,7 +306,10 @@ fn parse_param(
                         "explicit parent type is required for functions with a self parameter"
                     ),
                 },
+                docs: documentation(&recv.attrs),
                 name: "self".to_string(),
+                variadic: false,
+                named: false,
             });
             return Ok(());
         }
@@ -290,11 +324,16 @@ fn parse_param(
         ),
     };
 
+    let mut attrs = typed.attrs.clone();
+
     params.push(Param {
         binding: Binding::Owned,
         ident: ident.clone(),
         ty: *typed.ty.clone(),
         name: ident.to_string(),
+        docs: documentation(&attrs),
+        variadic: has_attr(&mut attrs, "variadic"),
+        named: has_attr(&mut attrs, "named"),
     });
 
     Ok(())

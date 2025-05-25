@@ -292,7 +292,10 @@ impl InnerNode {
 
 impl Debug for InnerNode {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{:?}: {}", self.kind, self.len)?;
+        write!(f, "{:?}{}: {}", 
+               self.kind, 
+                if self.erroneous { " (err)" } else { "" },
+               self.len)?;
         if !self.children.is_empty() {
             f.write_str(" ")?;
             f.debug_list().entries(&self.children).finish()?;

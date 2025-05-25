@@ -1,9 +1,9 @@
-use crate::ast::{Bool, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
-use crate::ast::{AstNode, Binary, Ident, Int};
+use crate::SyntaxNode;
 use crate::ast::atomics::Unit;
 use crate::ast::unary::Unary;
+use crate::ast::{AstNode, Binary, Ident, Int};
+use crate::ast::{Bool, Closure, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
 use crate::kind::SyntaxKind;
-use crate::SyntaxNode;
 
 /// An expression. The base of Compose. Any "statement" is an expression.
 ///
@@ -22,13 +22,14 @@ pub enum Expr<'a> {
     Ident(Ident<'a>),
     Binary(Binary<'a>),
     Int(Int<'a>),
-    LetBinding(LetBinding<'a>),   
+    LetBinding(LetBinding<'a>),
     CodeBlock(CodeBlock<'a>),
     Str(Str<'a>),
     Bool(Bool<'a>),
     FuncCall(FuncCall<'a>),
     FieldAccess(FieldAccess<'a>),
-    PathAccess(PathAccess<'a>),   
+    PathAccess(PathAccess<'a>),
+    Closure(Closure<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -37,15 +38,16 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::Unary => Some(Self::Unary(Unary::from_untyped(node)?)),
             SyntaxKind::Unit => Some(Self::Unit(Unit::from_untyped(node)?)),
             SyntaxKind::Ident => Some(Self::Ident(Ident::from_untyped(node)?)),
-            SyntaxKind::Binary => Some(Self::Binary(Binary::from_untyped(node)?)),       
-            SyntaxKind::Int => Some(Self::Int(Int::from_untyped(node)?)),       
+            SyntaxKind::Binary => Some(Self::Binary(Binary::from_untyped(node)?)),
+            SyntaxKind::Int => Some(Self::Int(Int::from_untyped(node)?)),
             SyntaxKind::LetBinding => Some(Self::LetBinding(LetBinding::from_untyped(node)?)),
-            SyntaxKind::CodeBlock => Some(Self::CodeBlock(CodeBlock::from_untyped(node)?)),       
+            SyntaxKind::CodeBlock => Some(Self::CodeBlock(CodeBlock::from_untyped(node)?)),
             SyntaxKind::Str => Some(Self::Str(Str::from_untyped(node)?)),
-            SyntaxKind::Bool => Some(Self::Bool(Bool::from_untyped(node)?)),       
-            SyntaxKind::FuncCall => Some(Self::FuncCall(FuncCall::from_untyped(node)?)),       
-            SyntaxKind::FieldAccess => Some(Self::FieldAccess(FieldAccess::from_untyped(node)?)),           
-            SyntaxKind::PathAccess => Some(Self::PathAccess(PathAccess::from_untyped(node)?)),           
+            SyntaxKind::Bool => Some(Self::Bool(Bool::from_untyped(node)?)),
+            SyntaxKind::FuncCall => Some(Self::FuncCall(FuncCall::from_untyped(node)?)),
+            SyntaxKind::FieldAccess => Some(Self::FieldAccess(FieldAccess::from_untyped(node)?)),
+            SyntaxKind::PathAccess => Some(Self::PathAccess(PathAccess::from_untyped(node)?)),
+            SyntaxKind::Closure => Some(Self::Closure(Closure::from_untyped(node)?)),
             _ => None,
         }
     }
@@ -55,15 +57,16 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::Unary(unary) => unary.to_untyped(),
             Self::Unit(unit) => unit.to_untyped(),
             Self::Ident(ident) => ident.to_untyped(),
-            Self::Binary(binary) => binary.to_untyped(),       
-            Self::Int(int) => int.to_untyped(),       
+            Self::Binary(binary) => binary.to_untyped(),
+            Self::Int(int) => int.to_untyped(),
             Self::LetBinding(let_binding) => let_binding.to_untyped(),
-            Self::CodeBlock(code_block) => code_block.to_untyped(),       
-            Self::Str(str) => str.to_untyped(),       
-            Self::Bool(bool) => bool.to_untyped(),       
-            Self::FuncCall(func_call) => func_call.to_untyped(),       
-            Self::FieldAccess(field_access) => field_access.to_untyped(),           
-            Self::PathAccess(path_access) => path_access.to_untyped(),           
+            Self::CodeBlock(code_block) => code_block.to_untyped(),
+            Self::Str(str) => str.to_untyped(),
+            Self::Bool(bool) => bool.to_untyped(),
+            Self::FuncCall(func_call) => func_call.to_untyped(),
+            Self::FieldAccess(field_access) => field_access.to_untyped(),
+            Self::PathAccess(path_access) => path_access.to_untyped(),
+            Self::Closure(closure) => closure.to_untyped(),
         }
     }
 }

@@ -80,6 +80,10 @@ impl SystemWorld {
         let source = sources.get_mut(&file_id).unwrap();
         editor(source);
     }
+    
+    pub fn entry_point_source(&self) -> FileResult<Source> {
+        self.source(self.entrypoint)
+    }
 }
 
 impl World for SystemWorld {

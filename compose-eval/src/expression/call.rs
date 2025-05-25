@@ -1,6 +1,6 @@
 use crate::{Eval, Vm};
 use compose_library::diag::{error, At, SourceResult, Spanned};
-use compose_library::{Arg, Args, Func, Type, UnboundItem, Value};
+use compose_library::{Arg, Args, Func, Type, UnboundItem, Value, World};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{ast, Span};
 use ecow::{eco_vec, EcoVec};
@@ -16,7 +16,7 @@ impl Eval for ast::FuncCall<'_> {
 
         let func = callee.cast::<Func>().at(callee_span)?;
 
-        func.call(args)
+        func.call(&vm.routines, vm.world, args)
     }
 }
 
@@ -96,8 +96,16 @@ impl Eval for ast::Args<'_> {
             match arg {
                 ast::Arg::Pos(expr) => items.push(Arg {
                     span,
+                    name: None,
                     value: Spanned::new(expr.eval(vm)?, expr.span()),
                 }),
+                ast::Arg::Named(named) => {
+                    items.push(Arg {
+                        span,
+                        name: Some(named.name().get().into()),
+                        value: Spanned::new(named.expr().eval(vm)?, named.expr().span()),
+                    })
+                }
             }
         }
 
@@ -108,3 +116,4 @@ impl Eval for ast::Args<'_> {
         })
     }
 }
+

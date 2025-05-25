@@ -1,0 +1,8 @@
+let f = (a, b = 2) => a + b;
+let g = a => a + 1;
+let h = (a, b, c) => a + b + c;
+
+println(f(2))
+println(f(2, b: 3))
+println(g(2))
+println(h(1, 2, 3))

@@ -4,6 +4,7 @@ mod foundations;
 mod sink;
 mod repr;
 
+use compose_library::diag::SourceResult;
 pub use foundations::*;
 pub use sink::*;
 pub use world::*;
@@ -17,13 +18,18 @@ pub struct Library {
     pub global: Module,
 }
 
+pub struct Routines {
+    pub eval_closure: fn(&Func, &Closure, &dyn World, Args) -> SourceResult<Value>
+}
+
 
 pub fn library() -> Library {
     let mut global = Scope::new();
 
     global.define_func::<assert>();
     global.define_func::<panic>();
-    global.define_func::<add_one>();
+    global.define_func::<print>();
+    global.define_func::<println>();
     global.define_type::<i64>();
     global.define_type::<Type>();
     

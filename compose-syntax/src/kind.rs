@@ -90,6 +90,7 @@ pub enum SyntaxKind {
     IndexAccess,
     Args,
     PathAccess,
+    NewLine,
 }
 
 impl SyntaxKind {

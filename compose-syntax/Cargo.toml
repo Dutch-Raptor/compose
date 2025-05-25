@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 ecow = { workspace = true }
+compose-utils = { path = "../compose-utils" }
 unscanny = "0.1.0"
 extension-traits = { workspace = true }
 

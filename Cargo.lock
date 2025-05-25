@@ -220,6 +220,7 @@ dependencies = [
  "compose-eval",
  "compose-library",
  "compose-syntax",
+ "compose-utils",
  "ecow",
  "indoc",
  "parking_lot 0.12.3",
@@ -272,6 +273,7 @@ dependencies = [
 name = "compose-syntax"
 version = "0.1.0"
 dependencies = [
+ "compose-utils",
  "ecow",
  "extension-traits",
  "sequential-test",

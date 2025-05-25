@@ -1,6 +1,7 @@
 use crate::SyntaxNode;
 use crate::ast::macros::node;
-use crate::ast::{AstNode, Expr};
+use crate::ast::{AstNode, Expr, Named};
+use crate::kind::SyntaxKind;
 
 node! {
     struct FuncCall
@@ -28,16 +29,21 @@ impl<'a> Args<'a> {
 #[derive(Debug, Clone, Copy)]
 pub enum Arg<'a> {
     Pos(Expr<'a>),
+    Named(Named<'a>)
 }
 
 impl<'a> AstNode<'a> for Arg<'a> {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self> {
-        node.cast().map(Self::Pos)
+        match node.kind() {
+            SyntaxKind::Named => Named::from_untyped(node).map(Arg::Named),
+            _ => Expr::from_untyped(node).map(Arg::Pos)
+        }
     }
 
     fn to_untyped(self) -> &'a SyntaxNode {
         match self {
             Arg::Pos(p) => p.to_untyped(),
+            Arg::Named(n) => n.to_untyped()
         }
     }
 }

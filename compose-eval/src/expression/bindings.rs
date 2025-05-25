@@ -24,13 +24,14 @@ impl<'a> Eval for ast::LetBinding<'a> {
     type Output = Value;
 
     fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+        let has_init = self.has_initial_value();
         let init = self.initial_value();
 
-        let binding_kind = match (self.is_mut(), init) {
-            (true, Some(_)) => compose_library::BindingKind::Mutable,
-            (false, Some(_)) => compose_library::BindingKind::Immutable { first_assign: None },
-            (true, None) => compose_library::BindingKind::UninitializedMutable,
-            (false, None) => compose_library::BindingKind::Uninitialized,
+        let binding_kind = match (self.is_mut(), has_init) {
+            (true, true) => compose_library::BindingKind::Mutable,
+            (false, true) => compose_library::BindingKind::Immutable { first_assign: None },
+            (true, false) => compose_library::BindingKind::UninitializedMutable,
+            (false, false) => compose_library::BindingKind::Uninitialized,
         };
 
         let value = match init {

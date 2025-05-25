@@ -3,8 +3,9 @@ use crate::file::FileId;
 use crate::kind::SyntaxKind;
 use crate::node::SyntaxNode;
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{SyntaxSet, UNARY_OP};
+use crate::set::{syntax_set, SyntaxSet, ARG_RECOVER, UNARY_OP};
 use crate::{Lexer, SyntaxError, ast, set};
+use compose_utils::trace_fn;
 use ecow::eco_format;
 use std::collections::HashSet;
 use std::ops::{Index, IndexMut};
@@ -39,6 +40,19 @@ fn code_expression(p: &mut Parser) {
 }
 
 fn code_expr_prec(p: &mut Parser, atomic: bool, min_prec: Precedence) {
+    trace_fn!(
+        "parse_code_expr_prec",
+        "atomic: {atomic} {}",
+        p.current_end()
+    );
+
+    // handle infinite loops
+    if p.current_end() == p.last_pos {
+        p.eat();
+        return;
+    }
+    p.last_pos = p.current_end();
+
     let m = p.marker();
     if !atomic && p.at_set(UNARY_OP) {
         let op = ast::UnOp::from_kind(p.current()).expect("Was checked to be a unary op");
@@ -50,6 +64,7 @@ fn code_expr_prec(p: &mut Parser, atomic: bool, min_prec: Precedence) {
     }
 
     loop {
+        trace_fn!("parse_code_expr_prec loop", "{:?}", p.current());
         if p.at(SyntaxKind::LeftParen) {
             args(p);
             p.wrap(m, SyntaxKind::FuncCall);
@@ -61,7 +76,7 @@ fn code_expr_prec(p: &mut Parser, atomic: bool, min_prec: Precedence) {
         if atomic && !at_field_or_index {
             break;
         }
-        
+
         // handle path access `a::b::c`
         if p.eat_if(SyntaxKind::ColonColon) {
             p.expect(SyntaxKind::Ident);
@@ -102,6 +117,7 @@ fn code_expr_prec(p: &mut Parser, atomic: bool, min_prec: Precedence) {
 }
 
 fn args(p: &mut Parser) {
+    trace_fn!("parse_args");
     let m = p.marker();
     p.expect(SyntaxKind::LeftParen);
 
@@ -109,7 +125,7 @@ fn args(p: &mut Parser) {
         arg(p);
 
         if !p.current().is_terminator() {
-            p.expect(SyntaxKind::Comma);
+            p.expect_or_recover(SyntaxKind::Comma, ARG_RECOVER);
         }
     }
 
@@ -119,13 +135,23 @@ fn args(p: &mut Parser) {
 }
 
 fn arg(p: &mut Parser) {
+    let m = p.marker();
     code_expression(p);
+
+    if p.eat_if(SyntaxKind::Colon) {
+        if p[m].kind() != SyntaxKind::Ident {
+            p[m].expected("identifier");
+        }
+        code_expression(p);
+        p.wrap(m, SyntaxKind::Named)
+    }
 }
 
 /// Parse a primary expression.
 ///
 /// A primary expressions are the building blocks in composable expressions.
 fn primary_expr(p: &mut Parser, atomic: bool) {
+    trace_fn!("parse_primary_expr");
     let m = p.marker();
     match p.current() {
         SyntaxKind::Ident => {
@@ -167,11 +193,12 @@ fn primary_expr(p: &mut Parser, atomic: bool) {
 }
 
 fn closure(p: &mut Parser, m: Marker) {
+    trace_fn!("parse_closure");
     debug_assert_eq!(p.current(), SyntaxKind::LeftParen);
 
     params(p);
 
-    p.expect(SyntaxKind::Arrow);
+    p.expect_or_recover_until(SyntaxKind::Arrow, syntax_set!(Arrow, LeftBrace, NewLine));
 
     code_expression(p);
 
@@ -217,13 +244,14 @@ fn params(p: &mut Parser) {
 }
 
 fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
+    trace_fn!("parse_param");
     let m = p.marker();
 
     let was_at_pat = p.at_set(set::PATTERN);
     pattern(p, false, seen, Some("parameter"));
 
-    // Parse named params like `a: 1`
-    if p.eat_if(SyntaxKind::Colon) {
+    // Parse named params like `a = 1`
+    if p.eat_if(SyntaxKind::Eq) {
         if was_at_pat && p[m].kind() != SyntaxKind::Ident {
             p[m].expected("identifier");
         }
@@ -240,6 +268,7 @@ fn pattern<'s>(
     seen: &mut HashSet<&'s str>,
     dupe: Option<&'s str>,
 ) {
+    trace_fn!("parse_pattern");
     match p.current() {
         SyntaxKind::Underscore => p.eat(),
         SyntaxKind::At => destructuring(p, reassignment, seen, dupe),
@@ -253,6 +282,7 @@ fn pattern_leaf<'s>(
     seen: &mut HashSet<&'s str>,
     dupe: Option<&'s str>,
 ) {
+    trace_fn!("parse_pattern_leaf");
     if p.current().is_keyword() {
         p.token.node.expected("pattern");
         p.eat();
@@ -286,6 +316,7 @@ fn pattern_leaf<'s>(
 }
 
 fn destructuring(p: &mut Parser, reassignment: bool, seen: &mut HashSet<&str>, dupe: Option<&str>) {
+    trace_fn!("parse_destructuring");
     p.assert(SyntaxKind::At);
 
     unimplemented!("destructuring")
@@ -361,6 +392,7 @@ struct Parser<'s> {
 
     balanced: bool,
     nodes: Vec<SyntaxNode>,
+    last_pos: usize,
 }
 
 struct SyntaxKindIter<'s> {
@@ -392,22 +424,6 @@ impl<'s> Iterator for SyntaxKindIter<'s> {
     }
 }
 
-impl<'s> Parser<'s> {
-    /// Consume the given syntax kind or produce an error. Returns whether the expected token was found.
-    pub(crate) fn expect(&mut self, kind: SyntaxKind) -> bool {
-        let at = self.at(kind);
-        if at {
-            self.eat();
-        } else if kind == SyntaxKind::Ident && self.token.kind.is_keyword() {
-            self.token.node.expected(eco_format!("{kind:?}"));
-            self.eat()
-        } else {
-            self.balanced &= !kind.is_grouping();
-            self.expected(&format!("{kind:?}"));
-        }
-        at
-    }
-}
 
 impl<'s> Parser<'s> {
     /// A marker that will point to the current token in the parser once it has been eaten.
@@ -442,6 +458,7 @@ impl<'s> Parser<'s> {
             token,
             balanced: true,
             nodes: vec![],
+            last_pos: 0,
         }
     }
 
@@ -560,6 +577,62 @@ impl<'s> Parser<'s> {
             .node
             .convert_to_error(eco_format!("unexpected token {:?}", self.token.kind));
         self.eat();
+    }
+
+    /// Consume the given syntax kind or produce an error. Returns whether the expected token was found.
+    pub(crate) fn expect(&mut self, kind: SyntaxKind) -> bool {
+        let at = self.at(kind);
+        if at {
+            self.eat();
+        } else if kind == SyntaxKind::Ident && self.token.kind.is_keyword() {
+            self.token.node.expected(eco_format!("{kind:?}"));
+            self.eat()
+        } else {
+            self.balanced &= !kind.is_grouping();
+            self.expected(&format!("{kind:?}"));
+            self.eat()
+        }
+        at
+    }
+
+    fn expect_or_recover(&mut self, expected: SyntaxKind, recover_set: SyntaxSet) -> bool {
+        if self.at(expected) {
+            self.eat();
+            return true;
+        }
+
+        let got = self.current();
+        self.expected(&format!("{expected:?}"));
+        if !recover_set.contains(got) {
+            self.eat()
+        }
+        false
+    }
+
+    fn expect_or_recover_until(&mut self, expected: SyntaxKind, recover_set: SyntaxSet) -> bool {
+        if self.at(expected) {
+            self.eat();
+            return true;
+        }
+        
+        self.recover_until(recover_set, &format!("{expected:?}"));
+        if self.current() == expected {
+            self.eat();
+            return false;
+        }
+        false
+    }
+
+    fn recover_until(&mut self, recovery_set: SyntaxSet, label: &str) {
+        self.expected(label);
+        self.eat();
+
+        while !self.end() && !recovery_set.contains(self.current() ) {
+            if recovery_set.contains(SyntaxKind::NewLine) && self.had_newline() {
+                break;
+            }
+            self.eat();
+        }
     }
 
     #[track_caller]

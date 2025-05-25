@@ -1,5 +1,5 @@
 use crate::Value;
-use crate::diag::{bail, StrResult};
+use crate::diag::{StrResult, bail};
 use compose_macros::func;
 
 mod assertions;
@@ -7,11 +7,25 @@ mod assertions;
 pub use assertions::*;
 
 #[func]
-pub fn add_one(x: i64) -> i64 {
-    x + 1
+pub fn panic(msg: Value) -> StrResult<()> {
+    bail!("Panic: {:?}", msg)
 }
 
 #[func]
-pub fn panic(msg: Value) -> StrResult<()> {
-    bail!("Panic: {:?}", msg)
+pub fn print(#[variadic] print_args: Vec<Value>) {
+    let message = print_args
+        .iter()
+        .map(|v| format!("{v:?}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    print!("{}", message);
+}
+#[func]
+pub fn println(#[variadic] print_args: Vec<Value>) {
+    let message = print_args
+        .iter()
+        .map(|v| format!("{v:?}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    println!("{}", message);
 }

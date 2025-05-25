@@ -3,11 +3,14 @@ use crate::diag::{At, SourceDiagnostic, SourceResult, Spanned, bail, error};
 use crate::foundations::IntoValue;
 use crate::foundations::cast::FromValue;
 use compose_syntax::Span;
-use ecow::EcoVec;
+use ecow::{EcoVec, eco_vec};
 
 pub struct Args {
     pub span: Span,
     pub items: EcoVec<Arg>,
+}
+
+impl Args {
 }
 
 impl Args {
@@ -16,16 +19,28 @@ impl Args {
             .into_iter()
             .map(|value| Arg {
                 span,
+                name: None,
                 value: Spanned::new(value.into_value(), span),
             })
             .collect();
-        Self {
-            span,
-            items,
-        }
+        Self { span, items }
     }
     pub fn insert(&mut self, index: i32, span: Span, value: Value) {
-        self.items.insert(index as usize, Arg { span, value: Spanned::new(value, span) });
+        self.items.insert(
+            index as usize,
+            Arg {
+                span,
+                name: None,
+                value: Spanned::new(value, span),
+            },
+        );
+    }
+    pub fn push(&mut self, span: Span, value: Value) {
+        self.items.push(Arg {
+            span,
+            name: None,
+            value: Spanned::new(value, span),
+        });
     }
 
     pub fn spanned(mut self, span: Span) -> Args {
@@ -60,6 +75,60 @@ impl Args {
         }
     }
 
+    /// Remove all args with the given name and return the last
+    /// or an error if the conversion fails.
+    ///
+    /// If no such arg exists, then Ok(None) is returned
+    pub fn named<T>(&mut self, name: &str) -> SourceResult<Option<T>>
+    where
+        T: FromValue<Spanned<Value>>,
+    {
+        let mut found = None;
+
+        for i in (0..self.items.len()).rev() {
+            if self.items[i].name.as_deref() == Some(name) {
+                let value = self.items.remove(i).value;
+                let span = value.span;
+                let casted = T::from_value(value).at(span)?;
+                
+                if found.is_none() {
+                    found = Some(casted);
+                }
+            }
+        }
+
+        Ok(found)
+    }
+
+    /// Find and consume all castable positional arguments
+    pub fn all<T>(&mut self) -> SourceResult<Vec<T>>
+    where
+        T: FromValue<Spanned<Value>>,
+    {
+        let mut vals = Vec::new();
+        let mut errors = eco_vec![];
+
+        self.items.retain(|item| {
+            if item.name.is_some() {
+                return true;
+            }
+
+            let span = item.value.span;
+            let spanned = Spanned::new(std::mem::take(&mut item.value.value), span);
+            match T::from_value(spanned).at(span) {
+                Ok(v) => vals.push(v),
+                Err(e) => errors.extend(e),
+            }
+            false
+        });
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        Ok(vals)
+    }
+
     fn missing_argument(&self, what: &str) -> SourceDiagnostic {
         // TODO: Handle named arguments
         error!(self.span, "missing argument `{}`", what)
@@ -87,5 +156,6 @@ impl Args {
 #[derive(Debug, Clone)]
 pub struct Arg {
     pub span: Span,
+    pub name: Option<String>,
     pub value: Spanned<Value>,
 }
