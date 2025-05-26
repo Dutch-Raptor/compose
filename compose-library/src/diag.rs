@@ -1,5 +1,5 @@
 use compose_syntax::{Span, SyntaxError};
-use ecow::{eco_vec, EcoVec};
+use ecow::{EcoVec, eco_vec};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::str::Utf8Error;
@@ -52,7 +52,6 @@ macro_rules! __bail {
         return Err(::ecow::eco_vec![$crate::diag::error!($($tts)*)])
     };
 }
-
 
 /// Construct an [`EcoString`], [`HintedString`] or [`SourceDiagnostic`] with
 /// severity `Error`.
@@ -160,7 +159,7 @@ impl Label {
 }
 
 impl SourceDiagnostic {
-    pub fn error<S>(span: Span, message: S) -> Self 
+    pub fn error<S>(span: Span, message: S) -> Self
     where
         S: Into<EcoString>,
     {
@@ -175,7 +174,7 @@ impl SourceDiagnostic {
             notes: eco_vec!(),
         }
     }
-    
+
     pub fn warning(span: Span, message: impl Into<EcoString>) -> Self {
         Self {
             severity: Severity::Warning,
@@ -188,32 +187,30 @@ impl SourceDiagnostic {
             notes: eco_vec!(),
         }
     }
-    
+
     pub fn with_label_message(mut self, message: impl Into<EcoString>) -> Self {
         self.label_message = Some(message.into());
         self
     }
-    
-    pub fn hint(&mut self, hint: impl Into<EcoString>)
-    {
+
+    pub fn hint(&mut self, hint: impl Into<EcoString>) {
         self.hints.push(hint.into());
     }
-    
+
     pub fn with_hint(mut self, hint: impl Into<EcoString>) -> Self {
         self.hint(hint);
         self
     }
-    
-    pub fn note(&mut self, note: impl Into<EcoString>)
-    {
+
+    pub fn note(&mut self, note: impl Into<EcoString>) {
         self.notes.push(note.into());
     }
-    
+
     pub fn with_note(mut self, note: impl Into<EcoString>) -> Self {
         self.note(note);
         self
     }
-    
+
     pub fn with_label(mut self, span: Span, message: impl Into<EcoString>) -> Self {
         self.labels.push(Label::new(span, message));
         self
@@ -226,11 +223,15 @@ impl From<SyntaxError> for SourceDiagnostic {
             severity: Severity::Error,
             span: error.span,
             message: error.message,
-            label_message: None,
+            label_message: error.label_message,
             trace: eco_vec![],
             hints: error.hints,
-            labels: eco_vec![],
-            notes: eco_vec![],       
+            labels: error
+                .labels
+                .into_iter()
+                .map(|label| Label::new(label.span, label.message))
+                .collect(),
+            notes: eco_vec![],
         }
     }
 }
@@ -246,7 +247,6 @@ pub struct Warned<T> {
     pub warnings: EcoVec<SourceDiagnostic>,
 }
 
-
 impl<T> Warned<T> {
     pub fn new(value: T) -> Self {
         Self {
@@ -254,12 +254,12 @@ impl<T> Warned<T> {
             warnings: eco_vec!(),
         }
     }
-    
+
     pub fn with_warning(mut self, warning: SourceDiagnostic) -> Self {
         self.warnings.push(warning);
         self
     }
-    
+
     pub fn extend_warnings(&mut self, warnings: EcoVec<SourceDiagnostic>) {
         self.warnings.extend(warnings);
     }
@@ -291,9 +291,7 @@ impl<T> Trace<T> for SourceResult<T> {
                     Some(error_range)
                         if error.span.id() == span.id()
                             && trace_range.start <= error_range.start
-                            && error_range.end >= trace_range.end =>
-                    {
-                    }
+                            && error_range.end >= trace_range.end => {}
                     _ => error.trace.push(Spanned::new(make_point(), error.span)),
                 }
             }
@@ -355,7 +353,8 @@ pub trait At<T> {
 }
 
 impl<T, S> At<T> for Result<T, S>
-where S: Into<EcoString>,
+where
+    S: Into<EcoString>,
 {
     fn at(self, span: Span) -> SourceResult<T> {
         self.map_err(|msg| {
@@ -394,10 +393,12 @@ impl FileError {
             io::ErrorKind::NotFound => Self::NotFound(path.into()),
             io::ErrorKind::PermissionDenied => Self::AccessDenied,
             io::ErrorKind::InvalidData
-            if err.to_string().contains("stream did not contain valid UTF-8") =>
-                {
-                    Self::InvalidUtf8
-                }
+                if err
+                    .to_string()
+                    .contains("stream did not contain valid UTF-8") =>
+            {
+                Self::InvalidUtf8
+            }
             _ => Self::Other(Some(eco_format!("{err}"))),
         }
     }

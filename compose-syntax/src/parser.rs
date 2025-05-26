@@ -2,13 +2,13 @@ use crate::ast::BinOp;
 use crate::file::FileId;
 use crate::kind::SyntaxKind;
 use crate::node::SyntaxNode;
+use crate::parser_impl::Parser;
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{syntax_set, ARG_RECOVER, UNARY_OP};
-use crate::{ast, set, Lexer};
+use crate::set::{ARG_RECOVER, UNARY_OP, syntax_set};
+use crate::{Lexer, ast, set};
 use compose_utils::trace_fn;
 use ecow::eco_format;
 use std::collections::HashSet;
-use crate::parser_impl::Parser;
 
 pub fn parse(text: &str, file_id: FileId) -> Vec<SyntaxNode> {
     parse_with_offset(text, file_id, 0)
@@ -198,7 +198,14 @@ fn closure(p: &mut Parser, m: Marker) {
 
     params(p);
 
-    p.expect_or_recover_until(SyntaxKind::Arrow, syntax_set!(Arrow, LeftBrace, NewLine));
+    p.expect_or_recover_until(
+        SyntaxKind::Arrow,
+        "expected `=>` after closure parameters",
+        syntax_set!(Arrow, LeftBrace, NewLine),
+    )
+    .map(|e| {
+        e.with_label_message("help: you probably meant to write `=>` here");
+    });
 
     code_expression(p);
 
@@ -399,4 +406,3 @@ pub(crate) struct Token {
     // The index into `text` of the end of the previous token
     pub(crate) prev_end: usize,
 }
-

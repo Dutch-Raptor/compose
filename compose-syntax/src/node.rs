@@ -30,6 +30,13 @@ impl SyntaxNode {
                 .collect()
         }
     }
+
+    pub fn error_mut(&mut self) -> Option<&mut SyntaxError> {
+        match &mut self.0 {
+            Repr::Error(e) => Some(&mut Arc::make_mut(e).error),
+            _ => None,
+        }
+    }
 }
 
 impl SyntaxNode {
@@ -292,10 +299,13 @@ impl InnerNode {
 
 impl Debug for InnerNode {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{:?}{}: {}", 
-               self.kind, 
-                if self.erroneous { " (err)" } else { "" },
-               self.len)?;
+        write!(
+            f,
+            "{:?}{}: {}",
+            self.kind,
+            if self.erroneous { " (err)" } else { "" },
+            self.len
+        )?;
         if !self.children.is_empty() {
             f.write_str(" ")?;
             f.debug_list().entries(&self.children).finish()?;
@@ -346,6 +356,31 @@ pub struct SyntaxError {
     /// Additional hints to the user, indicating how this error could be avoided
     /// or worked around.
     pub hints: EcoVec<EcoString>,
+    pub label_message: Option<EcoString>,
+    pub labels: EcoVec<Label>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Label {
+    pub span: Span,
+    pub message: EcoString,
+}
+
+impl SyntaxError {
+    pub fn with_hint(&mut self, hint: impl Into<EcoString>) -> &mut Self {
+        self.hints.push(hint.into());
+        self
+    }
+
+    pub fn with_label_message(&mut self, message: impl Into<EcoString>) -> &mut Self {
+        self.label_message = Some(message.into());
+        self
+    }
+
+    pub fn with_label(&mut self, label: Label) -> &mut Self {
+        self.labels.push(label);
+        self
+    }
 }
 
 impl SyntaxError {
@@ -354,6 +389,8 @@ impl SyntaxError {
             span,
             message: message.into(),
             hints: eco_vec![],
+            label_message: None,
+            labels: eco_vec![],
         }
     }
 }

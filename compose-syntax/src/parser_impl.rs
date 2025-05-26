@@ -1,10 +1,10 @@
-use std::ops::{Index, IndexMut};
-use ecow::{eco_format, EcoString};
-use compose_utils::trace_fn;
-use crate::parser::{Marker, SyntaxKindIter, Token};
-use crate::{FileId, Lexer, SyntaxError, SyntaxNode};
 use crate::kind::SyntaxKind;
+use crate::parser::{Marker, SyntaxKindIter, Token};
 use crate::set::SyntaxSet;
+use crate::{FileId, Lexer, SyntaxError, SyntaxNode};
+use compose_utils::trace_fn;
+use ecow::{EcoString, eco_format};
+use std::ops::{Index, IndexMut};
 
 impl Index<Marker> for Parser<'_> {
     type Output = SyntaxNode;
@@ -38,6 +38,23 @@ pub struct Parser<'s> {
     balanced: bool,
     nodes: Vec<SyntaxNode>,
     pub(crate) last_pos: usize,
+}
+
+pub enum ExpectResult<'a> {
+    Ok,
+    SyntaxError(&'a mut SyntaxError),
+}
+
+impl ExpectResult<'_> {
+    pub fn map(self, f: impl FnOnce(&mut SyntaxError) -> ()) -> Self {
+        match self {
+            Self::Ok => self,
+            Self::SyntaxError(err) => {
+                f(err);
+                Self::Ok
+            }
+        }
+    }
 }
 
 impl<'s> Parser<'s> {
@@ -166,21 +183,32 @@ impl<'s> Parser<'s> {
         self.eat();
     }
 
+    pub(crate) fn insert_error_here(&mut self, message: impl Into<EcoString>) -> &mut SyntaxError {
+        let error = SyntaxNode::error(
+            SyntaxError::new(message.into(), self.token.node.span()),
+            self.token.node.text(),
+        );
+        self.nodes.push(error);
+
+        self.last_err().unwrap()
+    }
+
+    pub fn last_err(&mut self) -> Option<&mut SyntaxError> {
+        self.nodes.iter_mut().rev().find_map(|n| n.error_mut())
+    }
+
     /// Include a syntax error node at the current token's position indicating that `expected` was expected.
     #[track_caller]
     pub(crate) fn expected(&mut self, expected: &str) {
         let kind = self.current();
-        let error = SyntaxNode::error(
-            SyntaxError::new(
-                eco_format!("expected {expected}, got {kind:?}"),
-                self.token.node.span(),
-            ),
-            self.token.node.text(),
-        );
-        self.nodes.push(error);
+        self.insert_error_here(eco_format!("expected {expected}, got {kind:?}"));
     }
 
-    pub(crate) fn unexpected(&mut self, message: impl Into<EcoString>, recover_set: Option<SyntaxSet>) {
+    pub(crate) fn unexpected(
+        &mut self,
+        message: impl Into<EcoString>,
+        recover_set: Option<SyntaxSet>,
+    ) {
         trace_fn!("error_unexpected");
         self.balanced &= !self.token.kind.is_grouping();
         let message = message.into();
@@ -214,7 +242,11 @@ impl<'s> Parser<'s> {
         at
     }
 
-    pub(crate) fn expect_or_recover(&mut self, expected: SyntaxKind, recover_set: SyntaxSet) -> bool {
+    pub(crate) fn expect_or_recover(
+        &mut self,
+        expected: SyntaxKind,
+        recover_set: SyntaxSet,
+    ) -> bool {
         if self.at(expected) {
             self.eat();
             return true;
@@ -232,24 +264,28 @@ impl<'s> Parser<'s> {
             || (recover_set.contains(SyntaxKind::NewLine) && self.had_newline())
     }
 
-    pub(crate) fn expect_or_recover_until(&mut self, expected: SyntaxKind, recover_set: SyntaxSet) -> bool {
+    pub(crate) fn expect_or_recover_until(
+        &mut self,
+        expected: SyntaxKind,
+        message: impl Into<EcoString>,
+        recover_set: SyntaxSet,
+    ) -> ExpectResult {
         if self.at(expected) {
             self.eat();
-            return true;
+            return ExpectResult::Ok;
         }
 
-        self.expected(&format!("{expected:?}"));
+        self.insert_error_here(message);
 
         self.recover_until(recover_set);
         if self.current() == expected {
             self.eat();
-            return false;
         }
-        false
+        ExpectResult::SyntaxError(self.last_err().expect("An error was just inserted"))
     }
 
     fn recover_until(&mut self, recovery_set: SyntaxSet) {
-        while !self.can_recover_with(recovery_set) &&  !self.end() {
+        while !self.can_recover_with(recovery_set) && !self.end() {
             self.eat();
         }
     }
