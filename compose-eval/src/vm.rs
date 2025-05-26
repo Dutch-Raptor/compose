@@ -1,3 +1,4 @@
+use crate::expression::eval_closure;
 use compose_library::diag::{error, At, SourceDiagnostic, SourceResult};
 use compose_library::{Binding, IntoValue, Routines, Scopes, Sink, Value, World};
 use compose_syntax::ast::AstNode;

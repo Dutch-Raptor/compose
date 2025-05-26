@@ -3,12 +3,12 @@ use crate::file::FileId;
 use crate::kind::SyntaxKind;
 use crate::node::SyntaxNode;
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{syntax_set, SyntaxSet, ARG_RECOVER, UNARY_OP};
-use crate::{Lexer, SyntaxError, ast, set};
+use crate::set::{syntax_set, ARG_RECOVER, UNARY_OP};
+use crate::{ast, set, Lexer};
 use compose_utils::trace_fn;
 use ecow::eco_format;
 use std::collections::HashSet;
-use std::ops::{Index, IndexMut};
+use crate::parser_impl::Parser;
 
 pub fn parse(text: &str, file_id: FileId) -> Vec<SyntaxNode> {
     parse_with_offset(text, file_id, 0)
@@ -27,7 +27,7 @@ pub fn parse_with_offset(text: &str, file_id: FileId, offset: usize) -> Vec<Synt
         // If the parser is not progressing, then we have an error
         if pos == p.current_end() && !p.end() {
             // Eat the token and continue trying to parse
-            p.unexpected();
+            p.unexpected("", None);
         }
         pos = p.current_end();
     }
@@ -225,19 +225,16 @@ fn params(p: &mut Parser) {
 
     while !p.current().is_terminator() {
         if !p.at_set(set::PARAM) {
-            p.unexpected();
+            p.unexpected("expected a param", None);
             continue;
         }
 
         param(p, &mut seen);
 
         if !p.current().is_terminator() {
-            p.assert(SyntaxKind::Comma);
+            p.expect_or_recover(SyntaxKind::Comma, ARG_RECOVER);
         }
     }
-
-    // allow trailing commas
-    p.eat_if(SyntaxKind::Comma);
 
     p.expect_closing_delimiter(m, SyntaxKind::RightParen);
     p.wrap(m, SyntaxKind::Params)
@@ -359,43 +356,9 @@ fn block(p: &mut Parser) {
 
 // Represents a node's position in the parser.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct Marker(usize);
+pub(crate) struct Marker(pub(crate) usize);
 
-impl Index<Marker> for Parser<'_> {
-    type Output = SyntaxNode;
-
-    fn index(&self, index: Marker) -> &Self::Output {
-        &self.nodes[index.0]
-    }
-}
-
-impl IndexMut<Marker> for Parser<'_> {
-    fn index_mut(&mut self, index: Marker) -> &mut Self::Output {
-        &mut self.nodes[index.0]
-    }
-}
-
-/// A parser for Compose syntax.
-///
-/// Builds an internal list of [SyntaxNodes](SyntaxNode) from the text.
-///
-/// The result is a CST where each node contains enough information
-/// to turn into an AST node lazily when needed.
-#[derive(Debug, Clone)]
-struct Parser<'s> {
-    /// The text being parsed.
-    text: &'s str,
-    /// The lexer used to tokenize the text.
-    lexer: Lexer<'s>,
-    // Current token
-    token: Token,
-
-    balanced: bool,
-    nodes: Vec<SyntaxNode>,
-    last_pos: usize,
-}
-
-struct SyntaxKindIter<'s> {
+pub(crate) struct SyntaxKindIter<'s> {
     lexer: Lexer<'s>,
     yielded_at_end: bool,
 }
@@ -424,237 +387,16 @@ impl<'s> Iterator for SyntaxKindIter<'s> {
     }
 }
 
-
-impl<'s> Parser<'s> {
-    /// A marker that will point to the current token in the parser once it has been eaten.
-    pub(crate) fn marker(&self) -> Marker {
-        Marker(self.nodes.len())
-    }
-}
-
 #[derive(Debug, Clone)]
-struct Token {
-    kind: SyntaxKind,
-    node: SyntaxNode,
+pub(crate) struct Token {
+    pub(crate) kind: SyntaxKind,
+    pub(crate) node: SyntaxNode,
     // Whether the preceding token had a trailing newline
-    newline: bool,
+    pub(crate) newline: bool,
 
-    start: usize,
+    pub(crate) start: usize,
 
     // The index into `text` of the end of the previous token
-    prev_end: usize,
+    pub(crate) prev_end: usize,
 }
 
-impl<'s> Parser<'s> {
-    fn new(text: &'s str, offset: usize, file_id: FileId) -> Self {
-        let mut lexer = Lexer::new(text, file_id);
-        lexer.jump(offset);
-
-        let token = Self::lex(&mut lexer);
-
-        Self {
-            text,
-            lexer,
-            token,
-            balanced: true,
-            nodes: vec![],
-            last_pos: 0,
-        }
-    }
-
-    fn finish(self) -> Vec<SyntaxNode> {
-        self.nodes
-    }
-
-    fn finish_into(self, kind: SyntaxKind) -> SyntaxNode {
-        assert!(self.end());
-        SyntaxNode::inner(kind, self.finish())
-    }
-
-    #[inline]
-    fn current(&self) -> SyntaxKind {
-        self.token.kind
-    }
-
-    pub(crate) fn current_text(&self) -> &'s str {
-        &self.text[self.token.start..self.current_end()]
-    }
-
-    fn current_end(&self) -> usize {
-        self.lexer.cursor()
-    }
-
-    // Peeks the token kind after current
-    fn peek(&self) -> SyntaxKind {
-        let (kind, _) = self.lexer.clone().next();
-        kind
-    }
-    fn peeker(&self) -> SyntaxKindIter {
-        SyntaxKindIter::new(self.lexer.clone())
-    }
-
-    fn at(&self, kind: SyntaxKind) -> bool {
-        self.current() == kind
-    }
-
-    fn at_set(&self, set: SyntaxSet) -> bool {
-        set.contains(self.current())
-    }
-
-    fn end(&self) -> bool {
-        self.at(SyntaxKind::End)
-    }
-
-    fn had_newline(&self) -> bool {
-        self.token.newline
-    }
-
-    fn eat(&mut self) {
-        self.nodes.push(std::mem::take(&mut self.token.node));
-        self.token = Self::lex(&mut self.lexer);
-    }
-
-    pub(crate) fn eat_if(&mut self, kind: SyntaxKind) -> bool {
-        let at = self.at(kind);
-        if at {
-            self.eat();
-        }
-        at
-    }
-
-    /// Move the parser forward without adding the node to the nodes vec
-    pub(crate) fn skip(&mut self) {
-        self.token = Self::lex(&mut self.lexer);
-    }
-
-    /// Move the parser forward without adding the node to the nodes vec
-    /// if the current kind == `kind`
-    pub(crate) fn skip_if(&mut self, kind: SyntaxKind) -> bool {
-        let at = self.at(kind);
-        if at {
-            self.skip();
-        }
-        at
-    }
-
-    fn convert_and_eat(&mut self, kind: SyntaxKind) {
-        self.token.node.convert_to_kind(kind);
-        self.eat();
-    }
-
-    fn wrap(&mut self, from: Marker, kind: SyntaxKind) {
-        let to = self.marker().0;
-        let from = from.0.min(to);
-
-        let children = self.nodes.drain(from..to).collect();
-        self.nodes.insert(from, SyntaxNode::inner(kind, children))
-    }
-
-    /// Assert that the current token is of kind `kind` and eat it.
-    #[track_caller]
-    fn assert(&mut self, kind: SyntaxKind) {
-        assert_eq!(self.current(), kind, "Expected {:?}", kind);
-        self.eat();
-    }
-
-    /// Include a syntax error node at the current token's position indicating that `expected` was expected.
-    #[track_caller]
-    fn expected(&mut self, expected: &str) {
-        let kind = self.current();
-        let error = SyntaxNode::error(
-            SyntaxError::new(
-                eco_format!("expected {expected}, got {kind:?}"),
-                self.token.node.span(),
-            ),
-            self.token.node.text(),
-        );
-        self.nodes.push(error);
-    }
-
-    fn unexpected(&mut self) {
-        self.balanced &= !self.token.kind.is_grouping();
-        self.token
-            .node
-            .convert_to_error(eco_format!("unexpected token {:?}", self.token.kind));
-        self.eat();
-    }
-
-    /// Consume the given syntax kind or produce an error. Returns whether the expected token was found.
-    pub(crate) fn expect(&mut self, kind: SyntaxKind) -> bool {
-        let at = self.at(kind);
-        if at {
-            self.eat();
-        } else if kind == SyntaxKind::Ident && self.token.kind.is_keyword() {
-            self.token.node.expected(eco_format!("{kind:?}"));
-            self.eat()
-        } else {
-            self.balanced &= !kind.is_grouping();
-            self.expected(&format!("{kind:?}"));
-            self.eat()
-        }
-        at
-    }
-
-    fn expect_or_recover(&mut self, expected: SyntaxKind, recover_set: SyntaxSet) -> bool {
-        if self.at(expected) {
-            self.eat();
-            return true;
-        }
-
-        let got = self.current();
-        self.expected(&format!("{expected:?}"));
-        if !recover_set.contains(got) {
-            self.eat()
-        }
-        false
-    }
-
-    fn expect_or_recover_until(&mut self, expected: SyntaxKind, recover_set: SyntaxSet) -> bool {
-        if self.at(expected) {
-            self.eat();
-            return true;
-        }
-        
-        self.recover_until(recover_set, &format!("{expected:?}"));
-        if self.current() == expected {
-            self.eat();
-            return false;
-        }
-        false
-    }
-
-    fn recover_until(&mut self, recovery_set: SyntaxSet, label: &str) {
-        self.expected(label);
-        self.eat();
-
-        while !self.end() && !recovery_set.contains(self.current() ) {
-            if recovery_set.contains(SyntaxKind::NewLine) && self.had_newline() {
-                break;
-            }
-            self.eat();
-        }
-    }
-
-    #[track_caller]
-    /// Expect that the current token is the closing delimiter `kind` and eat it.
-    /// If it is not convert the node at `open_marker` to an error indicating that its delimiter was unclosed
-    pub(crate) fn expect_closing_delimiter(&mut self, open_marker: Marker, kind: SyntaxKind) {
-        if !self.eat_if(kind) {
-            self[open_marker].convert_to_error("unclosed delimiter")
-        }
-    }
-
-    fn lex(lexer: &mut Lexer) -> Token {
-        let prev_end = lexer.cursor();
-        let start = prev_end;
-        let (kind, node) = lexer.next();
-
-        Token {
-            kind,
-            node,
-            newline: lexer.newline(),
-            start,
-            prev_end,
-        }
-    }
-}

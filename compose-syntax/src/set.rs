@@ -43,6 +43,7 @@ pub const STMT: SyntaxSet = syntax_set![LetBinding, Import, Return,];
 pub const ARG_RECOVER: SyntaxSet = syntax_set![
     Comma,
     RightParen,
+    NewLine,
 ];
 
 pub const UNARY_OP: SyntaxSet = syntax_set![Plus, Minus, Bang, Tilde];
