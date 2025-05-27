@@ -2,11 +2,11 @@ use crate::ast::BinOp;
 use crate::file::FileId;
 use crate::kind::SyntaxKind;
 use crate::node::SyntaxNode;
-use crate::parser_impl::Parser;
+use crate::parser_impl::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
 use crate::set::{ARG_RECOVER, UNARY_OP, syntax_set};
-use crate::{Lexer, ast, set};
-use compose_utils::trace_fn;
+use crate::{ast, set};
+use compose_utils::{trace_fn, trace_log};
 use ecow::eco_format;
 use std::collections::HashSet;
 
@@ -155,6 +155,7 @@ fn primary_expr(p: &mut Parser, atomic: bool) {
     let m = p.marker();
     match p.current() {
         SyntaxKind::Ident => {
+            trace_fn!("parse_primary_expr: ident");
             p.eat();
             // Parse a closure like `a => a + 1`
             if !atomic && p.at(SyntaxKind::Arrow) {
@@ -165,6 +166,7 @@ fn primary_expr(p: &mut Parser, atomic: bool) {
             }
         }
         SyntaxKind::Underscore if !atomic => {
+            trace_fn!("parse_primary_expr: underscore");
             // Parse closure like `_ => 1` or destructure like `_ = foo()`
             if p.at(SyntaxKind::Arrow) {
                 p.wrap(m, SyntaxKind::Params);
@@ -180,11 +182,12 @@ fn primary_expr(p: &mut Parser, atomic: bool) {
         }
         SyntaxKind::LeftBrace => block(p),
         SyntaxKind::LeftParen if at_unit_literal(p) => {
+            trace_fn!("parse_primary_expr: unit literal");
             p.assert(SyntaxKind::LeftParen);
             p.assert(SyntaxKind::RightParen);
             p.wrap(m, SyntaxKind::Unit)
         }
-        SyntaxKind::LeftParen => closure(p, m),
+        SyntaxKind::LeftParen => expr_with_parens(p, atomic),
         SyntaxKind::Let => let_binding(p),
         // Already fully handled in the lexer
         SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str => p.eat(),
@@ -192,9 +195,40 @@ fn primary_expr(p: &mut Parser, atomic: bool) {
     }
 }
 
-fn closure(p: &mut Parser, m: Marker) {
+fn expr_with_parens(p: &mut Parser, atomic: bool) {
+    trace_fn!("parse_expr_with_parens");
+    if atomic {
+        // If atomic, we don't parse any of the more complicated expressions
+        parenthesized(p);
+        return;
+    }
+
+    // Since expressions with params all look alike at the start of the expression, we will have to
+    // guess and backtrack if we guess incorrectly.
+    let Some((memo_key, checkpoint)) = p.restore_memo_or_checkpoint() else {
+        trace_log!("parse_expr_with_parens: restored from memo");
+        return;
+    };
+    
+    let prev_len = checkpoint.node_len;
+
+    // The most common and simple expr with params is the parenthesized expression, so we try that first.
+    parenthesized(p);
+
+    if p.at(SyntaxKind::Arrow) {
+        trace_fn!("parse_expr_with_parens: found closure");
+        // It looks like it was a closure instead! Let's rewind and parse as a closure instead
+        p.restore(checkpoint);
+        closure(p)
+    }
+
+    p.memoize_parsed_nodes(memo_key, prev_len)
+}
+
+fn closure(p: &mut Parser) {
     trace_fn!("parse_closure");
     debug_assert_eq!(p.current(), SyntaxKind::LeftParen);
+    let m = p.marker();
 
     params(p);
 
@@ -327,6 +361,7 @@ fn destructuring(p: &mut Parser, reassignment: bool, seen: &mut HashSet<&str>, d
 }
 
 fn let_binding(p: &mut Parser) {
+    trace_fn!("parse_let_binding");
     let m = p.marker();
     p.assert(SyntaxKind::Let);
 
@@ -341,15 +376,17 @@ fn let_binding(p: &mut Parser) {
     p.wrap(m, SyntaxKind::LetBinding)
 }
 
-fn parenthesized(p: &mut Parser, atomic: bool) {
+fn parenthesized(p: &mut Parser) {
+    trace_fn!("parse_parenthesized");
     let m = p.marker();
     p.assert(SyntaxKind::LeftParen);
-    code_expr_prec(p, atomic, Precedence::Lowest);
+    code_expr_prec(p, false, Precedence::Lowest);
     p.assert(SyntaxKind::RightParen);
     p.wrap(m, SyntaxKind::Parenthesized)
 }
 
 fn block(p: &mut Parser) {
+    trace_fn!("parse_block");
     let m = p.marker();
     p.assert(SyntaxKind::LeftBrace);
 
@@ -359,50 +396,4 @@ fn block(p: &mut Parser) {
 
     p.expect_closing_delimiter(m, SyntaxKind::RightBrace);
     p.wrap(m, SyntaxKind::CodeBlock)
-}
-
-// Represents a node's position in the parser.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct Marker(pub(crate) usize);
-
-pub(crate) struct SyntaxKindIter<'s> {
-    lexer: Lexer<'s>,
-    yielded_at_end: bool,
-}
-
-impl<'a> SyntaxKindIter<'a> {
-    pub fn new(lexer: Lexer<'a>) -> Self {
-        Self {
-            lexer,
-            yielded_at_end: false,
-        }
-    }
-}
-
-impl<'s> Iterator for SyntaxKindIter<'s> {
-    type Item = SyntaxKind;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.yielded_at_end {
-            return None;
-        }
-        let (kind, _) = self.lexer.next();
-        if kind == SyntaxKind::End {
-            self.yielded_at_end = true;
-        }
-        Some(kind)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct Token {
-    pub(crate) kind: SyntaxKind,
-    pub(crate) node: SyntaxNode,
-    // Whether the preceding token had a trailing newline
-    pub(crate) newline: bool,
-
-    pub(crate) start: usize,
-
-    // The index into `text` of the end of the previous token
-    pub(crate) prev_end: usize,
 }

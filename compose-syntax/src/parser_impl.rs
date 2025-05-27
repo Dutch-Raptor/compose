@@ -1,10 +1,10 @@
 use crate::kind::SyntaxKind;
-use crate::parser::{Marker, SyntaxKindIter, Token};
 use crate::set::SyntaxSet;
 use crate::{FileId, Lexer, SyntaxError, SyntaxNode};
 use compose_utils::trace_fn;
 use ecow::{EcoString, eco_format};
-use std::ops::{Index, IndexMut};
+use std::collections::HashMap;
+use std::ops::{Index, IndexMut, Range};
 
 impl Index<Marker> for Parser<'_> {
     type Output = SyntaxNode;
@@ -26,7 +26,7 @@ impl IndexMut<Marker> for Parser<'_> {
 ///
 /// The result is a CST where each node contains enough information
 /// to turn into an AST node lazily when needed.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Parser<'s> {
     /// The text being parsed.
     text: &'s str,
@@ -38,6 +38,18 @@ pub struct Parser<'s> {
     balanced: bool,
     nodes: Vec<SyntaxNode>,
     pub(crate) last_pos: usize,
+
+    memo: MemoArena,
+}
+
+impl<'s> Parser<'s> {
+}
+
+#[derive(Debug, Clone)]
+pub struct CheckPoint {
+    pub(crate) node_len: usize,
+    lexer_cursor: usize,
+    token: Token,
 }
 
 pub enum ExpectResult<'a> {
@@ -57,11 +69,10 @@ impl ExpectResult<'_> {
     }
 }
 
-impl<'s> Parser<'s> {
-    /// A marker that will point to the current token in the parser once it has been eaten.
-    pub(crate) fn marker(&self) -> Marker {
-        Marker(self.nodes.len())
-    }
+#[derive(Debug, Default)]
+struct MemoArena {
+    nodes: Vec<SyntaxNode>,
+    memo_map: HashMap<MemoKey, (Range<usize>, CheckPoint)>,
 }
 
 impl<'s> Parser<'s> {
@@ -78,6 +89,7 @@ impl<'s> Parser<'s> {
             balanced: true,
             nodes: vec![],
             last_pos: 0,
+            memo: Default::default(),
         }
     }
 
@@ -122,6 +134,11 @@ impl<'s> Parser<'s> {
 
     pub(crate) fn end(&self) -> bool {
         self.at(SyntaxKind::End)
+    }
+
+    /// A marker that will point to the current token in the parser once it has been eaten.
+    pub(crate) fn marker(&self) -> Marker {
+        Marker(self.nodes.len())
     }
 
     fn had_newline(&self) -> bool {
@@ -312,4 +329,95 @@ impl<'s> Parser<'s> {
             prev_end,
         }
     }
+
+    pub(crate) fn checkpoint(&self) -> CheckPoint {
+        CheckPoint {
+            node_len: self.nodes.len(),
+            lexer_cursor: self.lexer.cursor(),
+            token: self.token.clone(),
+        }
+    }
+
+    pub(crate) fn restore(&mut self, checkpoint: CheckPoint) {
+        self.nodes.truncate(checkpoint.node_len);
+        self.restore_partial(checkpoint);
+    }
+
+    pub(crate) fn restore_partial(&mut self, checkpoint: CheckPoint) {
+        self.lexer.jump(checkpoint.lexer_cursor);
+        self.token = checkpoint.token;
+    }
+
+    pub(crate) fn restore_memo_or_checkpoint(&mut self) -> Option<(MemoKey, CheckPoint)> {
+        let key: MemoKey = self.current_start();
+        match self.memo.memo_map.get(&key).cloned() {
+            Some((range, checkpoint)) => {
+                // restore the memo
+                self.nodes.extend_from_slice(&self.memo.nodes[range]);
+                self.restore_partial(checkpoint);
+                None
+            }
+            None => Some((key, self.checkpoint())),
+        }
+    }
+    
+    pub(crate) fn memoize_parsed_nodes(&mut self, key: MemoKey, prev_len: usize) {
+        let prev_memo_len = self.memo.nodes.len();
+        
+        self.memo.nodes.extend_from_slice(&self.nodes[prev_len..]);
+        let checkpoint = self.checkpoint();
+        self.memo.memo_map.insert(key, (prev_memo_len..self.memo.nodes.len(), checkpoint));
+    }
+
+    fn current_start(&self) -> MemoKey {
+        self.token.start
+    }
+}
+
+type MemoKey = usize;
+
+// Represents a node's position in the parser.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) struct Marker(pub(crate) usize);
+
+pub(crate) struct SyntaxKindIter<'s> {
+    lexer: Lexer<'s>,
+    yielded_at_end: bool,
+}
+
+impl<'a> SyntaxKindIter<'a> {
+    pub fn new(lexer: Lexer<'a>) -> Self {
+        Self {
+            lexer,
+            yielded_at_end: false,
+        }
+    }
+}
+
+impl<'s> Iterator for SyntaxKindIter<'s> {
+    type Item = SyntaxKind;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.yielded_at_end {
+            return None;
+        }
+        let (kind, _) = self.lexer.next();
+        if kind == SyntaxKind::End {
+            self.yielded_at_end = true;
+        }
+        Some(kind)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Token {
+    pub(crate) kind: SyntaxKind,
+    pub(crate) node: SyntaxNode,
+    // Whether the preceding token had a trailing newline
+    pub(crate) newline: bool,
+
+    pub(crate) start: usize,
+
+    // The index into `text` of the end of the previous token
+    pub(crate) prev_end: usize,
 }

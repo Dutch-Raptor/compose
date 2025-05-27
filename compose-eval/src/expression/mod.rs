@@ -13,6 +13,7 @@ mod unary;
 mod field_access;
 mod path_access;
 mod closure;
+mod parenthesized;
 
 pub use closure::eval_closure;
 

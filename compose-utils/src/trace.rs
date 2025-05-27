@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::LazyLock;
 use std::time::Instant;
 
@@ -11,8 +11,10 @@ thread_local! {
     static INDENT: RefCell<usize> = RefCell::new(0);
 }
 
+static CALL_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
+
 /// Run a closure with the current indentation level.
-fn with_indent<F: FnOnce(usize) -> String>(f: F) {
+pub fn with_indent<F: FnOnce(usize) -> String>(f: F) {
     INDENT.with(|level| {
         let indent = *level.borrow();
         println!("{}", f(indent));
@@ -34,17 +36,20 @@ pub struct TraceFnGuard {
     name: &'static str,
     enabled: bool,
     start_time: Option<Instant>,
+    id: usize,
 }
 
 impl TraceFnGuard {
     pub fn new(name: &'static str, message: Option<&str>) -> Self {
         let enabled = ENABLE_TRACE.load(Ordering::Relaxed);
         let start_time = if enabled { Some(Instant::now()) } else { None };
+        let id = CALL_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         if enabled {
             with_indent(|i| format!(
-                "{}↳ Enter: {} {}",
+                "{}[#{}]↳ Enter: {} {}",
                 "  ".repeat(i),
+                id,
                 name,
                 message.unwrap_or("")
             ));
@@ -55,6 +60,7 @@ impl TraceFnGuard {
             name,
             enabled,
             start_time,
+            id,
         }
     }
 }
@@ -66,8 +72,9 @@ impl Drop for TraceFnGuard {
             if let Some(start) = self.start_time {
                 let duration = start.elapsed();
                 with_indent(|i| format!(
-                    "{}↳ Exit:  {} (took {:.2?})",
+                    "{}[#{}]↳ Exit:  {} (took {:.2?})",
                     "  ".repeat(i),
+                    self.id,
                     self.name,
                     duration
                 ));
@@ -93,3 +100,13 @@ macro_rules! trace_fn {
     };
 }
 
+#[macro_export]
+macro_rules! trace_log {
+    ($($tt:tt)*) => {
+            $crate::with_indent(|i| format!(
+                "{}      {}",
+                "  ".repeat(i),
+                format!($($tt)*),
+            ));
+    };
+}

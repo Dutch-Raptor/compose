@@ -54,15 +54,16 @@ impl Args {
     where
         T: FromValue<Spanned<Value>>,
     {
-        // TODO: Handle named args;
-
-        if self.items.is_empty() {
-            return Ok(None);
+        for (i, item) in self.items.iter().enumerate() {
+            if item.name.is_some() {
+                // Only return positional args
+                continue;
+            }
+            let value = self.items.remove(i).value;
+            let span = value.span;
+            return T::from_value(value).at(span).map(Some)
         }
-
-        let value = self.items.remove(0).value;
-        let span = value.span;
-        T::from_value(value).at(span).map(Some)
+        Ok(None)
     }
 
     pub fn expect<T>(&mut self, what: &str) -> SourceResult<T>

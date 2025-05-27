@@ -1,0 +1,3 @@
+let g = (a = (b = ()) => b) => a(b: 2)
+
+println(g(a: (b = ()) => int::increment(b)))

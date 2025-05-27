@@ -8,6 +8,7 @@ mod bindings;
 mod call;
 mod field_access;
 mod path_access;
+mod parenthesized;
 
 use crate::node::SyntaxNode;
 use crate::span::Span;
@@ -22,6 +23,7 @@ pub use closure::*;
 pub use call::*;
 pub use field_access::*;
 pub use path_access::*;
+pub use parenthesized::*;
 
 pub trait AstNode<'a>: Sized {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self>;
