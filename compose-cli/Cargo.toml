@@ -9,6 +9,7 @@ compose-eval = { path = "../compose-eval" }
 compose-syntax = { path = "../compose-syntax" }
 compose-editor = { path = "../compose-editor" }
 compose-utils = { path = "../compose-utils" }
+compose = { path = "../compose" }
 codespan-reporting = "0.12.0"
 clap = { version = "4.5.37", features = ["derive"] }
 ecow = { workspace = true }

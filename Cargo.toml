@@ -5,7 +5,7 @@ members = [ "compose-cli",
     "compose-library",
     "compose-syntax",
     "compose-editor"
-, "compose-macros", "compose-utils"]
+, "compose-macros", "compose-utils", "compose"]
 
 [workspace.package]
 version = "0.1.0"

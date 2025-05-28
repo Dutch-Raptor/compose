@@ -28,12 +28,6 @@ pub enum BinOp {
     BitXor,
     BitShl,
     BitShr,
-
-    Assign,
-    AddAssign,
-    SubAssign,
-    MulAssign,
-    DivAssign,
 }
 
 impl BinOp {
@@ -60,24 +54,8 @@ impl BinOp {
             SyntaxKind::LtLt => Self::BitShl,
             SyntaxKind::GtGt => Self::BitShr,
 
-            SyntaxKind::Eq => Self::Assign,
-            SyntaxKind::PlusEq => Self::AddAssign,
-            SyntaxKind::MinusEq => Self::SubAssign,
-            SyntaxKind::StarEq => Self::MulAssign,
-            SyntaxKind::SlashEq => Self::DivAssign,
             _ => return None,
         })
-    }
-
-    pub(crate) fn is_assign(&self) -> bool {
-        match self {
-            Self::Assign
-            | Self::AddAssign
-            | Self::SubAssign
-            | Self::MulAssign
-            | Self::DivAssign => true,
-            _ => false,
-        }
     }
 
     pub fn assoc(self) -> Assoc {
@@ -86,11 +64,6 @@ impl BinOp {
             Self::BitAnd | Self::BitOr | Self::BitXor | Self::BitShl | Self::BitShr => Assoc::Left,
             Self::And | Self::Or => Assoc::Left,
             Self::Eq | Self::Neq | Self::Lt | Self::Lte | Self::Gt | Self::Gte => Assoc::Left,
-            Self::Assign
-            | Self::AddAssign
-            | Self::SubAssign
-            | Self::MulAssign
-            | Self::DivAssign => Assoc::Right,
         }
     }
 }
@@ -108,11 +81,6 @@ impl PrecedenceTrait for BinOp {
             BinOp::BitOr => Precedence::BitwiseOr,
             BinOp::BitXor => Precedence::BitwiseXor,
             BinOp::BitShl | BinOp::BitShr => Precedence::BitShift,
-            BinOp::Assign
-            | BinOp::AddAssign
-            | BinOp::SubAssign
-            | BinOp::MulAssign
-            | BinOp::DivAssign => Precedence::Assign,
         }
     }
 }

@@ -14,7 +14,7 @@ pub fn file(args: FileArgs) -> Result<(), CliError> {
         println!("AST: {:#?}\n", source.nodes());
     }
 
-    let Warned { value, warnings } = crate::eval(&source, 0..usize::MAX, &mut vm);
+    let Warned { value, warnings } = compose::eval(&source, &mut vm);
 
     if let Err(err) = value {
         crate::print_diagnostics(&world, &err, &warnings).unwrap();

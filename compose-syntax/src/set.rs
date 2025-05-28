@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use crate::kind::SyntaxKind;
 
 #[derive(Default, Copy, Clone)]
@@ -60,16 +61,14 @@ pub const BINARY_OP: SyntaxSet = syntax_set![
     
     // Logical
     PipePipe, AmpersandAmpersand, 
-    
-    // Assignment
-    Eq, MinusEq, PlusEq, StarEq, SlashEq, AmpersandEq, HatEq, PipeEq, AmpersandEq, 
 ];
+
+pub const ASSIGN_OP: SyntaxSet = syntax_set![Eq, MinusEq, PlusEq, StarEq, SlashEq, AmpersandEq, HatEq, PipeEq, AmpersandEq,];
 
 pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
     Ident,
     LeftBrace,
     LeftBracket,
-    Let,
     If,
     While,
     Loop,

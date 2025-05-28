@@ -1,5 +1,5 @@
 use crate::SyntaxNode;
-use crate::ast::Expr;
+use crate::ast::{Expr, Statement};
 use crate::ast::macros::node;
 use ecow::EcoString;
 use std::ops::Deref;
@@ -60,7 +60,7 @@ node! {
 }
 
 impl<'a> CodeBlock<'a> {
-    pub fn exprs(self) -> impl DoubleEndedIterator<Item = Expr<'a>> {
+    pub fn statements(self) -> impl DoubleEndedIterator<Item = Statement<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }
 }

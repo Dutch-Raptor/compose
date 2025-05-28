@@ -1,7 +1,8 @@
 use crate::error::CliError;
 use crate::world::SystemWorld;
 use clap::Parser;
-use codespan_reporting::diagnostic::Diagnostic;
+use clap::builder::styling::Style;
+use codespan_reporting::diagnostic::{Diagnostic, LabelStyle};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::{diagnostic, term};
 use compose_eval::{Eval, Vm};
@@ -10,9 +11,9 @@ use compose_library::{
     Value,
     diag::{Severity, SourceDiagnostic, SourceResult, Warned},
 };
-use compose_syntax::ast::Expr;
-use compose_syntax::{FileId, Source, Span};
-use ecow::{eco_vec, EcoVec};
+use compose_syntax::ast::{Expr, Statement};
+use compose_syntax::{FileId, Label, LabelType, Source, Span};
+use ecow::{EcoVec, eco_vec};
 use std::cmp::min;
 use std::ops::Range;
 use std::path::PathBuf;
@@ -87,11 +88,9 @@ pub fn print_diagnostics(
         .with_notes(diag.notes.iter().map(|n| format!("note: {n}")).collect())
         .with_notes(diag.hints.iter().map(|h| format!("help: {h}")).collect())
         .with_labels_iter(
-            primary_label(diag).into_iter().chain(
-                diag.labels
-                    .iter()
-                    .flat_map(|l| Some(secondary_label(l.span)?.with_message(l.message.clone()))),
-            ),
+            diag_label(diag)
+                .into_iter()
+                .chain(diag.labels.iter().flat_map(create_label)),
         );
 
         let writer = StandardStream::stderr(ColorChoice::Always);
@@ -103,91 +102,25 @@ pub fn print_diagnostics(
     Ok(())
 }
 
-pub fn primary_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId>> {
-    Some(diagnostic::Label::primary(
-        diag.span.id()?,
-        diag.span.range()?,
-    ))
-    .map(|l| match &diag.label_message {
-        Some(message) => l.with_message(message),
-        None => l,
-    })
-}
+pub fn diag_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId>> {
+    let id = diag.span.id()?;
+    let range = diag.span.range()?;
 
-pub fn secondary_label(span: Span) -> Option<diagnostic::Label<FileId>> {
-    Some(diagnostic::Label::secondary(span.id()?, span.range()?))
-}
-
-/// Eval a source file.
-///
-/// eval_range: eval these nodes
-pub fn eval(source: &Source, eval_range: Range<usize>, vm: &mut Vm) -> Warned<SourceResult<Value>> {
-    let mut result = Value::unit();
-
-    let range_start = min(eval_range.start, source.nodes().len());
-    let range_end = min(eval_range.end, source.nodes().len());
-
-    let nodes = source.nodes().get(range_start..range_end).unwrap();
-    let errors = nodes
-        .iter()
-        .flat_map(|n| n.errors())
-        .map(|e| e.into())
-        .collect::<EcoVec<SourceDiagnostic>>();
-    if !errors.is_empty() {
-        return Warned::new(Err(errors));
+    let mut label = diagnostic::Label::primary(id, range);
+    if let Some(message) = diag.label_message.as_ref() {
+        label = label.with_message(message);
     }
-    for node in nodes {
-        let expr: Expr = match node.cast() {
-            Some(expr) => expr,
-            None => {
-                let span = node.span();
-                let err = error!(span, "expected expression, found {:?}", node);
-                return Warned::new(Err(eco_vec![err]))
-                    .with_warnings(std::mem::take(&mut vm.sink.warnings));
-            }
-        };
-        result = match expr.eval(vm) {
-            Ok(value) => value,
-            Err(err) => {
-                return Warned::new(Err(err)).with_warnings(std::mem::take(&mut vm.sink.warnings));
-            }
-        }
-    }
-
-    Warned::new(Ok(result)).with_warnings(std::mem::take(&mut vm.sink.warnings))
+    
+    Some(label)
 }
 
-pub struct RepeatIter<T: Clone> {
-    item: T,
-    count: usize,
-}
+pub fn create_label(label: &Label) -> Option<diagnostic::Label<FileId>> {
+    let id = label.span.id()?;
+    let range = label.span.range()?;
+    let style = match label.ty {
+        LabelType::Primary => LabelStyle::Primary,
+        LabelType::Secondary => LabelStyle::Secondary,
+    };
 
-impl<T: Clone> Iterator for RepeatIter<T> {
-    type Item = T;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.count == 0 {
-            None
-        } else {
-            self.count -= 1;
-            Some(self.item.clone())
-        }
-    }
-}
-
-impl<T> RepeatIter<T>
-where
-    T: Clone,
-{
-    pub fn new(item: T, count: usize) -> Self {
-        Self { item, count }
-    }
-}
-
-#[test]
-fn test_repeat_iter() {
-    let mut iter = RepeatIter::new(1, 3);
-    assert_eq!(iter.next(), Some(1));
-    assert_eq!(iter.next(), Some(1));
-    assert_eq!(iter.next(), Some(1));
-    assert_eq!(iter.next(), None);
+    Some(diagnostic::Label::new(style, id, range).with_message(label.message.clone()))
 }

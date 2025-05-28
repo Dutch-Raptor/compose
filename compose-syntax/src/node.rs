@@ -1,6 +1,7 @@
 use crate::ast::AstNode;
 use crate::kind::SyntaxKind;
 use crate::span::Span;
+use compose_utils::trace_log;
 use ecow::{EcoString, EcoVec, eco_vec};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
@@ -145,12 +146,14 @@ impl SyntaxNode {
     }
 
     /// Convert the node to an error with the same span and text
-    pub(crate) fn convert_to_error(&mut self, message: impl Into<EcoString>) {
+    pub(crate) fn convert_to_error(&mut self, message: impl Into<EcoString>) -> &mut SyntaxError {
         if self.kind() != SyntaxKind::Error {
             let span = self.span();
             let text = std::mem::take(self).into_text();
             *self = SyntaxNode::error(SyntaxError::new(message, span), text);
         }
+
+        self.error_mut().unwrap()
     }
 
     fn into_text(self) -> EcoString {
@@ -163,7 +166,9 @@ impl SyntaxNode {
 
     pub(crate) fn expected(&mut self, expected: impl Into<EcoString>) {
         let kind = self.kind();
-        self.convert_to_error(format!("expected {}, found {:?}", expected.into(), kind));
+        let expected = expected.into();
+        self.convert_to_error(format!("expected {}, found {:?}", &expected, kind));
+        trace_log!("expected {}, found {:?}", &expected, kind);
     }
 }
 
@@ -356,7 +361,13 @@ pub struct SyntaxError {
     /// Additional hints to the user, indicating how this error could be avoided
     /// or worked around.
     pub hints: EcoVec<EcoString>,
+    /// Additional notes to the user, indicating more details about the error.
+    pub notes: EcoVec<EcoString>,
+    /// A message to be displayed as a label for the error. This message is
+    /// shown at the location of the error and can give more locational
+    /// information
     pub label_message: Option<EcoString>,
+    /// Related labels that provide additional information.
     pub labels: EcoVec<Label>,
 }
 
@@ -364,9 +375,39 @@ pub struct SyntaxError {
 pub struct Label {
     pub span: Span,
     pub message: EcoString,
+    pub ty: LabelType,
+}
+
+impl Label {
+    pub fn primary(span: Span, message: impl Into<EcoString>) -> Label {
+        Label {
+            span,
+            message: message.into(),
+            ty: LabelType::Primary,
+        }
+    }
+
+    pub fn secondary(span: Span, message: impl Into<EcoString>) -> Label {
+        Label {
+            span,
+            message: message.into(),
+            ty: LabelType::Secondary,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum LabelType {
+    Primary,
+    Secondary,
 }
 
 impl SyntaxError {
+    pub fn with_note(&mut self, note: impl Into<EcoString>) -> &mut Self {
+        self.notes.push(note.into());
+        self
+    }
+
     pub fn with_hint(&mut self, hint: impl Into<EcoString>) -> &mut Self {
         self.hints.push(hint.into());
         self
@@ -391,6 +432,7 @@ impl SyntaxError {
             hints: eco_vec![],
             label_message: None,
             labels: eco_vec![],
+            notes: eco_vec![],
         }
     }
 }
