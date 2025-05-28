@@ -68,6 +68,7 @@ impl Value {
     pub fn path(&self, path: &str, access_span: Span, sink: &mut impl Sink) -> SourceResult<Value> {
         match self {
             Self::Type(ty) => ty.path(path, access_span, sink).cloned().at(access_span),
+            Self::Func(func) => func.path(path, access_span, sink).cloned().at(access_span),
             _ => bail!(access_span, "no associated field or method named `{}` on `{}`", path, self.ty()),
         }
     }

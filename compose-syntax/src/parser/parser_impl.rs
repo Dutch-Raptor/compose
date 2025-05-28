@@ -1,10 +1,11 @@
 use crate::kind::SyntaxKind;
 use crate::set::SyntaxSet;
-use crate::{FileId, Lexer, SyntaxError, SyntaxNode};
-use compose_utils::trace_fn;
+use crate::{FileId, Label, Lexer, Span, SyntaxError, SyntaxNode};
+use compose_utils::trace_log;
 use ecow::{EcoString, eco_format};
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut, Range};
+use crate::parser::error_definitions::err_unclosed_delim;
 
 impl Index<Marker> for Parser<'_> {
     type Output = SyntaxNode;
@@ -36,18 +37,17 @@ pub struct Parser<'s> {
     pub(crate) token: Token,
 
     balanced: bool,
-    nodes: Vec<SyntaxNode>,
+    pub(crate) nodes: Vec<SyntaxNode>,
     pub(crate) last_pos: usize,
 
     memo: MemoArena,
 }
 
-impl<'s> Parser<'s> {
-}
+impl<'s> Parser<'s> {}
 
 #[derive(Debug, Clone)]
 pub struct CheckPoint {
-    pub(crate) node_len: usize,
+    pub(crate) nodes_len: usize,
     lexer_cursor: usize,
     token: Token,
 }
@@ -107,8 +107,35 @@ impl<'s> Parser<'s> {
         self.token.kind
     }
 
+    pub(crate) fn last_text(&self) -> Option<&str> {
+        let last = self.nodes.last()?;
+        let range = last.span().range()?;
+        self.text.get(range)
+    }
+
+    pub(crate) fn last_node(&self) -> Option<&SyntaxNode> {
+        self.nodes.last()
+    }
+
+    pub(crate) fn get_text(&self, range: Range<usize>) -> Option<&str> {
+        self.text.get(range)
+    }
+
     pub(crate) fn current_text(&self) -> &'s str {
-        &self.text[self.token.start..self.current_end()]
+        match self.token.node.span().range() {
+            Some(s) => &self.text.get(s).expect("text should exist"),
+            None => &self.text[self.token.start..self.current_end()],
+        }
+    }
+
+    #[inline]
+    pub(crate) fn current_node(&self) -> &SyntaxNode {
+        &self.token.node
+    }
+
+    #[inline]
+    pub(crate) fn current_span(&self) -> Span {
+        self.current_node().span()
     }
 
     pub(crate) fn current_end(&self) -> usize {
@@ -122,6 +149,14 @@ impl<'s> Parser<'s> {
     }
     pub(crate) fn peeker(&self) -> SyntaxKindIter {
         SyntaxKindIter::new(self.lexer.clone())
+    }
+
+    pub(crate) fn peek_at(&self, kind: SyntaxKind) -> bool {
+        self.peek() == kind
+    }
+
+    pub(crate) fn peek_at_set(&self, set: SyntaxSet) -> bool {
+        set.contains(self.peek())
     }
 
     pub(crate) fn at(&self, kind: SyntaxKind) -> bool {
@@ -141,7 +176,7 @@ impl<'s> Parser<'s> {
         Marker(self.nodes.len())
     }
 
-    fn had_newline(&self) -> bool {
+    fn had_leading_newline(&self) -> bool {
         self.token.newline
     }
 
@@ -205,9 +240,14 @@ impl<'s> Parser<'s> {
             SyntaxError::new(message.into(), self.token.node.span()),
             self.token.node.text(),
         );
+        trace_log!("inserting error: {:?}", error);
         self.nodes.push(error);
 
         self.last_err().unwrap()
+    }
+
+    pub(crate) fn err_at(&mut self, at: Marker) -> Option<&mut SyntaxError> {
+        self.nodes.get_mut(at.0).and_then(|n| n.error_mut())
     }
 
     pub fn last_err(&mut self) -> Option<&mut SyntaxError> {
@@ -225,22 +265,24 @@ impl<'s> Parser<'s> {
         &mut self,
         message: impl Into<EcoString>,
         recover_set: Option<SyntaxSet>,
-    ) {
-        trace_fn!("error_unexpected");
+    ) -> &mut SyntaxError {
         self.balanced &= !self.token.kind.is_grouping();
         let message = message.into();
+        trace_log!("error_unexpected: {}", message);
         self.token.node.convert_to_error(match message.as_str() {
             "" => eco_format!("unexpected token {:?}", self.token.kind),
             _ => message,
         });
 
-        match recover_set {
-            None => self.eat(),
-            Some(recover_set) => {
-                self.eat();
-                self.recover_until(recover_set);
-            }
+        let err_marker = self.marker();
+
+        self.eat();
+
+        if let Some(recover_set) = recover_set {
+            self.recover_until(recover_set);
         }
+
+        self.err_at(err_marker).expect("An error was just inserted")
     }
 
     /// Consume the given syntax kind or produce an error. Returns whether the expected token was found.
@@ -277,8 +319,12 @@ impl<'s> Parser<'s> {
     }
 
     fn can_recover_with(&self, recover_set: SyntaxSet) -> bool {
+        if self.had_leading_newline() {
+            dbg!(&self);
+        };
+        
         recover_set.contains(self.current())
-            || (recover_set.contains(SyntaxKind::NewLine) && self.had_newline())
+            || (recover_set.contains(SyntaxKind::NewLine) && self.had_leading_newline())
     }
 
     pub(crate) fn expect_or_recover_until(
@@ -301,7 +347,7 @@ impl<'s> Parser<'s> {
         ExpectResult::SyntaxError(self.last_err().expect("An error was just inserted"))
     }
 
-    fn recover_until(&mut self, recovery_set: SyntaxSet) {
+    pub(crate) fn recover_until(&mut self, recovery_set: SyntaxSet) {
         while !self.can_recover_with(recovery_set) && !self.end() {
             self.eat();
         }
@@ -310,11 +356,29 @@ impl<'s> Parser<'s> {
     #[track_caller]
     /// Expect that the current token is the closing delimiter `kind` and eat it.
     /// If it is not convert the node at `open_marker` to an error indicating that its delimiter was unclosed
-    pub(crate) fn expect_closing_delimiter(&mut self, open_marker: Marker, kind: SyntaxKind) {
-        if !self.eat_if(kind) {
-            self[open_marker].convert_to_error("unclosed delimiter")
+    pub(crate) fn expect_closing_delimiter(
+        &mut self,
+        open_marker: Marker,
+        expected_closing: SyntaxKind,
+    ) -> bool {
+        debug_assert!(expected_closing.is_grouping());
+        if self.eat_if(expected_closing) {
+            return true;
         }
+
+        let opening_delim = self[open_marker].kind();
+        debug_assert!(opening_delim.is_grouping());
+
+        err_unclosed_delim(self, open_marker, expected_closing, opening_delim);
+
+        let is_closing = self.current().is_closing_delimiter();
+        if is_closing {
+            self.eat(); // eat the offending closing delim
+        }
+
+        false
     }
+
 
     fn lex(lexer: &mut Lexer) -> Token {
         let prev_end = lexer.cursor();
@@ -331,15 +395,17 @@ impl<'s> Parser<'s> {
     }
 
     pub(crate) fn checkpoint(&self) -> CheckPoint {
+        trace_log!("Creating checkpoint: {}", self.nodes.len());
         CheckPoint {
-            node_len: self.nodes.len(),
+            nodes_len: self.nodes.len(),
             lexer_cursor: self.lexer.cursor(),
             token: self.token.clone(),
         }
     }
 
     pub(crate) fn restore(&mut self, checkpoint: CheckPoint) {
-        self.nodes.truncate(checkpoint.node_len);
+        trace_log!("Restoring checkpoint: {}", checkpoint.nodes_len);
+        self.nodes.truncate(checkpoint.nodes_len);
         self.restore_partial(checkpoint);
     }
 
@@ -360,13 +426,15 @@ impl<'s> Parser<'s> {
             None => Some((key, self.checkpoint())),
         }
     }
-    
+
     pub(crate) fn memoize_parsed_nodes(&mut self, key: MemoKey, prev_len: usize) {
         let prev_memo_len = self.memo.nodes.len();
-        
+
         self.memo.nodes.extend_from_slice(&self.nodes[prev_len..]);
         let checkpoint = self.checkpoint();
-        self.memo.memo_map.insert(key, (prev_memo_len..self.memo.nodes.len(), checkpoint));
+        self.memo
+            .memo_map
+            .insert(key, (prev_memo_len..self.memo.nodes.len(), checkpoint));
     }
 
     fn current_start(&self) -> MemoKey {

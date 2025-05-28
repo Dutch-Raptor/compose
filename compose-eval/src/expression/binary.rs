@@ -13,29 +13,11 @@ impl Eval for ast::Binary<'_> {
         match self.op() {
             BinOp::Add => apply_binary(self, vm, ops::add),
             BinOp::Mul => apply_binary(self, vm, ops::mul),
-            BinOp::Assign => apply_assignment(self, vm, |_init, rhs| Ok(rhs)),
-            BinOp::AddAssign => apply_assignment(self, vm, ops::add),
-            BinOp::MulAssign => apply_assignment(self, vm, ops::mul),
             other => bail!(self.span(), "unsupported binary operator: {:?}", other),
         }
     }
 }
 
-fn apply_assignment(
-    binary: ast::Binary,
-    vm: &mut Vm,
-    op: fn(Value, Value) -> StrResult<Value>,
-) -> SourceResult<Value> {
-    // assignments are right associative
-    let rhs = binary.rhs().eval(vm)?;
-    
-    let value_ref = binary.lhs().access(vm)?;
-    let lhs = std::mem::take(&mut *value_ref);
-    
-    *value_ref = op(lhs, rhs).at(binary.span())?;
-    
-    Ok(Value::default())
-}
 
 fn apply_binary(
     binary: ast::Binary,

@@ -1,19 +1,20 @@
 use crate::Eval;
 use crate::vm::Vm;
-use compose_library::{UnitValue, Value};
 use compose_library::diag::SourceResult;
+use compose_library::{UnitValue, Value};
 use compose_syntax::ast::{AstNode, Expr};
 
+mod assignment;
 mod atomic;
 mod binary;
 mod bindings;
 mod block;
 mod call;
-mod unary;
-mod field_access;
-mod path_access;
 mod closure;
+mod field_access;
 mod parenthesized;
+mod path_access;
+mod unary;
 
 pub use closure::eval_closure;
 
@@ -36,10 +37,10 @@ impl Eval for Expr<'_> {
             Expr::FieldAccess(f) => f.eval(vm),
             Expr::PathAccess(p) => p.eval(vm),
             Expr::Closure(c) => c.eval(vm),
+            Expr::Parenthesized(p) => p.eval(vm),
         }?
         .spanned(span);
 
-        // todo: Attach span here
         Ok(v)
     }
 }
@@ -49,8 +50,8 @@ pub mod test_utils {
     use crate::Eval;
     use crate::test_utils::test_world;
     use crate::vm::Vm;
-    use compose_library::{UnitValue, Value};
     use compose_library::diag::SourceResult;
+    use compose_library::{UnitValue, Value};
     use compose_syntax::FileId;
     use compose_syntax::ast::Expr;
 

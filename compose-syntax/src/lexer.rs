@@ -83,8 +83,7 @@ impl Lexer<'_> {
     pub fn next(&mut self) -> (SyntaxKind, SyntaxNode) {
         debug_assert!(self.error.is_none());
 
-        self.newline = false;
-        self.skip_whitespace(self.s.cursor());
+        self.newline = self.skip_whitespace(self.s.cursor());
         let start = self.cursor();
 
         let kind = match self.s.eat() {
@@ -98,9 +97,6 @@ impl Lexer<'_> {
             Some(error) => SyntaxNode::error(error, text),
             None => SyntaxNode::leaf(kind, text, span),
         };
-
-        // skip trailing whitespace
-        self.skip_whitespace(self.s.cursor());
 
         (kind, node)
     }
@@ -252,7 +248,7 @@ impl Lexer<'_> {
         SyntaxKind::Str
     }
 
-    fn skip_whitespace(&mut self, start: usize) {
+    fn skip_whitespace(&mut self, start: usize) -> bool {
         self.s.eat_while(|c| is_space(c));
 
         // count newlines
@@ -267,8 +263,8 @@ impl Lexer<'_> {
                 newline_count += 1;
             }
         }
-
-        self.newline = newline_count > 0;
+        
+        newline_count > 0
     }
 }
 

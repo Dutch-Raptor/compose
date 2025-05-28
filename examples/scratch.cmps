@@ -1,3 +1,4 @@
-let g = (a = (b = ()) => b) => a(b: 2)
+let !=
+let mut !=
 
-println(g(a: (b = ()) => int::increment(b)))
+let f = (x, a) => (x = a)

@@ -1,0 +1,13 @@
+[package]
+name = "compose"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+compose-library = { path = "../compose-library" }
+compose-eval = { path = "../compose-eval" }
+compose-syntax = { path = "../compose-syntax" }
+ecow = { workspace = true }
+
+[lints]
+workspace = true

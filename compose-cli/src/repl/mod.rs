@@ -162,7 +162,7 @@ fn eval_initial_pass(vm: &mut Vm, world: &SystemWorld) {
     // Evaluate every node in the source, printing any diagnostics along the way.
     // Do not return early if there are any errors, as we want to print all diagnostics.
     for i in 0..source.nodes().len() {
-        let Warned { value, warnings } = crate::eval(&source, i..i + 1, vm);
+        let Warned { value, warnings } = compose::eval_range(&source, i..i + 1, vm);
         crate::print_diagnostics(world, &[], &warnings).unwrap();
         if let Err(err) = value {
             crate::print_diagnostics(world, &err, &warnings).unwrap();
@@ -187,7 +187,7 @@ pub fn eval_repl_input(vm: &mut Vm, world: &SystemWorld, input: &str, args: &Rep
         println!("AST: {:#?}\n", nodes);
     }
 
-    let Warned { value, warnings } = crate::eval(&source, len_before_edit..len_after_edit, vm);
+    let Warned { value, warnings } = compose::eval_range(&source, len_before_edit..len_after_edit, vm);
 
     if args.debug {
         println!("{vm:#?}\n");

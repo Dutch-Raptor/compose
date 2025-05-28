@@ -3,7 +3,7 @@ use crate::diag::{At, SourceDiagnostic, SourceResult, error, warning};
 use crate::{Library, NativeFuncData, NativeType, Sink, Type, Value};
 use compose_library::diag::{StrResult, bail};
 use compose_library::{Func, NativeFunc};
-use compose_syntax::Span;
+use compose_syntax::{Label, Span};
 use ecow::{EcoString, eco_format, eco_vec};
 use indexmap::IndexMap;
 use indexmap::map::Entry;
@@ -336,7 +336,7 @@ impl Binding {
             sink.warn(
                 warning!(access_span, "use of variable before it has been initialized";)
                     .with_label_message("use of uninitialized variable")
-                    .with_label(self.span, "variable declared here without an initial value")
+                    .with_label(Label::secondary(self.span, "variable declared here without an initial value"))
                     .with_note("uninitialised variables evaluate to `()` by default"),
             )
         }
@@ -356,10 +356,10 @@ impl Binding {
                     access_span,
                     "cannot reassign to a variable declared as immutable"
                 )
-                .with_label(self.span, "was defined as immutable here")
+                .with_label(Label::secondary(self.span, "was defined as immutable here"))
                 .pipe(|diag| {
                     if let Some(first_assign) = first_assign {
-                        diag.with_label(first_assign, "first assignment occurred here")
+                        diag.with_label(Label::secondary(first_assign, "first assignment occurred here"))
                             .with_label_message("cannot reassign an immutable variable")
                     } else {
                         diag.with_label_message("is immutable")
@@ -371,7 +371,7 @@ impl Binding {
             BindingKind::Constant => Err(eco_vec![
                 error!(access_span, "cannot assign to a constant variable")
                     .with_label_message("is constant")
-                    .with_label(self.span, "was defined as constant here")
+                    .with_label(Label::secondary(self.span, "was defined as constant here"))
             ]),
             BindingKind::Mutable => Ok(&mut self.value),
             BindingKind::Uninitialized => {

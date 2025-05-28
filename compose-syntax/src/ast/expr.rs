@@ -1,7 +1,7 @@
 use crate::SyntaxNode;
 use crate::ast::atomics::Unit;
 use crate::ast::unary::Unary;
-use crate::ast::{AstNode, Binary, Ident, Int};
+use crate::ast::{AstNode, Binary, Ident, Int, Parenthesized};
 use crate::ast::{Bool, Closure, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
 use crate::kind::SyntaxKind;
 
@@ -30,6 +30,7 @@ pub enum Expr<'a> {
     FieldAccess(FieldAccess<'a>),
     PathAccess(PathAccess<'a>),
     Closure(Closure<'a>),
+    Parenthesized(Parenthesized<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -48,6 +49,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::FieldAccess => Some(Self::FieldAccess(FieldAccess::from_untyped(node)?)),
             SyntaxKind::PathAccess => Some(Self::PathAccess(PathAccess::from_untyped(node)?)),
             SyntaxKind::Closure => Some(Self::Closure(Closure::from_untyped(node)?)),
+            SyntaxKind::Parenthesized => Some(Self::Parenthesized(Parenthesized::from_untyped(node)?)),
             _ => None,
         }
     }
@@ -67,6 +69,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::FieldAccess(field_access) => field_access.to_untyped(),
             Self::PathAccess(path_access) => path_access.to_untyped(),
             Self::Closure(closure) => closure.to_untyped(),
+            Self::Parenthesized(parenthesized) => parenthesized.to_untyped(),       
         }
     }
 }

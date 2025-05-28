@@ -70,6 +70,17 @@ impl Func {
         }
     }
     
+    pub fn path(&self, path: &str, access_span: Span, sink: &mut impl Sink) -> StrResult<&Value> {
+        let scope = self.scope().ok_or("Cannot access fields on user-defined functions")?;
+        match scope.get(path) {
+            Some(binding) => Ok(binding.read_checked(access_span, sink)),
+            None => match self.name() {
+                Some(name) => bail!("function `{name}` does not contain associated field `{path}`"),
+                None => bail!("Function does not contain associated field `{path}`"),
+            }
+        }
+    }
+    
     pub fn is_associated_function(&self) -> bool {
         match self.repr {
             Repr::Native(n) => match n.fn_type {

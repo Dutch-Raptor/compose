@@ -92,6 +92,31 @@ impl Span {
 
         Some(start..end)
     }
+    
+    pub fn join(left: Span, right: Span) -> Span {
+        if left.id() != right.id() {
+            return left.or(right);
+        }
+        
+        let id = left.or(right).id().unwrap();
+        
+        let (start, end) =  match (left.range(), right.range()) {
+            (None, _) => return right,
+            (_, None) => return left,
+            (Some(l), Some(r)) => {
+                (l.start.min(r.start), r.end.max(l.end))
+            }
+        };
+        
+        Span::new(id, start..end)
+    }
+    
+    pub fn or(self, other: Span) -> Span {
+        if self.is_detached() {
+            return other;
+        }
+        self
+    }
 }
 
 impl Span {
