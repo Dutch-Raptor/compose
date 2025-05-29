@@ -6,8 +6,10 @@ use compose_eval::Vm;
 use compose_library::diag::{eco_format, Warned};
 use compose_syntax::Source;
 use std::fs;
+use compose::error_codes::lookup;
 use compose_editor::editor::Editor;
 use compose_editor::renderer::full::CrosstermRenderer;
+use compose_explain::Explain;
 use compose_library::{Value, World};
 
 mod editor;
@@ -94,6 +96,7 @@ fn print_help() {
           :worldstate        Print the current state of the world.
           :ast               Print the current abstract syntax tree (AST).
           :save              Save the current REPL source buffer to a file.
+          :explain <errcode> Show the explanation for a given error code.
 
         Tips:
           • The REPL maintains a running source buffer—each input is appended to the program.
@@ -144,6 +147,18 @@ fn handle_repl_commands(vm: &mut Vm, world: &SystemWorld, input: &str) -> Option
                 return Some(ReplCommand::Handled);
             }
             println!("Saved to {filename}");
+        }
+        _ if input.starts_with(":explain ") => {
+            let code = input.trim_start_matches(":explain ");
+            match lookup(code) {
+                Some(code) => {
+                    println!("-----------------");
+                    println!("{}", code.explain())
+                }
+                None => {
+                    println!("No explanation found for {code}");
+                }
+            }
         }
         _ => return None,
     }

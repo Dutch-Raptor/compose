@@ -1,27 +1,22 @@
 use crate::error::CliError;
 use crate::world::SystemWorld;
 use clap::Parser;
-use clap::builder::styling::Style;
 use codespan_reporting::diagnostic::{Diagnostic, LabelStyle};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::{diagnostic, term};
-use compose_eval::{Eval, Vm};
-use compose_library::diag::error;
-use compose_library::{
-    Value,
-    diag::{Severity, SourceDiagnostic, SourceResult, Warned},
-};
-use compose_syntax::ast::{Expr, Statement};
-use compose_syntax::{FileId, Label, LabelType, Source, Span};
-use ecow::{EcoVec, eco_vec};
-use std::cmp::min;
-use std::ops::Range;
+use compose_eval::Eval;
+use compose_library::World;
+use compose_library::diag::{Severity, SourceDiagnostic, write_diagnostics};
+use compose_syntax::{FileId, Label, LabelType};
+use ecow::eco_format;
 use std::path::PathBuf;
 
 mod error;
+mod explain;
 mod file;
 mod repl;
 mod world;
+
 use compose_utils::ENABLE_TRACE;
 
 #[derive(Debug, clap::Parser)]
@@ -37,6 +32,7 @@ struct Args {
 enum Command {
     Repl(ReplArgs),
     File(FileArgs),
+    Explain(ExplainArgs),
 }
 
 #[derive(Debug, clap::Parser)]
@@ -61,6 +57,11 @@ pub struct ReplArgs {
     pub from: Option<PathBuf>,
 }
 
+#[derive(Debug, clap::Parser)]
+pub struct ExplainArgs {
+    pub code: String,
+}
+
 fn main() -> Result<(), CliError> {
     let args = Args::parse();
 
@@ -69,58 +70,21 @@ fn main() -> Result<(), CliError> {
     match args.command {
         Command::Repl(args) => repl::repl(args)?,
         Command::File(args) => file::file(args)?,
+        Command::Explain(args) => explain::explain(args)?,
     }
 
     Ok(())
 }
 
 pub fn print_diagnostics(
-    world: &SystemWorld,
+    world: &dyn World,
     errors: &[SourceDiagnostic],
     warnings: &[SourceDiagnostic],
 ) -> Result<(), codespan_reporting::files::Error> {
-    for diag in warnings.iter().chain(errors) {
-        let diagnostic = match diag.severity {
-            Severity::Error => Diagnostic::error(),
-            Severity::Warning => Diagnostic::warning(),
-        }
-        .with_message(diag.message.clone())
-        .with_notes(diag.notes.iter().map(|n| format!("note: {n}")).collect())
-        .with_notes(diag.hints.iter().map(|h| format!("help: {h}")).collect())
-        .with_labels_iter(
-            diag_label(diag)
-                .into_iter()
-                .chain(diag.labels.iter().flat_map(create_label)),
-        );
+    let writer = StandardStream::stderr(ColorChoice::Always);
+    let config = term::Config::default();
 
-        let writer = StandardStream::stderr(ColorChoice::Always);
-        let config = term::Config::default();
-
-        term::emit(&mut writer.lock(), &config, &world, &diagnostic)?;
-    }
+    write_diagnostics(world, errors, warnings, &mut writer.lock(), &config)?;
 
     Ok(())
-}
-
-pub fn diag_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId>> {
-    let id = diag.span.id()?;
-    let range = diag.span.range()?;
-
-    let mut label = diagnostic::Label::primary(id, range);
-    if let Some(message) = diag.label_message.as_ref() {
-        label = label.with_message(message);
-    }
-    
-    Some(label)
-}
-
-pub fn create_label(label: &Label) -> Option<diagnostic::Label<FileId>> {
-    let id = label.span.id()?;
-    let range = label.span.range()?;
-    let style = match label.ty {
-        LabelType::Primary => LabelStyle::Primary,
-        LabelType::Secondary => LabelStyle::Secondary,
-    };
-
-    Some(diagnostic::Label::new(style, id, range).with_message(label.message.clone()))
 }

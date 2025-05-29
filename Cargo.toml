@@ -1,11 +1,20 @@
 [workspace]
 resolver = "3"
-members = [ "compose-cli",
+members = [
+    "compose-cli",
     "compose-eval",
     "compose-library",
     "compose-syntax",
-    "compose-editor"
-, "compose-macros", "compose-utils", "compose"]
+    "compose-editor",
+    "compose-macros",
+    "compose-utils",
+    "compose",
+    "compose-error-codes",
+    "compose-explain",
+]
+default-members = [
+    "compose-cli"
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -16,6 +25,21 @@ ecow = "0.2.4"
 indexmap = "2.9.0"
 tap = "1.0.1"
 extension-traits = "2.0.0"
-tracing = "0.1.41"
+compose = { path = "compose" }
+compose-cli = { path = "compose-cli" }
+compose-eval = { path = "compose-eval" }
+compose-library = { path = "compose-library" }
+compose-macros = { path = "compose-macros" }
+compose-syntax = { path = "compose-syntax" }
+compose-utils = { path = "compose-utils" }
+compose-error-codes = { path = "compose-error-codes" }
+compose-editor = { path = "compose-editor" }
+compose-explain = { path = "compose-explain" }
+codespan-reporting = "0.12.0"
 
 [workspace.lints]
+
+
+[profile.release]
+lto = true
+codegen-units = 1

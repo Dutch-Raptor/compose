@@ -2,6 +2,7 @@ use crate::kind::SyntaxKind;
 use crate::parser::parser_impl::{Marker, Parser};
 use crate::Label;
 use ecow::eco_format;
+use compose_error_codes::E0001_UNCLOSED_DELIMITER;
 
 pub(super) fn err_unclosed_delim(
     p: &mut Parser,
@@ -30,6 +31,7 @@ pub(super) fn err_unclosed_delim(
     let closing_span = p.current_span();
     p[open_marker]
         .convert_to_error("unclosed delimiter")
+        .with_code(&E0001_UNCLOSED_DELIMITER)
         // label on the opening delimiter
         .with_label_message(eco_format!(
             "unclosed `{}` starts here",

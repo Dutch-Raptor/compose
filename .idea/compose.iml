@@ -11,6 +11,9 @@
       <sourceFolder url="file://$MODULE_DIR$/compose-macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/compose-utils/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/compose/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-error-codes/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-explain/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-reporting/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

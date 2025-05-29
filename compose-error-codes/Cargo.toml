@@ -1,0 +1,12 @@
+[package]
+name = "compose-error-codes"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
+
+[build-dependencies]
+walkdir = "2.5.0"

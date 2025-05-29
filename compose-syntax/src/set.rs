@@ -86,6 +86,10 @@ pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
 
 pub const PATTERN_LEAF: SyntaxSet = ATOMIC_EXPR;
 
-pub const PATTERN: SyntaxSet = PATTERN_LEAF.add(SyntaxKind::At).add(SyntaxKind::Underscore);
+pub const PATTERN: SyntaxSet = syntax_set![
+    At,
+    Underscore,
+    Ident,
+];
 
 pub const PARAM: SyntaxSet = PATTERN;

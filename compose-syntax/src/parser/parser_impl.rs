@@ -319,10 +319,6 @@ impl<'s> Parser<'s> {
     }
 
     fn can_recover_with(&self, recover_set: SyntaxSet) -> bool {
-        if self.had_leading_newline() {
-            dbg!(&self);
-        };
-        
         recover_set.contains(self.current())
             || (recover_set.contains(SyntaxKind::NewLine) && self.had_leading_newline())
     }

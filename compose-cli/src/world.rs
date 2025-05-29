@@ -115,50 +115,51 @@ impl World for SystemWorld {
     }
 }
 
-impl<'a> Files<'a> for &SystemWorld {
-    type FileId = FileId;
-    type Name = String;
-    type Source = Source;
 
-    fn name(&'a self, id: Self::FileId) -> Result<Self::Name, Error> {
-        // get path relative to root
-        let path = match id.path().0.strip_prefix(&self.root) {
-            Ok(p) => p,
-            Err(_) => &id.path().0,
-        };
-
-        Ok(path.display().to_string())
-    }
-
-    fn source(&'a self, id: Self::FileId) -> Result<Self::Source, Error> {
-        World::source(*self, id).map_err(|_| Error::FileMissing)
-    }
-
-    fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Result<usize, Error> {
-        let source = Files::source(self, id)?;
-        Ok(source
-            .line_starts()
-            .binary_search(&byte_index)
-            .unwrap_or_else(|next_line| next_line - 1))
-    }
-
-    fn line_range(&'a self, id: Self::FileId, line_index: usize) -> Result<Range<usize>, Error> {
-        let source = Files::source(self, id)?;
-        let start = source
-            .line_starts()
-            .get(line_index)
-            .copied()
-            .ok_or(Error::LineTooLarge {
-                given: line_index,
-                max: source.line_starts().len(),
-            })?;
-
-        let end = source
-            .line_starts()
-            .get(line_index + 1)
-            .copied()
-            .unwrap_or(source.text().len());
-
-        Ok(start..end)
-    }
-}
+// impl<'a> Files<'a> for &SystemWorld {
+//     type FileId = FileId;
+//     type Name = String;
+//     type Source = Source;
+//
+//     fn name(&'a self, id: Self::FileId) -> Result<Self::Name, Error> {
+//         // get path relative to root
+//         let path = match id.path().0.strip_prefix(&self.root) {
+//             Ok(p) => p,
+//             Err(_) => &id.path().0,
+//         };
+//
+//         Ok(path.display().to_string())
+//     }
+//
+//     fn source(&'a self, id: Self::FileId) -> Result<Self::Source, Error> {
+//         World::source(*self, id).map_err(|_| Error::FileMissing)
+//     }
+//
+//     fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Result<usize, Error> {
+//         let source = Files::source(self, id)?;
+//         Ok(source
+//             .line_starts()
+//             .binary_search(&byte_index)
+//             .unwrap_or_else(|next_line| next_line - 1))
+//     }
+//
+//     fn line_range(&'a self, id: Self::FileId, line_index: usize) -> Result<Range<usize>, Error> {
+//         let source = Files::source(self, id)?;
+//         let start = source
+//             .line_starts()
+//             .get(line_index)
+//             .copied()
+//             .ok_or(Error::LineTooLarge {
+//                 given: line_index,
+//                 max: source.line_starts().len(),
+//             })?;
+//
+//         let end = source
+//             .line_starts()
+//             .get(line_index + 1)
+//             .copied()
+//             .unwrap_or(source.text().len());
+//
+//         Ok(start..end)
+//     }
+// }

@@ -238,7 +238,6 @@ mod tests {
 
         let body = closure.body();
 
-        dbg!(&body);
         let as_bin_op: Binary = body.to_untyped().cast().unwrap();
         assert_eq!(as_bin_op.op(), BinOp::Sub);
 

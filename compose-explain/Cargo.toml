@@ -1,0 +1,17 @@
+[package]
+name = "compose-explain"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+compose-error-codes = {workspace = true}
+compose-eval = {workspace = true}
+compose-syntax = {workspace = true}
+compose-library = {workspace = true}
+codespan-reporting = {workspace = true}
+pulldown-cmark = { version = "0.13.0" }
+pulldown-cmark-to-cmark = "21.0.0"
+regex = "1.11.1"
+
+[lints]
+workspace = true
