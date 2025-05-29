@@ -103,10 +103,12 @@ macro_rules! trace_fn {
 #[macro_export]
 macro_rules! trace_log {
     ($($tt:tt)*) => {
-            $crate::with_indent(|i| format!(
-                "{}      {}",
-                "  ".repeat(i),
-                format!($($tt)*),
-            ));
+            if $crate::ENABLE_TRACE.load(std::sync::atomic::Ordering::Relaxed) {
+                $crate::with_indent(|i| format!(
+                    "{}      {}",
+                    "  ".repeat(i),
+                    format!($($tt)*),
+                ));
+            }
     };
 }

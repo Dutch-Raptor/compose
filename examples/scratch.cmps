@@ -1,4 +1,6 @@
-let !=
-let mut !=
-
-let f = (x, a) => (x = a)
+(unclosed_paren == 2
+let other_statement
+{
+    let f = (x, a) => (x == a)
+)
+{ unclosed_to_eof

@@ -1,10 +1,68 @@
-use compose_syntax::{Label, Span, SyntaxError};
+use compose_syntax::{FileId, Label, LabelType, Span, SyntaxError};
 use ecow::{EcoVec, eco_vec};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 use std::{fmt, io};
+use codespan_reporting::{diagnostic, term};
+use codespan_reporting::term::termcolor::WriteColor;
+
+pub fn write_diagnostics(
+    world: &dyn World,
+    errors: &[SourceDiagnostic],
+    warnings: &[SourceDiagnostic],
+    writer: &mut dyn WriteColor,
+    config: &term::Config,
+) -> Result<(), codespan_reporting::files::Error> {
+    for diag in warnings.iter().chain(errors) {
+        let mut diagnostic = match diag.severity {
+            Severity::Error => diagnostic::Diagnostic::error(),
+            Severity::Warning => diagnostic::Diagnostic::warning(),
+        }
+            .with_message(diag.message.clone())
+            .with_notes(diag.notes.iter().map(|n| format!("note: {n}")).collect())
+            .with_notes(diag.hints.iter().map(|h| format!("help: {h}")).collect())
+            .with_labels_iter(
+                diag_label(diag)
+                    .into_iter()
+                    .chain(diag.labels.iter().flat_map(create_label)),
+            );
+
+        if let Some(code) = &diag.code {
+            diagnostic = diagnostic.with_code(code.code)
+                .with_note(eco_format!("help: for more information about this error, try `compose explain {}`", code.code))
+        }
+
+        term::emit(writer, config, &world, &diagnostic)?;
+    }
+
+    Ok(())
+}
+
+fn diag_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId>> {
+    let id = diag.span.id()?;
+    let range = diag.span.range()?;
+
+    let mut label = diagnostic::Label::primary(id, range);
+    if let Some(message) = diag.label_message.as_ref() {
+        label = label.with_message(message);
+    }
+
+    Some(label)
+}
+
+fn create_label(label: &Label) -> Option<diagnostic::Label<FileId>> {
+    let id = label.span.id()?;
+    let range = label.span.range()?;
+    let style = match label.ty {
+        LabelType::Primary => diagnostic::LabelStyle::Primary,
+        LabelType::Secondary => diagnostic::LabelStyle::Secondary,
+    };
+
+    Some(diagnostic::Label::new(style, id, range).with_message(label.message.clone()))
+}
+
 
 /// Early-return with a [`StrResult`] or [`SourceResult`].
 ///
@@ -127,11 +185,13 @@ pub use {
     crate::__warning as warning,
     ecow::{eco_format, EcoString},
 };
+use compose_error_codes::ErrorCode;
+use compose_library::World;
 
 pub type SourceResult<T> = Result<T, EcoVec<SourceDiagnostic>>;
 pub type StrResult<T> = Result<T, EcoString>;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SourceDiagnostic {
     pub severity: Severity,
     pub span: Span,
@@ -141,6 +201,7 @@ pub struct SourceDiagnostic {
     pub hints: EcoVec<EcoString>,
     pub labels: EcoVec<Label>,
     pub notes: EcoVec<EcoString>,
+    pub code: Option<&'static ErrorCode>,
 }
 
 impl SourceDiagnostic {
@@ -157,6 +218,7 @@ impl SourceDiagnostic {
             hints: eco_vec!(),
             labels: eco_vec!(),
             notes: eco_vec!(),
+            code: None,
         }
     }
 
@@ -170,12 +232,22 @@ impl SourceDiagnostic {
             hints: eco_vec!(),
             labels: eco_vec!(),
             notes: eco_vec!(),
+            code: None,
         }
     }
 
     pub fn with_label_message(mut self, message: impl Into<EcoString>) -> Self {
         self.label_message = Some(message.into());
         self
+    }
+    
+    pub fn code(&mut self, code: &'static ErrorCode) {
+        self.code = Some(code);
+    }
+    
+    pub fn with_code(mut self, code: &'static ErrorCode) -> Self {
+        self.code(code);
+        self   
     }
 
     pub fn hint(&mut self, hint: impl Into<EcoString>) {
@@ -213,6 +285,7 @@ impl From<SyntaxError> for SourceDiagnostic {
             hints: error.hints,
             labels: error.labels,
             notes: error.notes,
+            code: error.code,
         }
     }
 }
@@ -288,7 +361,7 @@ pub enum TracePoint {
 }
 
 impl Display for TracePoint {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             TracePoint::Call(Some(name)) => {
                 write!(f, "error occurred in this call to `{}`", name)

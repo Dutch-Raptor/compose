@@ -14,6 +14,7 @@ use compose_utils::{trace_fn, trace_log};
 use ecow::eco_format;
 use parser_impl::Parser;
 use std::collections::HashSet;
+use compose_error_codes::E0002_INVALID_ASSIGNMENT;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ExprContext {
@@ -190,6 +191,7 @@ fn err_assign_in_expr_context(p: &mut Parser) {
     let error_marker = p.marker();
 
     p.insert_error_here("assignments are not allowed in expression contexts")
+        .with_code(&E0002_INVALID_ASSIGNMENT)
         .with_label_message("assignment is not allowed here");
     p.eat();
     code_expression(p);

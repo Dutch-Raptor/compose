@@ -12,6 +12,7 @@ use std::hash::Hash;
 use std::iter;
 use strsim::jaro_winkler;
 use tap::Pipe;
+use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
 
 pub trait NativeScope {
     fn scope() -> Scope;
@@ -335,6 +336,7 @@ impl Binding {
         if self.is_uninitialized() {
             sink.warn(
                 warning!(access_span, "use of variable before it has been initialized";)
+                    .with_code(&W0001_USED_UNINITIALIZED_VARIABLE)
                     .with_label_message("use of uninitialized variable")
                     .with_label(Label::secondary(self.span, "variable declared here without an initial value"))
                     .with_note("uninitialised variables evaluate to `()` by default"),
@@ -356,6 +358,7 @@ impl Binding {
                     access_span,
                     "cannot reassign to a variable declared as immutable"
                 )
+                .with_code(&E0004_MUTATE_IMMUTABLE_VARIABLE)
                 .with_label(Label::secondary(self.span, "was defined as immutable here"))
                 .pipe(|diag| {
                     if let Some(first_assign) = first_assign {

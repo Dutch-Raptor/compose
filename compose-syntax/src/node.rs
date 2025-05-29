@@ -5,6 +5,7 @@ use compose_utils::trace_log;
 use ecow::{EcoString, EcoVec, eco_vec};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+use compose_error_codes::ErrorCode;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct SyntaxNode(Repr);
@@ -369,6 +370,7 @@ pub struct SyntaxError {
     pub label_message: Option<EcoString>,
     /// Related labels that provide additional information.
     pub labels: EcoVec<Label>,
+    pub code: Option<&'static ErrorCode>
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -422,6 +424,11 @@ impl SyntaxError {
         self.labels.push(label);
         self
     }
+
+    pub fn with_code(&mut self, code: &'static ErrorCode) -> &mut Self {
+        self.code = Some(code);
+        self
+    }
 }
 
 impl SyntaxError {
@@ -433,6 +440,7 @@ impl SyntaxError {
             label_message: None,
             labels: eco_vec![],
             notes: eco_vec![],
+            code: None,
         }
     }
 }

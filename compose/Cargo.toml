@@ -4,9 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-compose-library = { path = "../compose-library" }
-compose-eval = { path = "../compose-eval" }
-compose-syntax = { path = "../compose-syntax" }
+compose-library = { workspace = true }
+compose-eval = { workspace = true}
+compose-syntax = { workspace = true}
+compose-error-codes = {workspace = true}
 ecow = { workspace = true }
 
 [lints]
