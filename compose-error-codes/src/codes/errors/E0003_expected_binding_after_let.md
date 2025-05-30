@@ -1,8 +1,7 @@
 # E0003: Expected binding after `let`
 
-A `let` statement must be followed by a **binding pattern**, such as a variable name, before the equals sign (`=`).
-
-This error typically occurs when a binding is omitted or mistyped, such as writing `let = ...`.
+A `let` statement must include a **binding**, like `let x = ...`.
+- ✅ Add a variable name (e.g., `let x = 5;`) or a destructuring pattern (e.g., `let { a, b } = obj;`).
 
 ---
 
@@ -16,13 +15,19 @@ let = 5
 
 ### Explanation
 
-A `let` statement introduces a new binding (or destructuring pattern) and must follow the full syntax:
+A `let` statement introduces a new binding and must follow this form:
 
 ```text
 let pattern = expression;
 ```
 
-The *pattern* is required — it's what receives the value of the expression. It can be a simple name like `x`, a mutable name like `mut x`, or a destructuring pattern like `(a, b)` or `{ key }`.
+The *pattern* is required — it determines where the value of the expression is stored. It can be:
+
+* a variable name: `let x = 5;`
+* a mutable variable: `let mut x = 5;`
+* a destructuring pattern: `let (a, b) = tuple;`, `let { a } = obj;`
+
+If you omit the pattern, as in `let = 5`, the language doesn’t know what to bind the value to.
 
 ---
 
@@ -40,9 +45,9 @@ let x = 5;
 let { a, b } = some_object;
 ```
 
-#### ✅ Use `mut` if you intend to mutate the variable:
+#### ✅ Use `mut` if mutation is needed:
 
 ```compose
-let mut x = 10;
-x = 20;
+let mut count = 10;
+count = 20;
 ```

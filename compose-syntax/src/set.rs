@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use crate::kind::SyntaxKind;
 
 #[derive(Default, Copy, Clone)]

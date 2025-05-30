@@ -1,6 +1,9 @@
 # W0001: Use of a variable before it has been initialized
 
-This warning is emitted when you use a variable that was declared with `let` but not given an initial value.
+A variable declared with `let` but not initialized defaults to `()`.
+- ✅ Assign a value when declaring (e.g., `let a = 5;`)
+- ✅ Or assign a value before first use (e.g., `let a; a = 5; a`)
+
 
 ---
 
@@ -15,22 +18,24 @@ a
 
 ### Explanation
 
-When you declare a variable without assigning it a value, it defaults to the **unit value `()`**, similar to `void` in other languages.
+When you declare a variable with `let` but do **not** give it an initial value, Compose defaults it to the unit value `()` (similar to `void` in other languages).
 
-While this may be valid syntax, it’s often a sign of a mistake — for example, forgetting to assign a value or assuming the variable has a meaningful default.
+While this is valid syntax, it often indicates a mistake — such as assuming the variable has a meaningful default or forgetting to initialize it before use.
+
+This warning helps prevent subtle logic bugs or no-op evaluations.
 
 ---
 
 ### Fixes
 
-#### ✅ Initialize the variable at declaration time:
+#### ✅ Initialize the variable during declaration:
 
 ```compose
 let a = 42;
 a
 ```
 
-#### ✅ If you intend to assign it later, do so before using it:
+#### ✅ Assign a value before using the variable:
 
 ```compose
 let a;
@@ -38,7 +43,7 @@ a = 10;
 a
 ```
 
-#### ✅ If you truly mean to use the unit value:
+#### ✅ If you meant to use the unit value, make it explicit:
 
 ```compose
 let a = ();
@@ -49,11 +54,11 @@ a // evaluates to ()
 
 ### Why this matters
 
-Using an uninitialized variable results in the value `()`, which is not very useful if unintended. This warning helps you catch cases where a variable was declared but never properly initialized.
-
-It’s particularly useful in catching logic bugs like:
+Uninitialized variables default to `()`, which is often unintentional. For example:
 
 ```compose warning
 let total;
-print("Total is", total);
+println("Total is", total);
 ```
+
+This will print `"Total is ()"` — which likely isn't what you meant.

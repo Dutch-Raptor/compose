@@ -13,7 +13,6 @@ use compose_explain::Explain;
 use compose_library::{Value, World};
 
 mod editor;
-mod command;
 
 pub fn repl(args: ReplArgs) -> Result<(), CliError> {
     let start_text = match &args.from {

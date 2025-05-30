@@ -1,8 +1,8 @@
-use crate::file::{FileId, VirtualPath};
+use crate::file::FileId;
+use crate::parser::parse_with_offset;
+use crate::{parse, SyntaxNode};
 use std::path::PathBuf;
 use std::sync::Arc;
-use crate::{parse, SyntaxNode};
-use crate::parser::parse_with_offset;
 
 #[derive(Clone, Debug)]
 pub struct Source(Arc<Repr>);

@@ -1,14 +1,9 @@
 use crate::error::CliError;
-use crate::world::SystemWorld;
 use clap::Parser;
-use codespan_reporting::diagnostic::{Diagnostic, LabelStyle};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-use codespan_reporting::{diagnostic, term};
-use compose_eval::Eval;
+use codespan_reporting::term;
+use compose_library::diag::{write_diagnostics, SourceDiagnostic};
 use compose_library::World;
-use compose_library::diag::{Severity, SourceDiagnostic, write_diagnostics};
-use compose_syntax::{FileId, Label, LabelType};
-use ecow::eco_format;
 use std::path::PathBuf;
 
 mod error;

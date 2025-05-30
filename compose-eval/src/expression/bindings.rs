@@ -80,7 +80,7 @@ fn destructure_impl(
     match pattern {
         Pattern::Single(expr) => bind(vm, expr, value)?,
         Pattern::PlaceHolder(_) => {} // A placeholder means we discard the value, no need to bind
-        Pattern::Destructuring(destruct) => {
+        Pattern::Destructuring(_) => {
             unimplemented!("destructuring")
         }
     };

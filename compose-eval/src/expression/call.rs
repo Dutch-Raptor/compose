@@ -1,6 +1,6 @@
 use crate::{Eval, Vm};
 use compose_library::diag::{error, At, SourceResult, Spanned};
-use compose_library::{Arg, Args, Func, Type, UnboundItem, Value, World};
+use compose_library::{Arg, Args, Func, Type, UnboundItem, Value};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{ast, Span};
 use ecow::{eco_vec, EcoVec};

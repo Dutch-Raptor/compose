@@ -4,7 +4,7 @@ use codespan_reporting::term::termcolor::Ansi;
 use compose_error_codes::ErrorCode;
 use compose_eval::Vm;
 use compose_library::diag::{Warned, write_diagnostics};
-use compose_library::{Value, World};
+use compose_library::Value;
 use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
 use regex::Regex;
 
