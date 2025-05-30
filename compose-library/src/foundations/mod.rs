@@ -19,7 +19,6 @@ pub use cast::*;
 pub use args::*;
 pub use global_funcs::*;
 pub use module::*;
-pub use cast::*;
 pub use ty::*;
 pub use unit::*;
 pub use str::*;

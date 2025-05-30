@@ -1,20 +1,19 @@
 mod error_definitions;
 mod parser_impl;
 
-use crate::LabelType::Primary;
 use crate::ast::{AssignOp, BinOp};
 use crate::file::FileId;
 use crate::kind::SyntaxKind;
 use crate::kind::SyntaxKind::Assignment;
 use crate::node::SyntaxNode;
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{ARG_RECOVER, ASSIGN_OP, SyntaxSet, UNARY_OP, syntax_set};
+use crate::set::{syntax_set, SyntaxSet, ARG_RECOVER, ASSIGN_OP, UNARY_OP};
 use crate::{ast, set};
+use compose_error_codes::E0002_INVALID_ASSIGNMENT;
 use compose_utils::{trace_fn, trace_log};
 use ecow::eco_format;
 use parser_impl::Parser;
 use std::collections::HashSet;
-use compose_error_codes::E0002_INVALID_ASSIGNMENT;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ExprContext {
@@ -468,7 +467,7 @@ fn pattern_leaf<'s>(
     }
 }
 
-fn destructuring(p: &mut Parser, reassignment: bool, seen: &mut HashSet<&str>, dupe: Option<&str>) {
+fn destructuring(p: &mut Parser, _reassignment: bool, _seen: &mut HashSet<&str>, _dupe: Option<&str>) {
     trace_fn!("parse_destructuring");
     p.assert(SyntaxKind::At);
 

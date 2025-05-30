@@ -1,3 +1,4 @@
+#![allow(unused)]
 mod cast;
 mod func;
 mod kw;

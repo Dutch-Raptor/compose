@@ -1,6 +1,6 @@
-use crate::SyntaxNode;
-use crate::ast::{Expr, Statement};
 use crate::ast::macros::node;
+use crate::ast::Statement;
+use crate::SyntaxNode;
 use ecow::EcoString;
 use std::ops::Deref;
 use unscanny::Scanner;

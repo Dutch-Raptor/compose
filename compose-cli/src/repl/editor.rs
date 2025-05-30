@@ -98,11 +98,6 @@ impl EditorHistory {
         history.push(s.to_string());
     }
     
-    pub fn clear(&self) {
-        let mut history = self.0.lock();
-        history.clear();
-    }
-    
     pub fn len(&self) -> usize {
         self.0.lock().len()
     }

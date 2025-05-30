@@ -111,14 +111,14 @@ fn create_castable_body(input: &CastData) -> TokenStream {
 impl Parse for CastData {
     fn parse(input: ParseStream) -> Result<Self> {
         let ty = input.parse()?;
-        let _: syn::Token![,] = input.parse()?;
+        let _: Token![,] = input.parse()?;
 
         let mut into_value = None;
-        if input.peek(syn::Token![self]) {
-            let _: syn::Token![self] = input.parse()?;
-            let _: syn::Token![ => ] = input.parse()?;
+        if input.peek(Token![self]) {
+            let _: Token![self] = input.parse()?;
+            let _: Token![ => ] = input.parse()?;
             into_value = Some(input.parse()?);
-            let _: syn::Token![, ] = input.parse()?;
+            let _: Token![, ] = input.parse()?;
         }
 
         let from_value = Punctuated::parse_terminated(input)?;
@@ -150,10 +150,10 @@ impl Parse for Cast {
 
         // Pat: Ty
         let pattern = syn::Pat::parse_single(input)?;
-        let _: syn::Token![:] = input.parse()?;
+        let _: Token![:] = input.parse()?;
         let ty = input.parse()?;
 
-        let _: syn::Token![=>] = input.parse()?;
+        let _: Token![=>] = input.parse()?;
         let expr = input.parse()?;
 
         Ok(Self {

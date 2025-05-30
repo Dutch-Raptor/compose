@@ -1,11 +1,11 @@
 use crate::kind::SyntaxKind;
+use crate::parser::error_definitions::err_unclosed_delim;
 use crate::set::SyntaxSet;
-use crate::{FileId, Label, Lexer, Span, SyntaxError, SyntaxNode};
+use crate::{FileId, Lexer, Span, SyntaxError, SyntaxNode};
 use compose_utils::trace_log;
-use ecow::{EcoString, eco_format};
+use ecow::{eco_format, EcoString};
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut, Range};
-use crate::parser::error_definitions::err_unclosed_delim;
 
 impl Index<Marker> for Parser<'_> {
     type Output = SyntaxNode;

@@ -4,7 +4,6 @@ use compose_library::diag::{bail, At, SourceResult, StrResult};
 use compose_library::{ops, Value};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
-use crate::access::Access;
 
 impl Eval for ast::Binary<'_> {
     type Output = Value;
