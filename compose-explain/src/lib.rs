@@ -3,8 +3,8 @@ use codespan_reporting::term::Config;
 use codespan_reporting::term::termcolor::Ansi;
 use compose_error_codes::ErrorCode;
 use compose_eval::Vm;
-use compose_library::diag::{Warned, write_diagnostics};
 use compose_library::Value;
+use compose_library::diag::{Warned, write_diagnostics};
 use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
 use regex::Regex;
 
@@ -133,11 +133,6 @@ fn execute_with_diagnostics(code: &str) -> String {
         }
     }
 
-    if !stdout.is_empty() {
-        output.push_str("\n");
-        output.push_str(stdout.as_str());
-    }
-
     match value {
         Ok(value) => {
             write_diagnostics(&world, &[], &warnings, &mut wtr, &config).unwrap();
@@ -147,7 +142,15 @@ fn execute_with_diagnostics(code: &str) -> String {
                 output.push_str(String::from_utf8(diags_buffer).unwrap().trim());
             }
 
+            if !stdout.is_empty() {
+                sep(&mut output);
+                sep(&mut output);
+                output.push_str("stdout:\n");
+                output.push_str(stdout.as_str());
+            }
+
             if value != Value::unit() {
+                sep(&mut output);
                 sep(&mut output);
                 output.push_str(&format!("{value:?}"));
             }
@@ -155,6 +158,12 @@ fn execute_with_diagnostics(code: &str) -> String {
         }
         Err(err) => {
             write_diagnostics(&world, &err, &warnings, &mut wtr, &config).unwrap();
+
+            if !stdout.is_empty() {
+                sep(&mut output);
+                output.push_str("stdout:\n");
+                output.push_str(stdout.as_str());
+            }
 
             if !diags_buffer.is_empty() {
                 sep(&mut output);

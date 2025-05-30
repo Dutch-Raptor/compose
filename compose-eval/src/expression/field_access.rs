@@ -12,6 +12,6 @@ impl Eval for ast::FieldAccess<'_> {
         let field = self.field();
         let field_span = field.span();
         
-        target.field(&field, field_span, &mut vm.sink).at(field_span)
+        target.field(&field, field_span, vm.sink_mut()).at(field_span)
     }
 }

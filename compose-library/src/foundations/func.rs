@@ -1,11 +1,13 @@
-use std::sync::LazyLock;
-use compose_library::{Scope, World};
-use compose_macros::{cast, ty};
 use crate::diag::{bail, SourceResult, StrResult};
 use crate::foundations::args::Args;
-use crate::{Routines, Sink, Value};
-use compose_syntax::{Span, SyntaxNode};
+use crate::{Sink, Value};
+use compose_library::{Engine, Scope, World};
+use compose_macros::{cast, ty};
+use compose_syntax::{ast, Span, SyntaxNode};
 use compose_utils::Static;
+use std::fmt;
+use std::sync::LazyLock;
+use compose_syntax::ast::AstNode;
 
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast)]
@@ -23,6 +25,15 @@ impl Func {
     }
 }
 
+impl fmt::Display for Func {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.repr {
+            Repr::Native(native) => write!(f, "{}", native.0.name),
+            Repr::Closure(closure) => closure.fmt(f),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Repr {
     Native(Static<NativeFuncData>),
@@ -30,16 +41,16 @@ enum Repr {
 }
 
 impl Func {
-    pub fn call(&self, routines: &Routines, world: &dyn World, mut args: Args) -> SourceResult<Value> {
+    pub fn call(&self, engine: &mut Engine, mut args: Args) -> SourceResult<Value> {
         match &self.repr {
             Repr::Native(native) => {
-                let value = (native.closure)(&mut args)?;
+                let value = (native.closure)(engine, &mut args)?;
                 args.finish()?;
                 Ok(value)
             }
             Repr::Closure(closure) => {
-                (routines.eval_closure)(
-                    self, closure, world, args
+                (engine.routines.eval_closure)(
+                    self, closure, engine.world, args
                 )
             }
         }
@@ -59,7 +70,7 @@ impl Func {
         }
     }
 
-    pub fn field(&self, field: &str, access_span: Span, sink: &mut impl Sink) -> StrResult<&Value> {
+    pub fn field(&self, field: &str, access_span: Span, sink: &mut Sink) -> StrResult<&Value> {
         let scope = self.scope().ok_or("Cannot access fields on user-defined functions")?;
         match scope.get(field) {
             Some(binding) => Ok(binding.read_checked(access_span, sink)),
@@ -70,7 +81,7 @@ impl Func {
         }
     }
     
-    pub fn path(&self, path: &str, access_span: Span, sink: &mut impl Sink) -> StrResult<&Value> {
+    pub fn path(&self, path: &str, access_span: Span, sink: &mut Sink) -> StrResult<&Value> {
         let scope = self.scope().ok_or("Cannot access fields on user-defined functions")?;
         match scope.get(path) {
             Some(binding) => Ok(binding.read_checked(access_span, sink)),
@@ -98,7 +109,7 @@ pub trait NativeFunc {
 
 #[derive(Debug)]
 pub struct NativeFuncData {
-    pub closure: fn(&mut Args) -> SourceResult<Value>,
+    pub closure: fn(&mut Engine, &mut Args) -> SourceResult<Value>,
     pub name: &'static str,
     pub scope: LazyLock<Scope>,
     pub fn_type: FuncType,
@@ -109,6 +120,15 @@ pub struct Closure {
     pub node: SyntaxNode,
     pub defaults: Vec<Value>,
     pub num_pos_params: usize,
+}
+
+impl fmt::Display for Closure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let closure: ast::Closure = self.node.cast().expect("closure");
+        let params = closure.params().to_untyped().create_text();
+        
+        write!(f, "{} => ...", params)
+    }
 }
 
 #[derive(Debug)]

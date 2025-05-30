@@ -2,11 +2,14 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
-    let files = walkdir::WalkDir::new("src/codes")
+    let mut files = walkdir::WalkDir::new("src/codes")
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file() && e.path().extension().unwrap() == "md")
+        .filter(|e| e.file_type().is_file() && e.path().extension().unwrap_or_default() == "md")
         .collect::<Vec<_>>();
+
+    // Sort for build determinism
+    files.sort_by_key(|f| f.path().to_owned());
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let codes_path = "src/codes";
@@ -20,7 +23,12 @@ fn main() {
     for file in files {
         let path = file.path();
         println!("cargo:rerun-if-changed={}", path.display());
-        let name = file.path().file_stem().unwrap().to_str().unwrap();
+        let name = file
+            .path()
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .expect("invalid file name")
+            .to_uppercase();
         let split = name.split('_').collect::<Vec<_>>();
         assert!(
             split.len() >= 2,
@@ -44,16 +52,14 @@ fn main() {
                 description: "{contents}",
             }};
         "#,
-            name = name.to_uppercase(),
             contents = escape(&contents),
         ));
         out.push_str("\n\n");
-        
+
         lookup_matches.push_str(&format!(
             r#"
                 "{code}" => &{name},
             "#,
-            name = name.to_uppercase()
         ));
     }
 

@@ -127,17 +127,18 @@ fn create_wrapper_closure(func: &Func) -> TokenStream {
             .as_ref()
             .map(bind)
             .map(|tokens| quote! { #tokens, });
+        let engine = func.special.engine.then(|| quote! { engine, });
         let forwarded = func.params.iter().map(bind);
 
         quote! {
-            __func(#self_ #(#forwarded,)*)
+            __func(#self_ #engine #(#forwarded,)*)
         }
     };
 
     let parent = func.parent.as_ref().map(|ty| quote! { #ty:: });
     let ident = &func.rust_name;
     quote! {
-        |args| {
+        |engine, args| {
             let __func = #parent #ident;
             #arg_handlers
             #finish
@@ -280,6 +281,7 @@ impl Parse for Meta {
 #[derive(Default)]
 struct SpecialParams {
     self_: Option<Param>,
+    engine: bool,
 }
 
 fn parse_param(
@@ -324,17 +326,22 @@ fn parse_param(
         ),
     };
 
-    let mut attrs = typed.attrs.clone();
+    match ident.to_string().as_str() {
+        "engine" => special_params.engine = true,
+        _ => {
+            let mut attrs = typed.attrs.clone();
 
-    params.push(Param {
-        binding: Binding::Owned,
-        ident: ident.clone(),
-        ty: *typed.ty.clone(),
-        name: ident.to_string(),
-        docs: documentation(&attrs),
-        variadic: has_attr(&mut attrs, "variadic"),
-        named: has_attr(&mut attrs, "named"),
-    });
+            params.push(Param {
+                binding: Binding::Owned,
+                ident: ident.clone(),
+                ty: *typed.ty.clone(),
+                name: ident.to_string(),
+                docs: documentation(&attrs),
+                variadic: has_attr(&mut attrs, "variadic"),
+                named: has_attr(&mut attrs, "named"),
+            });
+        }
+    }
 
     Ok(())
 }

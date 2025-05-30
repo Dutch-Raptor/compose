@@ -1,6 +1,8 @@
-use crate::Value;
 use crate::diag::{StrResult, bail};
+use crate::{Engine, Value};
 use compose_macros::func;
+use ecow::EcoString;
+use std::io::Write;
 
 mod assertions;
 
@@ -12,20 +14,27 @@ pub fn panic(msg: Value) -> StrResult<()> {
 }
 
 #[func]
-pub fn print(#[variadic] print_args: Vec<Value>) {
-    let message = print_args
-        .iter()
-        .map(|v| format!("{v:?}"))
-        .collect::<Vec<_>>()
-        .join(" ");
-    print!("{}", message);
+pub fn print(engine: &mut Engine, #[variadic] print_args: Vec<Value>) -> StrResult<()> {
+    engine
+        .world
+        .write(&|wtr: &mut dyn Write| write!(wtr, "{}", join_args(&print_args)))
+        .map_err(|e| e.to_string().into())
 }
 #[func]
-pub fn println(#[variadic] print_args: Vec<Value>) {
-    let message = print_args
-        .iter()
-        .map(|v| format!("{v:?}"))
-        .collect::<Vec<_>>()
-        .join(" ");
-    println!("{}", message);
+pub fn println(engine: &mut Engine, #[variadic] print_args: Vec<Value>) -> StrResult<()> {
+    engine
+        .world
+        .write(&|wtr: &mut dyn Write| writeln!(wtr, "{}", join_args(&print_args)))
+        .map_err(|e| e.to_string().into())
+}
+
+fn join_args(args: &[Value]) -> EcoString {
+    let mut joined = EcoString::new();
+    for arg in args {
+        if !joined.is_empty() {
+            joined.push(' ');
+        }
+        joined.push_str(&arg.to_string());
+    }
+    joined
 }

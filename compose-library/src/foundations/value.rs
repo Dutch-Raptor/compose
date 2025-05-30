@@ -1,3 +1,5 @@
+use std::fmt;
+use ecow::{eco_format, EcoString};
 use crate::diag::{At, SourceResult};
 use crate::IntoValue;
 use crate::Reflect;
@@ -5,6 +7,7 @@ use crate::{CastInfo, Str, UnitValue};
 use crate::{FromValue, Func};
 use crate::{Sink, Type};
 use compose_library::diag::{bail, StrResult};
+use compose_library::repr::Repr;
 use compose_syntax::Span;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -45,7 +48,7 @@ impl Value {
     }
 
     /// Access a field on this value (with dot syntax) `a.b`
-    pub fn field(&self, field: &str, access_span: Span, sink: &mut impl Sink) -> StrResult<Value> {
+    pub fn field(&self, field: &str, access_span: Span, sink: &mut Sink) -> StrResult<Value> {
         let field_value = match self {
             Self::Func(func) => func.field(field, access_span, sink).cloned(),
             Self::Type(ty) => ty.field(field, access_span, sink).cloned(),
@@ -65,11 +68,37 @@ impl Value {
     }
 
     /// Access an associated value of this value by path syntax `a::b`
-    pub fn path(&self, path: &str, access_span: Span, sink: &mut impl Sink) -> SourceResult<Value> {
+    pub fn path(&self, path: &str, access_span: Span, sink: &mut Sink) -> SourceResult<Value> {
         match self {
             Self::Type(ty) => ty.path(path, access_span, sink).cloned().at(access_span),
             Self::Func(func) => func.path(path, access_span, sink).cloned().at(access_span),
             _ => bail!(access_span, "no associated field or method named `{}` on `{}`", path, self.ty()),
+        }
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Int(v) => write!(f, "{}", v),
+            Value::Bool(v) => write!(f, "{}", v),
+            Value::Unit(_) => write!(f, "()"),
+            Value::Str(v) => write!(f, "{}", v),
+            Value::Func(v) => write!(f, "{}", v),
+            Value::Type(v) => write!(f, "{}", v),
+        }
+    }
+}
+
+impl Repr for Value {
+    fn repr(&self) -> EcoString {
+        match self {
+            Value::Int(v) => eco_format!("{v}"),
+            Value::Bool(v) => eco_format!("{v}"),
+            Value::Unit(_) => eco_format!("()"),
+            Value::Str(v) => v.repr(),
+            Value::Func(v) => eco_format!("{v}"),
+            Value::Type(v) => eco_format!("{v}"),
         }
     }
 }

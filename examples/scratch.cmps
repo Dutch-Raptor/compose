@@ -1,6 +1,11 @@
-(unclosed_paren == 2
-let other_statement
-{
-    let f = (x, a) => (x == a)
-)
-{ unclosed_to_eof
+let result = (x, y) => (x = y);
+
+let = 10;
+
+let a = 5;
+a = 6;
+
+let b;
+print("b is", b);
+b = 7;
+b = 8

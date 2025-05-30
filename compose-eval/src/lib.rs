@@ -52,18 +52,18 @@ pub fn eval_range(
                 let span = node.span();
                 let err = error!(span, "expected a statement, found {:?}", node);
                 return Warned::new(Err(eco_vec![err]))
-                    .with_warnings(std::mem::take(&mut vm.sink.warnings));
+                    .with_warnings(vm.sink_mut().take_warnings());
             }
         };
         result = match statement.eval(vm) {
             Ok(value) => value,
             Err(err) => {
-                return Warned::new(Err(err)).with_warnings(std::mem::take(&mut vm.sink.warnings));
+                return Warned::new(Err(err)).with_warnings(vm.sink_mut().take_warnings());
             }
         }
     }
 
-    Warned::new(Ok(result)).with_warnings(std::mem::take(&mut vm.sink.warnings))
+    Warned::new(Ok(result)).with_warnings(vm.sink_mut().take_warnings())
 }
 
 

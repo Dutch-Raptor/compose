@@ -21,7 +21,7 @@ impl Type {
         &self.0.0.scope
     }
 
-    pub fn field(&self, field: &str, access_span: Span, sink: &mut impl Sink) -> StrResult<&Value> {
+    pub fn field(&self, field: &str, access_span: Span, sink: &mut Sink) -> StrResult<&Value> {
         self.0
             .scope
             .get(field)
@@ -33,7 +33,7 @@ impl Type {
         &self,
         path: &str,
         access_span: Span,
-        sink: &mut impl Sink,
+        sink: &mut Sink,
     ) -> Result<&Value, UnBoundError> {
         self.0
             .scope

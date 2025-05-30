@@ -1,3 +1,5 @@
+use ecow::EcoString;
+
 pub fn separated_list(pieces: &[impl AsRef<str>], last: &str) -> String {
     let mut buf = String::new();
     for (i, part) in pieces.iter().enumerate() {
@@ -18,4 +20,8 @@ pub fn separated_list(pieces: &[impl AsRef<str>], last: &str) -> String {
         buf.push_str(part.as_ref());
     }
     buf
+}
+
+pub trait Repr {
+    fn repr(&self) -> EcoString;
 }

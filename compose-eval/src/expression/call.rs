@@ -16,7 +16,7 @@ impl Eval for ast::FuncCall<'_> {
 
         let func = callee.cast::<Func>().at(callee_span)?;
 
-        func.call(&vm.routines, vm.world, args)
+        func.call(&mut vm.engine, args)
     }
 }
 
@@ -49,7 +49,7 @@ impl ast::FuncCall<'_> {
 
         args.insert(0, target_expr.span(), target);
 
-        let callee = callee_binding.read_checked(target_expr.span(), &mut vm.sink).clone();
+        let callee = callee_binding.read_checked(target_expr.span(), vm.sink_mut()).clone();
 
         if let Value::Func(func) = &callee {
             if func.is_associated_function() {
