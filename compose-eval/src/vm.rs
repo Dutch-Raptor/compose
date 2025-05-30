@@ -1,17 +1,23 @@
-use crate::expression::eval_closure;
 use compose_library::diag::{error, At, SourceDiagnostic, SourceResult};
-use compose_library::{Binding, IntoValue, Routines, Scopes, Sink, Value, World};
+use compose_library::{Binding, Engine, IntoValue, Routines, Scopes, Sink, Value, World};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{ast, Span};
-use ecow::EcoVec;
 use std::fmt::Debug;
 
 pub struct Vm<'a> {
-    pub world: &'a dyn World,
     pub scopes: Scopes<'a>,
     pub flow: Option<FlowEvent>,
-    pub sink: VmSink,
-    pub routines: Routines,
+    pub engine: Engine<'a>,
+}
+
+impl<'a> Vm<'a> {
+    pub(crate) fn sink(&self) -> &Sink {
+        &self.engine.sink
+    }
+    
+    pub(crate) fn sink_mut(&mut self) -> &mut Sink {
+        &mut self.engine.sink
+    }
 }
 
 impl Debug for Vm<'_> {
@@ -19,15 +25,11 @@ impl Debug for Vm<'_> {
         f.debug_struct("Vm")
             .field("scopes", &self.scopes)
             .field("flow", &self.flow)
-            .field("sink", &self.sink)
+            .field("sink", &self.engine)
             .finish()
     }
 }
 
-#[derive(Default, Debug)]
-pub struct VmSink {
-    pub warnings: EcoVec<SourceDiagnostic>,
-}
 
 #[derive(Debug)]
 pub enum FlowEvent {
@@ -55,11 +57,13 @@ impl FlowEvent {
 impl<'a> Vm<'a> {
     pub fn new(world: &'a dyn World) -> Self {
         Self {
-            world,
             scopes: Scopes::new(Some(world.library())),
             flow: None,
-            sink: Default::default(),
-            routines: routines(),
+            engine: Engine {
+                routines: routines(),
+                sink: Sink::default(),
+                world,
+            },
         }
     }
 
@@ -78,11 +82,7 @@ impl<'a> Vm<'a> {
 }
 
 pub fn routines() -> Routines {
-    Routines { eval_closure }
-}
-
-impl Sink for VmSink {
-    fn warn(&mut self, warning: SourceDiagnostic) {
-        self.warnings.push(warning);
+    Routines {
+        eval_closure: crate::expression::eval_closure,
     }
 }

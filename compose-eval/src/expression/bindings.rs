@@ -15,7 +15,7 @@ impl<'a> Eval for ast::Ident<'a> {
             .scopes
             .get(&self)
             .at(span)?
-            .read_checked(span, &mut vm.sink)
+            .read_checked(span, &mut vm.engine.sink)
             .clone())
     }
 }
@@ -163,8 +163,8 @@ mod tests {
         assert_eq!(result, Value::unit());
 
         // should have emitted a warning
-        assert_eq!(vm.sink.warnings.len(), 1);
-        let warning = &vm.sink.warnings[0];
+        assert_eq!(vm.sink().warnings.len(), 1);
+        let warning = &vm.sink().warnings[0];
         assert!(warning.message.contains("uninitialised"));
         // should have a hint
         assert_eq!(warning.hints.len(), 1);

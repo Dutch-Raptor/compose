@@ -1,11 +1,11 @@
 use crate::ast::AstNode;
 use crate::kind::SyntaxKind;
 use crate::span::Span;
+use compose_error_codes::ErrorCode;
 use compose_utils::trace_log;
 use ecow::{EcoString, EcoVec, eco_vec};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use compose_error_codes::ErrorCode;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct SyntaxNode(Repr);
@@ -39,18 +39,14 @@ impl SyntaxNode {
             _ => None,
         }
     }
-}
 
-impl SyntaxNode {
     pub(crate) fn descendents(&self) -> usize {
         match &self.0 {
             Repr::Leaf(_) | Repr::Error(_) => 1,
             Repr::Inner(i) => i.descendents,
         }
     }
-}
 
-impl SyntaxNode {
     pub(crate) fn len(&self) -> usize {
         match &self.0 {
             Repr::Leaf(l) => l.len(),
@@ -128,6 +124,28 @@ impl SyntaxNode {
         }
     }
 
+    /// Like text, but also returns the text of inner nodes.
+    /// 
+    /// Builds a new string, so is more computationally expensive.
+    pub fn create_text(&self) -> EcoString {
+        let mut str = EcoString::new();
+
+        fn inner(node: &SyntaxNode, str: &mut EcoString) {
+            match &node.0 {
+                Repr::Leaf(l) => str.push_str(&l.text),
+                Repr::Inner(i) => {
+                    for child in &i.children {
+                        inner(child, str);
+                    }
+                }
+                Repr::Error(e) => str.push_str(&e.text),
+            }
+        }
+
+        inner(self, &mut str);
+        str
+    }
+
     pub fn children(&self) -> std::slice::Iter<'_, SyntaxNode> {
         match &self.0 {
             Repr::Leaf(_) | Repr::Error(_) => [].iter(),
@@ -171,9 +189,7 @@ impl SyntaxNode {
         self.convert_to_error(format!("expected {}, found {:?}", &expected, kind));
         trace_log!("expected {}, found {:?}", &expected, kind);
     }
-}
 
-impl SyntaxNode {
     pub fn span(&self) -> Span {
         match &self.0 {
             Repr::Leaf(l) => l.span,
@@ -261,7 +277,7 @@ struct InnerNode {
     erroneous: bool,
     /// This node's children, losslessly make up this node.
     children: Vec<SyntaxNode>,
-    /// The number of descendents of this node (including itself).
+    /// The number of descendents in this node (including itself).
     descendents: usize,
 }
 
@@ -370,7 +386,7 @@ pub struct SyntaxError {
     pub label_message: Option<EcoString>,
     /// Related labels that provide additional information.
     pub labels: EcoVec<Label>,
-    pub code: Option<&'static ErrorCode>
+    pub code: Option<&'static ErrorCode>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

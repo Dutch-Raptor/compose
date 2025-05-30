@@ -14,6 +14,6 @@ impl Eval for ast::PathAccess<'_> {
         let target = target_expr.eval(vm)?;
 
         let span = member.span();
-        target.path(&member, span, &mut vm.sink)
+        target.path(&member, span, vm.sink_mut())
     }
 }

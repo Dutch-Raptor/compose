@@ -332,7 +332,7 @@ impl Binding {
     /// Read the value behind the binding.
     ///
     /// A warning is emitted to the sink if the variable was not yet initialized.
-    pub fn read_checked(&self, access_span: Span, sink: &mut impl Sink) -> &Value {
+    pub fn read_checked(&self, access_span: Span, sink: &mut Sink) -> &Value {
         if self.is_uninitialized() {
             sink.warn(
                 warning!(access_span, "use of variable before it has been initialized";)

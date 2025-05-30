@@ -3,11 +3,13 @@ mod world;
 mod foundations;
 mod sink;
 mod repr;
+mod engine;
 
 use compose_library::diag::SourceResult;
 pub use foundations::*;
 pub use sink::*;
 pub use world::*;
+pub use engine::*;
 
 // Workaround to refer to self as compose_library instead of crate. Needed for some macros
 extern crate self as compose_library;

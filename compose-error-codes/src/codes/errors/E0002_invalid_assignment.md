@@ -49,7 +49,3 @@ let f = (x, a) => { x = a };
 ```compose
 let f = (x, a) => { let x = a; x };
 ```
-
----
-
-Let me know if you'd like to update `E0003` and `W0001` similarly — happy to help polish them too.
