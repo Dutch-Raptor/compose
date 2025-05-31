@@ -8,13 +8,13 @@ In Compose, `if` and `while` conditions do not need to be wrapped in parentheses
 
 ```compose warning
 if (true) {
-    // ...
+    println("it was true")
 }
 ```
 
 ✅ **Fix:**
 
-```cmps
+```compose
 if true {
     // ...
 }

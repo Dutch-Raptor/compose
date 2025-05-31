@@ -15,7 +15,7 @@ impl SyntaxNode {
         match &self.0 {
             Repr::Leaf(_) => false,
             Repr::Inner(i) => i.erroneous,
-            Repr::Error(_) => true,
+            Repr::Error(e) => e.error.severity == SyntaxErrorSeverity::Error,
         }
     }
     pub fn errors(&self) -> Vec<SyntaxError> {
@@ -30,6 +30,20 @@ impl SyntaxNode {
                 .filter(|node| node.erroneous())
                 .flat_map(|node| node.errors())
                 .collect()
+        }
+    }
+
+    pub fn warnings(&self) -> Vec<SyntaxError> {
+        match &self.0 {
+            Repr::Error(node) => {
+                if node.error.severity == SyntaxErrorSeverity::Warning {
+                    vec![node.error.clone()]
+                } else {
+                    vec![]
+                }
+            }
+            Repr::Inner(i) => i.children.iter().flat_map(|node| node.warnings()).collect(),
+            Repr::Leaf(_) => vec![],
         }
     }
 
@@ -125,7 +139,7 @@ impl SyntaxNode {
     }
 
     /// Like text, but also returns the text of inner nodes.
-    /// 
+    ///
     /// Builds a new string, so is more computationally expensive.
     pub fn create_text(&self) -> EcoString {
         let mut str = EcoString::new();
@@ -388,7 +402,7 @@ pub struct SyntaxError {
     pub labels: EcoVec<Label>,
     pub code: Option<&'static ErrorCode>,
 
-    pub severity: SyntaxErrorSeverity
+    pub severity: SyntaxErrorSeverity,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

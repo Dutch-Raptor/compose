@@ -132,6 +132,7 @@ fn execute_with_diagnostics(code: &str) -> String {
             s.push_str("\n");
         }
     }
+    
 
     match value {
         Ok(value) => {
@@ -150,7 +151,6 @@ fn execute_with_diagnostics(code: &str) -> String {
             }
 
             if value != Value::unit() {
-                sep(&mut output);
                 sep(&mut output);
                 output.push_str(&format!("{value:?}"));
             }
