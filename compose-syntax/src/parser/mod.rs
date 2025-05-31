@@ -1,3 +1,4 @@
+mod control_flow;
 mod expressions;
 mod funcs;
 mod patterns;
@@ -238,6 +239,25 @@ impl<'s> Parser<'s> {
         self.eat();
     }
 
+    /// Inserts a syntax error node before the current token position.
+    ///
+    /// The span will be 0 sized.
+    pub(crate) fn insert_error_before(
+        &mut self,
+        message: impl Into<EcoString>,
+    ) -> &mut SyntaxError {
+        let (span, text) = match self.last_node() {
+            Some(v) => (v.span().after(), ""),
+            None => (self.token.node.span(), ""),
+        };
+        let error = SyntaxNode::error(SyntaxError::new(message.into(), span), text);
+
+        trace_log!("inserting error: {:?}", error);
+        self.nodes.push(error);
+
+        self.last_err().unwrap()
+    }
+
     /// Inserts a syntax error node at the current token position.
     ///
     /// The error message is stored and will be included in the final CST as a [SyntaxNode::Error].
@@ -248,6 +268,21 @@ impl<'s> Parser<'s> {
             self.token.node.text(),
         );
         trace_log!("inserting error: {:?}", error);
+        self.nodes.push(error);
+
+        self.last_err().unwrap()
+    }
+
+    pub(crate) fn insert_error(&mut self, error: SyntaxError) -> &mut SyntaxError {
+        trace_log!("inserting error: {:?}", error);
+        let span = error.span;
+
+        let error = SyntaxNode::error(
+            error,
+            span.range()
+                .and_then(|r| self.get_text(r))
+                .unwrap_or_default(),
+        );
         self.nodes.push(error);
 
         self.last_err().unwrap()
@@ -371,9 +406,9 @@ impl<'s> Parser<'s> {
     /// Skips tokens until a token in the `recovery_set` is found or EOF is reached.
     ///
     /// Used in combination with error reporting for safe continuation.
-    /// 
+    ///
     /// ### Behaviour
-    /// 
+    ///
     /// Stops advancing when the current token is in the recovery set or at EOF.
     pub(crate) fn recover_until(&mut self, recovery_set: SyntaxSet) {
         while !self.can_recover_with(recovery_set) && !self.end() {
@@ -397,10 +432,7 @@ impl<'s> Parser<'s> {
             return true;
         }
 
-        let opening_delim = self[open_marker].kind();
-        debug_assert!(opening_delim.is_grouping());
-
-        err_unclosed_delim(self, open_marker, expected_closing, opening_delim);
+        err_unclosed_delim(self, open_marker, expected_closing);
 
         let is_closing = self.current().is_closing_delimiter();
         if is_closing {
@@ -573,7 +605,11 @@ impl<'s> Parser<'s> {
     fn lex(lexer: &mut Lexer) -> Token {
         let prev_end = lexer.cursor();
         let start = prev_end;
-        let (kind, node) = lexer.next();
+        let (mut kind, mut node) = lexer.next();
+        
+        while kind == SyntaxKind::Comment {
+            (kind, node) = lexer.next();
+        }
 
         Token {
             kind,

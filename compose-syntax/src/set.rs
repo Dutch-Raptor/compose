@@ -38,7 +38,7 @@ macro_rules! syntax_set {
 
 pub(crate) use syntax_set;
 
-pub const STMT: SyntaxSet = syntax_set![LetBinding, Import, Return,];
+pub const STMT: SyntaxSet = syntax_set![Let].union(ATOMIC_EXPR);
 
 pub const ARG_RECOVER: SyntaxSet = syntax_set![
     Comma,

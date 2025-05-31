@@ -3,6 +3,7 @@ use crate::ast::atomics::Unit;
 use crate::ast::unary::Unary;
 use crate::ast::{AstNode, Binary, Ident, Int, Parenthesized};
 use crate::ast::{Bool, Closure, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
+use crate::ast::control_flow::Conditional;
 use crate::kind::SyntaxKind;
 
 /// An expression. The base of Compose. Any "statement" is an expression.
@@ -31,6 +32,7 @@ pub enum Expr<'a> {
     PathAccess(PathAccess<'a>),
     Closure(Closure<'a>),
     Parenthesized(Parenthesized<'a>),
+    Conditional(Conditional<'a>)
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -50,6 +52,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::PathAccess => Some(Self::PathAccess(PathAccess::from_untyped(node)?)),
             SyntaxKind::Closure => Some(Self::Closure(Closure::from_untyped(node)?)),
             SyntaxKind::Parenthesized => Some(Self::Parenthesized(Parenthesized::from_untyped(node)?)),
+            SyntaxKind::Conditional => Some(Self::Conditional(Conditional::from_untyped(node)?)),
             _ => None,
         }
     }
@@ -70,6 +73,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::PathAccess(path_access) => path_access.to_untyped(),
             Self::Closure(closure) => closure.to_untyped(),
             Self::Parenthesized(parenthesized) => parenthesized.to_untyped(),       
+            Self::Conditional(conditional) => conditional.to_untyped(),       
         }
     }
 }

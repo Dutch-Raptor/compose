@@ -92,6 +92,12 @@ pub enum SyntaxKind {
     PathAccess,
     NewLine,
     Assignment,
+    Condition,
+    Conditional,
+    ConditionalAlternate,
+    ConditionalElse,
+    Comment,
+    DocComment,
 }
 
 
@@ -198,6 +204,12 @@ impl SyntaxKind {
             PathAccess => "path",
             NewLine => "newline",
             Assignment => "assignment",
+            Conditional => "if expression",
+            ConditionalAlternate => "else if expression",
+            ConditionalElse => "else expression",
+            Condition => "condition",
+            Comment => "comment",
+            DocComment => "doc comment",
         }
     }
     

@@ -1,4 +1,4 @@
-use compose_syntax::{FileId, Label, LabelType, Span, SyntaxError};
+use compose_syntax::{FileId, Label, LabelType, Span, SyntaxError, SyntaxErrorSeverity};
 use ecow::{EcoVec, eco_vec};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
@@ -277,7 +277,7 @@ impl SourceDiagnostic {
 impl From<SyntaxError> for SourceDiagnostic {
     fn from(error: SyntaxError) -> Self {
         Self {
-            severity: Severity::Error,
+            severity: Severity::from(error.severity),
             span: error.span,
             message: error.message,
             label_message: error.label_message,
@@ -294,6 +294,15 @@ impl From<SyntaxError> for SourceDiagnostic {
 pub enum Severity {
     Error,
     Warning,
+}
+
+impl From<SyntaxErrorSeverity> for Severity {
+    fn from(value: SyntaxErrorSeverity) -> Self {
+        match value {
+            SyntaxErrorSeverity::Error => Severity::Error,
+            SyntaxErrorSeverity::Warning => Severity::Warning,
+        }
+    }
 }
 
 pub struct Warned<T> {

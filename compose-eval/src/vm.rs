@@ -11,10 +11,6 @@ pub struct Vm<'a> {
 }
 
 impl<'a> Vm<'a> {
-    pub(crate) fn sink(&self) -> &Sink {
-        &self.engine.sink
-    }
-    
     pub(crate) fn sink_mut(&mut self) -> &mut Sink {
         &mut self.engine.sink
     }

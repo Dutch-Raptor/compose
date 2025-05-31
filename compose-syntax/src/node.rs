@@ -387,6 +387,14 @@ pub struct SyntaxError {
     /// Related labels that provide additional information.
     pub labels: EcoVec<Label>,
     pub code: Option<&'static ErrorCode>,
+
+    pub severity: SyntaxErrorSeverity
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum SyntaxErrorSeverity {
+    Error,
+    Warning,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -445,6 +453,11 @@ impl SyntaxError {
         self.code = Some(code);
         self
     }
+
+    pub fn with_severity(&mut self, severity: SyntaxErrorSeverity) -> &mut Self {
+        self.severity = severity;
+        self
+    }
 }
 
 impl SyntaxError {
@@ -457,6 +470,7 @@ impl SyntaxError {
             labels: eco_vec![],
             notes: eco_vec![],
             code: None,
+            severity: SyntaxErrorSeverity::Error,
         }
     }
 }

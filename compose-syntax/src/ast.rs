@@ -11,6 +11,7 @@ mod path_access;
 mod parenthesized;
 mod statement;
 mod assignment;
+mod control_flow;
 
 use crate::node::SyntaxNode;
 use crate::span::Span;
@@ -28,6 +29,7 @@ pub use path_access::*;
 pub use parenthesized::*;
 pub use statement::*;
 pub use assignment::*;
+pub use control_flow::*;
 
 pub trait AstNode<'a>: Sized {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self>;

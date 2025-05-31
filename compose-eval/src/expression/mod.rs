@@ -15,6 +15,7 @@ mod field_access;
 mod parenthesized;
 mod path_access;
 mod unary;
+mod control_flow;
 
 pub use closure::eval_closure;
 
@@ -38,6 +39,7 @@ impl Eval for Expr<'_> {
             Expr::PathAccess(p) => p.eval(vm),
             Expr::Closure(c) => c.eval(vm),
             Expr::Parenthesized(p) => p.eval(vm),
+            Expr::Conditional(c) => c.eval(vm),
         }?
         .spanned(span);
 

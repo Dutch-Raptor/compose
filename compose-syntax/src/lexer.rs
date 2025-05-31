@@ -17,14 +17,12 @@ pub struct Lexer<'s> {
 
 impl<'s> Lexer<'s> {
     pub fn new(text: &'s str, file_id: FileId) -> Self {
-        let mut lex = Self {
+        Self {
             s: Scanner::new(text),
             newline: false,
             error: None,
             file_id,
-        };
-        lex.skip_whitespace(0);
-        lex
+        }
     }
 
     /// The index in the string at which the last token ended and the next token will start
@@ -83,7 +81,7 @@ impl Lexer<'_> {
     pub fn next(&mut self) -> (SyntaxKind, SyntaxNode) {
         debug_assert!(self.error.is_none());
 
-        self.newline = self.skip_whitespace(self.s.cursor());
+        self.newline = self.skip_whitespace(self.cursor());
         let start = self.cursor();
 
         let kind = match self.s.eat() {
@@ -101,9 +99,17 @@ impl Lexer<'_> {
         (kind, node)
     }
 
-
     fn kind(&mut self, start: usize, c: char) -> SyntaxKind {
         match c {
+            '/' if self.s.eat_if('/') => {
+                if self.s.eat_if('/') {
+                    self.lex_doc_comment(start)
+                } else {
+                    self.lex_line_comment()
+                }
+            }
+            '/' if self.s.eat_if('*') => self.lex_block_comment(start),
+
             '=' if self.s.eat_if('=') => SyntaxKind::EqEq,
             '!' if self.s.eat_if('=') => SyntaxKind::ExclEq,
             '+' if self.s.eat_if('=') => SyntaxKind::PlusEq,
@@ -132,14 +138,14 @@ impl Lexer<'_> {
             ':' if self.s.eat_if(':') => SyntaxKind::ColonColon,
 
             '=' if self.s.eat_if('>') => SyntaxKind::Arrow,
-            
+
             '{' => SyntaxKind::LeftBrace,
             '}' => SyntaxKind::RightBrace,
             '[' => SyntaxKind::LeftBracket,
             ']' => SyntaxKind::RightBracket,
             '(' => SyntaxKind::LeftParen,
             ')' => SyntaxKind::RightParen,
-            
+
             '.' => SyntaxKind::Dot,
             ',' => SyntaxKind::Comma,
             ';' => SyntaxKind::Semicolon,
@@ -163,7 +169,7 @@ impl Lexer<'_> {
             '>' => SyntaxKind::Gt,
             '<' => SyntaxKind::Lt,
             '=' => SyntaxKind::Eq,
-            
+
             '"' => self.lex_string(start),
             '0'..='9' => self.lex_number(start),
 
@@ -185,7 +191,7 @@ impl Lexer<'_> {
             let number = matches!(self.s.scout(1), Some('0'..='9' | 'e' | 'E'));
             dot && number
         };
-        
+
         if is_fractional {
             // Read the fractional part.
             if self.s.eat_if('.') {
@@ -248,6 +254,25 @@ impl Lexer<'_> {
         SyntaxKind::Str
     }
 
+    fn lex_line_comment(&mut self) -> SyntaxKind {
+        self.s.eat_while(|c| !is_newline(c));
+        SyntaxKind::Comment
+    }
+
+    fn lex_block_comment(&mut self, start: usize) -> SyntaxKind {
+        while let Some(c) = self.s.eat() {
+            if c == '*' && self.s.eat_if('/') {
+                return SyntaxKind::Comment;
+            }
+        }
+        self.error("unterminated block comment", self.range_from(start))
+    }
+
+    fn lex_doc_comment(&mut self, start: usize) -> SyntaxKind {
+        self.s.eat_while(|c| !is_newline(c));
+        SyntaxKind::DocComment
+    }
+
     fn skip_whitespace(&mut self, start: usize) -> bool {
         self.s.eat_while(|c| is_space(c));
 
@@ -263,7 +288,7 @@ impl Lexer<'_> {
                 newline_count += 1;
             }
         }
-        
+
         newline_count > 0
     }
 }
@@ -320,7 +345,13 @@ mod tests {
             );
         }
 
-        fn assert_next_error(&mut self, kind: SyntaxKind, message: &str, text: &str, range: Range<usize>) {
+        fn assert_next_error(
+            &mut self,
+            kind: SyntaxKind,
+            message: &str,
+            text: &str,
+            range: Range<usize>,
+        ) {
             assert_eq!(
                 self.next(),
                 (
@@ -367,7 +398,7 @@ mod tests {
         lexer.assert_next(SyntaxKind::Float, "1.0", 0..3);
         lexer.assert_end(3);
     }
-    
+
     #[test]
     fn test_integer_methods_disambiguation() {
         let file_id = test_file_id();
@@ -379,7 +410,7 @@ mod tests {
         lexer.assert_next(SyntaxKind::RightParen, ")", 9..10);
         lexer.assert_end(10)
     }
-    
+
     #[test]
     fn test_float_methods_disambiguation() {
         let file_id = test_file_id();
@@ -483,5 +514,19 @@ mod tests {
                 SyntaxNode::leaf(SyntaxKind::End, "", Span::new(file_id, 0..0))
             )
         );
+    }
+
+    #[test]
+    fn test_comment_kinds() {
+        let file_id = test_file_id();
+
+        let mut lexer = Lexer::new("// regular comment", file_id);
+        lexer.assert_next(SyntaxKind::Comment, "// regular comment", 0..18);
+
+        let mut lexer = Lexer::new("/// doc comment", file_id);
+        lexer.assert_next(SyntaxKind::DocComment, "/// doc comment", 0..15);
+
+        let mut lexer = Lexer::new("/* block\ncomment */", file_id);
+        lexer.assert_next(SyntaxKind::Comment, "/* block\ncomment */", 0..19);
     }
 }

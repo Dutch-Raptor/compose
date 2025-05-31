@@ -163,8 +163,8 @@ mod tests {
         assert_eq!(result, Value::unit());
 
         // should have emitted a warning
-        assert_eq!(vm.sink().warnings.len(), 1);
-        let warning = &vm.sink().warnings[0];
+        assert_eq!(vm.engine.sink.warnings.len(), 1);
+        let warning = &vm.engine.sink.warnings[0];
         assert!(warning.message.contains("uninitialised"));
         // should have a hint
         assert_eq!(warning.hints.len(), 1);

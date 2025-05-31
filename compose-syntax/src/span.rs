@@ -117,6 +117,18 @@ impl Span {
         }
         self
     }
+    
+    pub fn after(self) -> Self {
+        if self.is_detached() {
+            return self;
+        }
+        
+        let range = self.range().unwrap();
+        let end = range.end;
+        let at = end + 1;
+        
+        Span::new(self.id().unwrap(), at..at + 1)
+    }
 }
 
 impl Span {

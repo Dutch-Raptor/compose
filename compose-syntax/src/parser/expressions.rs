@@ -9,6 +9,7 @@ use crate::{ast, Label};
 use compose_error_codes::{E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT};
 use compose_utils::{trace_fn, trace_log};
 use ecow::eco_format;
+use crate::parser::control_flow::conditional;
 
 pub fn code(p: &mut Parser, end_set: SyntaxSet) {
     let mut pos = p.current_end();
@@ -177,6 +178,7 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             p.assert(SyntaxKind::RightParen);
             p.wrap(m, SyntaxKind::Unit)
         }
+        SyntaxKind::If => conditional(p),
         SyntaxKind::LeftParen => expr_with_parens(p, ctx),
         SyntaxKind::Let => statements::let_binding(p),
         // Already fully handled in the lexer
@@ -263,7 +265,6 @@ pub(in crate::parser) fn err_unclosed_delim(
     p: &mut Parser,
     open_marker: Marker,
     expected_closing: SyntaxKind,
-    opening: SyntaxKind,
 ) {
     let closing_delim_label;
     if p.current().is_closing_delimiter() {
@@ -290,7 +291,7 @@ pub(in crate::parser) fn err_unclosed_delim(
         // label on the opening delimiter
         .with_label_message(eco_format!(
             "unclosed `{}` starts here",
-            opening.descriptive_name()
+            expected_closing.matching_delimiter().unwrap().descriptive_name()
         ))
         // label on (or near) the closing delimiter / EOF
         .with_label(Label::primary(closing_span, closing_delim_label))
