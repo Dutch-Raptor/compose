@@ -1,7 +1,7 @@
 use crate::diag::{bail, SourceResult, StrResult};
 use crate::foundations::args::Args;
 use crate::{Sink, Value};
-use compose_library::{Engine, Scope, World};
+use compose_library::{Engine, Scope};
 use compose_macros::{cast, ty};
 use compose_syntax::{ast, Span, SyntaxNode};
 use compose_utils::Static;

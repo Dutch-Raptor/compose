@@ -42,7 +42,7 @@ impl<'s> Lexer<'s> {
 
     /// The number of characters until the most recent newline from an index.
     pub fn column(&self, index: usize) -> usize {
-        let mut s = self.s; // Make a new temporary scanner (cheap).
+        let mut s = self.s; // Make a new temporary scanner (inexpensive).
         s.jump(index);
         s.before()
             .chars()
@@ -103,7 +103,7 @@ impl Lexer<'_> {
         match c {
             '/' if self.s.eat_if('/') => {
                 if self.s.eat_if('/') {
-                    self.lex_doc_comment(start)
+                    self.lex_doc_comment()
                 } else {
                     self.lex_line_comment()
                 }
@@ -268,7 +268,7 @@ impl Lexer<'_> {
         self.error("unterminated block comment", self.range_from(start))
     }
 
-    fn lex_doc_comment(&mut self, start: usize) -> SyntaxKind {
+    fn lex_doc_comment(&mut self) -> SyntaxKind {
         self.s.eat_while(|c| !is_newline(c));
         SyntaxKind::DocComment
     }

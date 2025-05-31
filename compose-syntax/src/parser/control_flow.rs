@@ -58,7 +58,7 @@ fn condition(p: &mut Parser) {
 }
 
 fn parse_conditional_block(p: &mut Parser) -> bool {
-    let mut open_delim = p.marker();
+    let open_delim = p.marker();
     let had_open_brace = p.at(SyntaxKind::LeftBrace);
     if !p.eat_if(SyntaxKind::LeftBrace) {
         p.insert_error_before("if expression bodies require braces")
