@@ -34,6 +34,7 @@ pub fn library() -> Library {
     global.define_func::<println>();
     global.define_type::<i64>();
     global.define_type::<Type>();
+    global.define_type::<ValueIter>();
     
     Library {
         global: Module::new("global", global),

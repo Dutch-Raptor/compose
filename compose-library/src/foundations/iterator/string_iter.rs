@@ -1,3 +1,5 @@
+use crate::{IntoValue, ValueIter};
+use compose_library::Value;
 use ecow::EcoString;
 
 #[derive(Debug, Clone)]
@@ -26,3 +28,8 @@ impl Iterator for StringIterator {
     }
 }
 
+impl IntoValue for StringIterator {
+    fn into_value(self) -> Value {
+        Value::Iterator(ValueIter::from_dyn(Box::new(self)))
+    }
+}

@@ -1,6 +1,7 @@
 use crate::diag::bail;
 use compose_library::diag::StrResult;
-use compose_macros::func;
+use compose_library::Value;
+use compose_macros::{cast, func};
 use compose_macros::{scope, ty};
 
 #[ty(scope, cast, name = "int")]
@@ -30,4 +31,10 @@ impl i64 {
             Err(e) => bail!("{} is too big for an exponent", e.to_string(),),
         }
     }
+}
+
+cast! {
+    usize,
+    self => Value::Int(self as i64),
+    v: i64 => v as usize,
 }

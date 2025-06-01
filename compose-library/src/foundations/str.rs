@@ -1,12 +1,21 @@
+use compose_macros::func;
 use std::fmt;
-use compose_library::Value;
-use compose_macros::{cast, ty};
+use compose_library::{StringIterator, Value};
+use compose_macros::{cast, scope, ty};
 use ecow::EcoString;
 use compose_library::repr::Repr;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[ty(cast, title = "String")]
+#[ty(scope, cast, name = "string")]
 pub struct Str(pub EcoString);
+
+#[scope]
+impl Str {
+    #[func]
+    pub fn chars(self) -> StringIterator {
+        StringIterator::new(self.0)
+    }
+}
 
 impl Repr for Str {
     fn repr(&self) -> EcoString {

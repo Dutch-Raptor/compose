@@ -1,34 +1,45 @@
+use compose_macros::func;
 use crate::Value;
 use compose_library::IntoValue;
 use compose_library::diag::bail;
-use compose_macros::ty;
+use compose_macros::{scope, ty};
 use dyn_clone::DynClone;
 use ecow::EcoString;
 use std::fmt::Debug;
-use string_iter::StringIterator;
 
 mod string_iter;
+mod take_iter;
 
-#[ty(cast, name = "Iterator")]
+pub use string_iter::*;
+pub use take_iter::*;
+
+#[ty(scope, cast, name = "Iterator")]
 #[derive(Debug, Clone)]
 pub struct ValueIter {
     iter: Box<dyn ValueIterator>,
 }
+
+impl ValueIter {
+    pub fn from_dyn(iter: Box<dyn ValueIterator>) -> Self {
+        Self { iter }
+    }
+}
+
+
+#[scope]
+impl ValueIter {
+    #[func]
+    fn take(self, n: usize) -> Self {
+        ValueIter::from_dyn(Box::new(TakeIter::new(self.iter, n)))
+    }
+}
+
 
 pub trait ValueIterator: DynClone + Debug + Send + Sync {
     fn next(&mut self) -> Option<Value>;
 }
 
 dyn_clone::clone_trait_object!(ValueIterator);
-
-#[derive(Debug, Clone)]
-pub struct EmptyIterator;
-
-impl ValueIterator for EmptyIterator {
-    fn next(&mut self) -> Option<Value> {
-        None
-    }
-}
 
 impl<T, V> ValueIterator for T
 where
