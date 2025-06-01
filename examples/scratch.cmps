@@ -1,3 +1,3 @@
-for c in "abdcddee".chars().take_while(c => c != "c") {
+for c in "abdcddee".chars().map(c => "print this many times") {
     println(c)
 }

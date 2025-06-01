@@ -52,10 +52,35 @@ impl ValueIterator for TakeWhileIter {
         let span = self.predicate.span();
         let args = Args::new(span, iter::once(item.clone()));
 
-        if self.predicate.call(engine, args)?.cast::<bool>().at(span)? {
+        if self.predicate.call(engine, args)?.cast::<bool>().at(span)
+            .map_err(|mut err| {
+                err.make_mut()[0].hint("predicate must return a boolean");
+                err
+            })
+            ? {
             Ok(Some(item))
         } else {
             Ok(None)
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MapIter {
+    pub(crate) inner: Box<dyn ValueIterator>,
+    pub(crate) map: Func,
+}
+
+impl ValueIterator for MapIter {
+    fn next(&mut self, engine: &mut Engine) -> SourceResult<Option<Value>> {
+        self.inner
+            .next(engine)?
+            .map(|item| {
+                let span = self.map.span();
+                let args = Args::new(span, iter::once(item.clone()));
+
+                self.map.call(engine, args)
+            })
+            .transpose()
     }
 }

@@ -48,6 +48,14 @@ impl ValueIter {
             predicate,
         }))
     }
+
+    #[func]
+    fn map(self, map: Func) -> Self {
+        ValueIter::from_dyn(Box::new(MapIter {
+            inner: self.iter,
+            map,
+        }))
+    }
 }
 
 pub trait ValueIterator: DynClone + Debug + Send + Sync {
