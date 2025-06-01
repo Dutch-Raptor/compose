@@ -58,6 +58,29 @@ impl BinOp {
         })
     }
 
+    pub fn descriptive_name(self) -> &'static str {
+        match self {
+            Self::Add => "+",
+            Self::Sub => "-",
+            Self::Mul => "*",
+            Self::Div => "/",
+            Self::Mod => "%",
+            Self::And => "&&",
+            Self::Or => "||",
+            Self::Eq => "==",
+            Self::Neq => "!=",
+            Self::Lt => "<",
+            Self::Lte => "<=",
+            Self::Gt => ">",
+            Self::Gte => ">=",
+            Self::BitAnd => "&",
+            Self::BitOr => "|",
+            Self::BitXor => "^",
+            Self::BitShl => "<<",
+            Self::BitShr => ">>",
+        }
+    }
+
     pub fn assoc(self) -> Assoc {
         match self {
             Self::Add | Self::Sub | Self::Mul | Self::Div | Self::Mod => Assoc::Left,
@@ -108,8 +131,8 @@ impl<'a> Binary<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{AstNode, Int};
     use super::*;
+    use crate::ast::{AstNode, Int};
     use crate::test_utils::test_parse;
 
     #[test]
@@ -121,59 +144,59 @@ mod tests {
     #[test]
     fn test_precedence_equal() {
         let node = test_parse("1 + 2 + 3").pop().unwrap();
-        
+
         let outer_bin: Binary = node.cast().unwrap();
-        
+
         assert_eq!(outer_bin.op(), BinOp::Add);
-        
+
         let lhs_int: Int = outer_bin.lhs().to_untyped().cast().unwrap();
         assert_eq!(lhs_int.get(), 1);
-        
+
         let rhs_bin: Binary = outer_bin.rhs().to_untyped().cast().unwrap();
         assert_eq!(rhs_bin.op(), BinOp::Add);
-        
+
         let rhs_bin_lhs: Int = rhs_bin.lhs().to_untyped().cast().unwrap();
         assert_eq!(rhs_bin_lhs.get(), 2);
         let rhs_bin_rhs: Int = rhs_bin.rhs().to_untyped().cast().unwrap();
         assert_eq!(rhs_bin_rhs.get(), 3);
     }
-    
+
     #[test]
     fn test_precedence_higher() {
         {
-        let node = test_parse("1 + 2 * 3").pop().unwrap();
-        
-        let outer_bin: Binary = node.cast().unwrap();
-        
-        assert_eq!(outer_bin.op(), BinOp::Add);
-        
-        let lhs_int: Int = outer_bin.lhs().to_untyped().cast().unwrap();
-        assert_eq!(lhs_int.get(), 1);
-        
-        let rhs_bin: Binary = outer_bin.rhs().to_untyped().cast().unwrap();
-        assert_eq!(rhs_bin.op(), BinOp::Mul);
-        
-        let rhs_bin_lhs: Int = rhs_bin.lhs().to_untyped().cast().unwrap();
-        assert_eq!(rhs_bin_lhs.get(), 2);
-        let rhs_bin_rhs: Int = rhs_bin.rhs().to_untyped().cast().unwrap();
-        assert_eq!(rhs_bin_rhs.get(), 3);
+            let node = test_parse("1 + 2 * 3").pop().unwrap();
+
+            let outer_bin: Binary = node.cast().unwrap();
+
+            assert_eq!(outer_bin.op(), BinOp::Add);
+
+            let lhs_int: Int = outer_bin.lhs().to_untyped().cast().unwrap();
+            assert_eq!(lhs_int.get(), 1);
+
+            let rhs_bin: Binary = outer_bin.rhs().to_untyped().cast().unwrap();
+            assert_eq!(rhs_bin.op(), BinOp::Mul);
+
+            let rhs_bin_lhs: Int = rhs_bin.lhs().to_untyped().cast().unwrap();
+            assert_eq!(rhs_bin_lhs.get(), 2);
+            let rhs_bin_rhs: Int = rhs_bin.rhs().to_untyped().cast().unwrap();
+            assert_eq!(rhs_bin_rhs.get(), 3);
         }
 
         {
             let node = test_parse("2 * 3 + 1").pop().unwrap();
-            
+
             let outer_bin: Binary = node.cast().unwrap();
-            
+
             assert_eq!(outer_bin.op(), BinOp::Add);
-            
+
             let lhs_bin: Binary = outer_bin.lhs().to_untyped().cast().unwrap();
             assert_eq!(lhs_bin.op(), BinOp::Mul);
-            
+
             let lhs_bin_lhs: Int = lhs_bin.lhs().to_untyped().cast().unwrap();
             assert_eq!(lhs_bin_lhs.get(), 2);
             let lhs_bin_rhs: Int = lhs_bin.rhs().to_untyped().cast().unwrap();
             assert_eq!(lhs_bin_rhs.get(), 3);
-            
+
             let rhs_int: Int = outer_bin.rhs().to_untyped().cast().unwrap();
             assert_eq!(rhs_int.get(), 1);
         }

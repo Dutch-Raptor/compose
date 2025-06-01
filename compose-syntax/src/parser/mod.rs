@@ -335,7 +335,7 @@ impl<'s> Parser<'s> {
         self.err_at(err_marker).expect("An error was just inserted")
     }
 
-    /// Consumes the current token if it matches `kind`. Otherwise inserts an error and consumes anyway.
+    /// Consumes the current token if it matches `kind`. Otherwise inserts an error.
     ///
     /// Returns `true` if the expected token was present; otherwise returns `false`.
     pub(crate) fn expect(&mut self, kind: SyntaxKind) -> bool {
@@ -344,11 +344,9 @@ impl<'s> Parser<'s> {
             self.eat();
         } else if kind == SyntaxKind::Ident && self.token.kind.is_keyword() {
             self.token.node.expected(eco_format!("{kind:?}"));
-            self.eat()
         } else {
             self.balanced &= !kind.is_grouping();
             self.expected(&format!("{kind:?}"));
-            self.eat()
         }
         at
     }
@@ -433,11 +431,6 @@ impl<'s> Parser<'s> {
         }
 
         err_unclosed_delim(self, open_marker, expected_closing);
-
-        let is_closing = self.current().is_closing_delimiter();
-        if is_closing {
-            self.eat(); // eat the offending closing delim
-        }
 
         false
     }

@@ -1,9 +1,3 @@
-if false {
-    println("It ran!")
-} else if false {
-    println("else if")
-} else if false {
-    println("else if")
-} else {
-    println("else")
+for c in "abcd" {
+    println(c)
 }

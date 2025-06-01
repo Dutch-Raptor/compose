@@ -141,7 +141,7 @@ impl SyntaxNode {
     /// Like text, but also returns the text of inner nodes.
     ///
     /// Builds a new string, so is more computationally expensive.
-    pub fn create_text(&self) -> EcoString {
+    pub fn to_text(&self) -> EcoString {
         let mut str = EcoString::new();
 
         fn inner(node: &SyntaxNode, str: &mut EcoString) {

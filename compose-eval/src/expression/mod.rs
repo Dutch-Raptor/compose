@@ -1,5 +1,5 @@
-use crate::Eval;
 use crate::vm::Vm;
+use crate::Eval;
 use compose_library::diag::SourceResult;
 use compose_library::{UnitValue, Value};
 use compose_syntax::ast::{AstNode, Expr};
@@ -40,6 +40,8 @@ impl Eval for Expr<'_> {
             Expr::Closure(c) => c.eval(vm),
             Expr::Parenthesized(p) => p.eval(vm),
             Expr::Conditional(c) => c.eval(vm),
+            Expr::WhileLoop(w) => w.eval(vm),
+            Expr::ForLoop(f) => f.eval(vm),
         }?
         .spanned(span);
 
@@ -49,19 +51,19 @@ impl Eval for Expr<'_> {
 
 #[cfg(test)]
 pub mod test_utils {
-    use crate::Eval;
     use crate::test_utils::test_world;
     use crate::vm::Vm;
+    use crate::Eval;
     use compose_library::diag::SourceResult;
     use compose_library::{UnitValue, Value};
+    use compose_syntax::ast::Statement;
     use compose_syntax::FileId;
-    use compose_syntax::ast::Expr;
 
-    pub fn eval_expr(code: &str) -> SourceResult<Value> {
-        eval_expr_with_vm(&mut Vm::new(&test_world(code)), code)
+    pub fn eval_code(code: &str) -> SourceResult<Value> {
+        eval_code_with_vm(&mut Vm::new(&test_world(code)), code)
     }
 
-    pub fn eval_expr_with_vm(vm: &mut Vm, code: &str) -> SourceResult<Value> {
+    pub fn eval_code_with_vm(vm: &mut Vm, code: &str) -> SourceResult<Value> {
         let file_id = FileId::new("test.comp");
         let nodes = compose_syntax::parse(code, file_id);
 
@@ -69,8 +71,8 @@ pub mod test_utils {
 
         for node in nodes {
             value = node
-                .cast::<Expr>()
-                .expect(&format!("{node:#?} is not a valid expression"))
+                .cast::<Statement>()
+                .expect(&format!("{node:#?} is not a valid statement"))
                 .eval(vm)?;
         }
 

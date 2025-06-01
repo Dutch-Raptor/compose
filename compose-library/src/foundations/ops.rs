@@ -24,6 +24,14 @@ pub fn mul(lhs: Value, rhs: Value) -> StrResult<Value> {
     }
 }
 
+pub fn lt(lhs: Value, rhs: Value) -> StrResult<Value> {
+    use Value::*;
+    match (lhs, rhs) {
+        (Int(left), Int(right)) => Ok(Bool(left < right)),
+        (left, right) => type_error!("cannot compare {} to {}", left, right),
+    }
+}
+
 pub fn unary_plus(value: Value) -> StrResult<Value> {
     use Value::*;
     match value {

@@ -1,7 +1,7 @@
 use crate::SyntaxNode;
 use crate::ast::atomics::Unit;
 use crate::ast::unary::Unary;
-use crate::ast::{AstNode, Binary, Ident, Int, Parenthesized};
+use crate::ast::{AstNode, Binary, ForLoop, Ident, Int, Parenthesized, WhileLoop};
 use crate::ast::{Bool, Closure, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
 use crate::ast::control_flow::Conditional;
 use crate::kind::SyntaxKind;
@@ -10,7 +10,7 @@ use crate::kind::SyntaxKind;
 ///
 /// # Examples:
 ///
-/// ```comp
+/// ```compose
 /// 1 + 2
 /// foobar()
 /// foo.bar()[0]
@@ -32,7 +32,9 @@ pub enum Expr<'a> {
     PathAccess(PathAccess<'a>),
     Closure(Closure<'a>),
     Parenthesized(Parenthesized<'a>),
-    Conditional(Conditional<'a>)
+    Conditional(Conditional<'a>),
+    WhileLoop(WhileLoop<'a>),
+    ForLoop(ForLoop<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -53,6 +55,8 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::Closure => Some(Self::Closure(Closure::from_untyped(node)?)),
             SyntaxKind::Parenthesized => Some(Self::Parenthesized(Parenthesized::from_untyped(node)?)),
             SyntaxKind::Conditional => Some(Self::Conditional(Conditional::from_untyped(node)?)),
+            SyntaxKind::WhileLoop => Some(Self::WhileLoop(WhileLoop::from_untyped(node)?)),       
+            SyntaxKind::ForLoop => Some(Self::ForLoop(ForLoop::from_untyped(node)?)),       
             _ => None,
         }
     }
@@ -74,6 +78,8 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::Closure(closure) => closure.to_untyped(),
             Self::Parenthesized(parenthesized) => parenthesized.to_untyped(),       
             Self::Conditional(conditional) => conditional.to_untyped(),       
+            Self::WhileLoop(while_loop) => while_loop.to_untyped(),       
+            Self::ForLoop(for_loop) => for_loop.to_untyped(),       
         }
     }
 }

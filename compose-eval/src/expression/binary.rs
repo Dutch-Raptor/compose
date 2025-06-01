@@ -1,7 +1,7 @@
-use crate::vm::Vm;
 use crate::Eval;
-use compose_library::diag::{bail, At, SourceResult, StrResult};
-use compose_library::{ops, Value};
+use crate::vm::Vm;
+use compose_library::diag::{At, SourceResult, StrResult, bail};
+use compose_library::{Value, ops};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
 
@@ -12,11 +12,15 @@ impl Eval for ast::Binary<'_> {
         match self.op() {
             BinOp::Add => apply_binary(self, vm, ops::add),
             BinOp::Mul => apply_binary(self, vm, ops::mul),
-            other => bail!(self.span(), "unsupported binary operator: {:?}", other),
+            BinOp::Lt => apply_binary(self, vm, ops::lt),
+            other => bail!(
+                self.span(),
+                "unsupported binary operator `{}`",
+                other.descriptive_name()
+            ),
         }
     }
 }
-
 
 fn apply_binary(
     binary: ast::Binary,
@@ -29,7 +33,7 @@ fn apply_binary(
     if binary.op().short_circuits(&lhs) {
         return Ok(lhs);
     }
-    
+
     let rhs = binary.rhs().eval(vm)?;
     op(lhs, rhs).at(binary.span())
 }
@@ -50,31 +54,31 @@ impl ShortCircuits for BinOp {
 
 #[cfg(test)]
 mod tests {
-    use crate::expression::test_utils::eval_expr;
+    use crate::expression::test_utils::eval_code;
     use compose_library::Value;
 
     #[test]
     fn test_addition() {
-        assert_eq!(eval_expr("2 + 4"), Ok(Value::Int(6)));
-        assert_eq!(eval_expr("2 + 4 + 6"), Ok(Value::Int(12)));
-        assert_eq!(eval_expr("0 + 9884 + 2171"), Ok(Value::Int(12055)));
+        assert_eq!(eval_code("2 + 4"), Ok(Value::Int(6)));
+        assert_eq!(eval_code("2 + 4 + 6"), Ok(Value::Int(12)));
+        assert_eq!(eval_code("0 + 9884 + 2171"), Ok(Value::Int(12055)));
     }
-    
+
     #[test]
     fn test_multiplication() {
-        assert_eq!(eval_expr("2 * 4"), Ok(Value::Int(8)));
-        assert_eq!(eval_expr("2 * 4 * 6"), Ok(Value::Int(48)));
-        assert_eq!(eval_expr("0 * 9884 * 2171"), Ok(Value::Int(0)));
+        assert_eq!(eval_code("2 * 4"), Ok(Value::Int(8)));
+        assert_eq!(eval_code("2 * 4 * 6"), Ok(Value::Int(48)));
+        assert_eq!(eval_code("0 * 9884 * 2171"), Ok(Value::Int(0)));
     }
-    
+
     #[test]
     fn test_mixed() {
-        assert_eq!(eval_expr("2 + 4 * 6"), Ok(Value::Int(26)));
-        assert_eq!(eval_expr("2 * 4 + 6"), Ok(Value::Int(14)));
+        assert_eq!(eval_code("2 + 4 * 6"), Ok(Value::Int(26)));
+        assert_eq!(eval_code("2 * 4 + 6"), Ok(Value::Int(14)));
     }
-    
+
     #[test]
     fn test_assignment() {
-        assert_eq!(eval_expr("let x; x = 6; x"), Ok(Value::Int(6)));
+        assert_eq!(eval_code("let x; x = 6; x"), Ok(Value::Int(6)));
     }
 }

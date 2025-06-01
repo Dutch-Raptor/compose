@@ -11,6 +11,7 @@ pub mod ty;
 mod int;
 mod bool;
 mod unit;
+mod iterator;
 
 pub use value::*;
 pub use scope::*;
@@ -22,3 +23,4 @@ pub use module::*;
 pub use ty::*;
 pub use unit::*;
 pub use str::*;
+pub use iterator::*;

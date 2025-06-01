@@ -125,7 +125,7 @@ pub struct Closure {
 impl fmt::Display for Closure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let closure: ast::Closure = self.node.cast().expect("closure");
-        let params = closure.params().to_untyped().create_text();
+        let params = closure.params().to_untyped().to_text();
         
         write!(f, "{} => ...", params)
     }

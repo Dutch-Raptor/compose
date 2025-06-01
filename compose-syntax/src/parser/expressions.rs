@@ -1,15 +1,15 @@
 use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
-use crate::parser::{Marker, Parser};
+use crate::parser::control_flow::{conditional, for_loop, while_loop};
 use crate::parser::statements::statement;
 use crate::parser::{funcs, statements, ExprContext};
+use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
 use crate::set::{syntax_set, SyntaxSet, UNARY_OP};
 use crate::{ast, Label};
 use compose_error_codes::{E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT};
 use compose_utils::{trace_fn, trace_log};
 use ecow::eco_format;
-use crate::parser::control_flow::conditional;
 
 pub fn code(p: &mut Parser, end_set: SyntaxSet) {
     let mut pos = p.current_end();
@@ -179,6 +179,8 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             p.wrap(m, SyntaxKind::Unit)
         }
         SyntaxKind::If => conditional(p),
+        SyntaxKind::While => while_loop(p),
+        SyntaxKind::For => for_loop(p),
         SyntaxKind::LeftParen => expr_with_parens(p, ctx),
         SyntaxKind::Let => statements::let_binding(p),
         // Already fully handled in the lexer
@@ -255,7 +257,7 @@ fn parenthesized(p: &mut Parser) {
     code_expr_prec(p, ExprContext::Expr, Precedence::Lowest);
     if !p.expect_closing_delimiter(m, SyntaxKind::RightParen) {
         // If the closing parenthesis is missing or incorrect, try to recover
-        p.recover_until(syntax_set!(RightParen, NewLine));
+        p.recover_until(syntax_set!(RightParen, NewLine, Semicolon));
         p.eat_if(SyntaxKind::RightParen);
     }
     p.wrap(m, SyntaxKind::Parenthesized)

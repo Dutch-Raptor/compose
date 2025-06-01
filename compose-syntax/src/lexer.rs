@@ -315,6 +315,7 @@ fn keyword(ident: &str) -> Option<SyntaxKind> {
         "pub" => SyntaxKind::Pub,
         "return" => SyntaxKind::Return,
         "true" => SyntaxKind::Bool,
+        "while" => SyntaxKind::While,
         _ => return None,
     })
 }
@@ -478,7 +479,7 @@ mod tests {
                 SyntaxNode::leaf(SyntaxKind::Ident, "a", Span::new(file_id, 0..1))
             )
         );
-        assert_eq!(lexer.newline(), true);
+        assert_eq!(lexer.newline(), false);
         assert_eq!(
             lexer.next(),
             (
@@ -486,7 +487,7 @@ mod tests {
                 SyntaxNode::leaf(SyntaxKind::Ident, "b", Span::new(file_id, 2..3))
             )
         );
-        assert_eq!(lexer.newline(), false);
+        assert_eq!(lexer.newline(), true);
     }
 
     #[test]

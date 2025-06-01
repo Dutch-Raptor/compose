@@ -61,3 +61,8 @@ cast! {
     self => Value::Str(self.into()),
     v: Str => v.into()
 }
+
+cast! {
+    char,
+    self => Value::Str(EcoString::from(self).into()),
+}

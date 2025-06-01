@@ -13,4 +13,5 @@ ecow = { workspace = true }
 indexmap = { workspace = true }
 strsim = "0.11.1"
 tap = { workspace = true }
+dyn-clone = { workspace = true }
 

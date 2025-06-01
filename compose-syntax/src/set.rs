@@ -83,7 +83,13 @@ pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
     Bool,
 ];
 
-pub const PATTERN_LEAF: SyntaxSet = ATOMIC_EXPR;
+pub const PATTERN_LEAF: SyntaxSet = syntax_set![
+    Ident,
+    Int,
+    Float,
+    Str,
+    Bool,
+];
 
 pub const PATTERN: SyntaxSet = syntax_set![
     At,

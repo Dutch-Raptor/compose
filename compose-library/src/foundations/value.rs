@@ -9,6 +9,7 @@ use crate::{Sink, Type};
 use compose_library::diag::{bail, StrResult};
 use compose_library::repr::Repr;
 use compose_syntax::Span;
+use crate::foundations::iterator::ValueIter;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
@@ -18,6 +19,7 @@ pub enum Value {
     Str(Str),
     Func(Func),
     Type(Type),
+    Iterator(ValueIter),
 }
 
 impl Value {
@@ -29,6 +31,7 @@ impl Value {
             Value::Str(_) => Type::of::<Str>(),
             Value::Func(_) => Type::of::<Func>(),
             Value::Type(_) => Type::of::<Type>(),
+            Value::Iterator(_) => Type::of::<ValueIter>(),       
         }
     }
     
@@ -86,6 +89,7 @@ impl fmt::Display for Value {
             Value::Str(v) => write!(f, "{}", v),
             Value::Func(v) => write!(f, "{}", v),
             Value::Type(v) => write!(f, "{}", v),
+            Value::Iterator(v) => write!(f, "{:?}", v),       
         }
     }
 }
@@ -99,6 +103,7 @@ impl Repr for Value {
             Value::Str(v) => v.repr(),
             Value::Func(v) => eco_format!("{v}"),
             Value::Type(v) => eco_format!("{v}"),
+            Value::Iterator(v) => eco_format!("iterator({v:?})"),      
         }
     }
 }
@@ -157,3 +162,4 @@ primitive!(Str: "str", Str);
 primitive!(Func: "func", Func);
 primitive!(Type: "type", Type);
 primitive!(UnitValue: "unit", Unit);
+primitive!(ValueIter: "iterator", Iterator);

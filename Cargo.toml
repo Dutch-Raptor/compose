@@ -26,7 +26,6 @@ indexmap = "2.9.0"
 tap = "1.0.1"
 extension-traits = "2.0.0"
 compose = { path = "compose" }
-compose-cli = { path = "compose-cli" }
 compose-eval = { path = "compose-eval" }
 compose-library = { path = "compose-library" }
 compose-macros = { path = "compose-macros" }
@@ -36,6 +35,7 @@ compose-error-codes = { path = "compose-error-codes" }
 compose-editor = { path = "compose-editor" }
 compose-explain = { path = "compose-explain" }
 codespan-reporting = "0.12.0"
+dyn-clone = "1.0.19"
 
 [workspace.lints]
 

@@ -14,6 +14,13 @@ impl<'a> Vm<'a> {
     pub(crate) fn sink_mut(&mut self) -> &mut Sink {
         &mut self.engine.sink
     }
+    
+    pub(crate) fn in_scope<T>(&mut self, f: impl FnOnce(&mut Vm<'a>) -> T) -> T {
+        self.scopes.enter();
+        let result = f(self);
+        self.scopes.exit();   
+        result
+    }
 }
 
 impl Debug for Vm<'_> {
@@ -27,7 +34,7 @@ impl Debug for Vm<'_> {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FlowEvent {
     Continue(Span),
     Break(Span),

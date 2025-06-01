@@ -270,6 +270,7 @@ dependencies = [
 name = "compose-eval"
 version = "0.1.0"
 dependencies = [
+ "compose-error-codes",
  "compose-library",
  "compose-syntax",
  "ecow",
@@ -299,6 +300,7 @@ dependencies = [
  "compose-macros",
  "compose-syntax",
  "compose-utils",
+ "dyn-clone",
  "ecow",
  "indexmap",
  "strsim",
@@ -401,6 +403,12 @@ dependencies = [
  "adler32",
  "byteorder",
 ]
+
+[[package]]
+name = "dyn-clone"
+version = "1.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c7a8fb8a9fbf66c1f703fe16184d10ca0ee9d23be5b4436400408ba54a95005"
 
 [[package]]
 name = "ecow"

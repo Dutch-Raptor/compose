@@ -8,20 +8,23 @@ impl Eval for CodeBlock<'_> {
 
     fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
         let flow = vm.flow.take();
-        vm.scopes.enter();
         let mut result = Value::unit();
 
-        let exprs = self.statements();
+        let statements = self.statements();
 
-        for expr in exprs {
-            result = expr.eval(vm)?;
-            if vm.flow.is_some() {
-                break;
+        vm.in_scope(|vm| {
+            for statement in statements {
+                result = statement.eval(vm)?;
+                if vm.flow.is_some() {
+                    break;
+                }
             }
-        }
+            SourceResult::Ok(())
+        })?;
 
-        vm.flow = flow;
-        vm.scopes.exit();
+        if let Some(flow) = flow {
+            vm.flow = Some(flow);
+        }
 
         Ok(result)
     }
@@ -30,11 +33,11 @@ impl Eval for CodeBlock<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::test_utils::eval_expr;
+    use crate::expression::test_utils::eval_code;
 
     #[test]
     fn test_block() {
-        let result = eval_expr(
+        let result = eval_code(
             r#"
             let a = 4
             let val = {
@@ -51,7 +54,7 @@ mod tests {
 
     #[test]
     fn access_outer_scope() {
-        let result = eval_expr(
+        let result = eval_code(
             r#"
             let a = 4
             let val = {
