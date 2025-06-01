@@ -376,7 +376,11 @@ impl Debug for ErrorNode {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Error {:?}: {:?} ({})",
+            "{} {:?}: {:?} ({})",
+            match self.error.severity {
+                SyntaxErrorSeverity::Error => "error",
+                SyntaxErrorSeverity::Warning => "warning",           
+            },
             self.error.span, self.text, self.error.message
         )
     }

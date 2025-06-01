@@ -1,16 +1,16 @@
-use crate::error::CliError;
-use crate::repl::editor::{print_input, EditorFooter, EditorGutter, EditorHistory, EditorReader};
-use crate::world::SystemWorld;
 use crate::ReplArgs;
-use compose_eval::Vm;
-use compose_library::diag::{eco_format, Warned};
-use compose_syntax::Source;
-use std::fs;
+use crate::error::CliError;
+use crate::repl::editor::{EditorFooter, EditorGutter, EditorHistory, EditorReader, print_input};
+use crate::world::SystemWorld;
 use compose::error_codes::lookup;
 use compose_editor::editor::Editor;
 use compose_editor::renderer::full::CrosstermRenderer;
+use compose_eval::{EvalConfig, Vm};
 use compose_explain::Explain;
+use compose_library::diag::{Warned, eco_format};
 use compose_library::{Value, World};
+use compose_syntax::Source;
+use std::fs;
 
 mod editor;
 
@@ -173,10 +173,16 @@ enum ReplCommand {
 fn eval_initial_pass(vm: &mut Vm, world: &SystemWorld) {
     let source = entrypoint(world);
 
+    let warnings: Vec<_> = source.warnings().into_iter().map(|w| w.into()).collect();
+    if !warnings.is_empty() {
+        crate::print_diagnostics(world, &[], &warnings).unwrap();
+    }
+
     // Evaluate every node in the source, printing any diagnostics along the way.
     // Do not return early if there are any errors, as we want to print all diagnostics.
     for i in 0..source.nodes().len() {
-        let Warned { value, warnings } = compose::eval_range(&source, i..i + 1, vm);
+        let Warned { value, warnings } =
+            compose::eval_range(&source, i..i + 1, vm, &EvalConfig::default());
         crate::print_diagnostics(world, &[], &warnings).unwrap();
         if let Err(err) = value {
             crate::print_diagnostics(world, &err, &warnings).unwrap();
@@ -201,7 +207,22 @@ pub fn eval_repl_input(vm: &mut Vm, world: &SystemWorld, input: &str, args: &Rep
         println!("AST: {:#?}\n", nodes);
     }
 
-    let Warned { value, warnings } = compose::eval_range(&source, len_before_edit..len_after_edit, vm);
+    let syntax_warnings: Vec<_> = source.nodes()[len_before_edit..len_after_edit]
+        .iter()
+        .flat_map(|n| n.warnings())
+        .map(|w| w.into())
+        .collect();
+
+    if !syntax_warnings.is_empty() {
+        crate::print_diagnostics(world, &[], &syntax_warnings).unwrap();
+    }
+
+    let Warned { value, warnings } = compose::eval_range(
+        &source,
+        len_before_edit..len_after_edit,
+        vm,
+        &EvalConfig::default(),
+    );
 
     if args.debug {
         println!("{vm:#?}\n");

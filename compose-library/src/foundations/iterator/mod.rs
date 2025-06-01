@@ -1,22 +1,28 @@
-use compose_macros::func;
 use crate::Value;
-use compose_library::IntoValue;
-use compose_library::diag::bail;
+use compose_library::diag::{SourceResult, bail};
+use compose_library::{Engine, Func, IntoValue};
+use compose_macros::func;
 use compose_macros::{scope, ty};
 use dyn_clone::DynClone;
 use ecow::EcoString;
 use std::fmt::Debug;
 
+mod iter_combinators;
 mod string_iter;
-mod take_iter;
 
+pub use iter_combinators::*;
 pub use string_iter::*;
-pub use take_iter::*;
 
 #[ty(scope, cast, name = "Iterator")]
 #[derive(Debug, Clone)]
 pub struct ValueIter {
     iter: Box<dyn ValueIterator>,
+}
+
+impl ValueIterator for ValueIter {
+    fn next(&mut self, engine: &mut Engine) -> SourceResult<Option<Value>> {
+        self.iter.next(engine)
+    }
 }
 
 impl ValueIter {
@@ -25,18 +31,27 @@ impl ValueIter {
     }
 }
 
-
 #[scope]
 impl ValueIter {
     #[func]
     fn take(self, n: usize) -> Self {
-        ValueIter::from_dyn(Box::new(TakeIter::new(self.iter, n)))
+        ValueIter::from_dyn(Box::new(TakeIter {
+            inner: self.iter,
+            take: n,
+        }))
+    }
+
+    #[func]
+    fn take_while(self, predicate: Func) -> Self {
+        ValueIter::from_dyn(Box::new(TakeWhileIter {
+            inner: self.iter,
+            predicate,
+        }))
     }
 }
 
-
 pub trait ValueIterator: DynClone + Debug + Send + Sync {
-    fn next(&mut self) -> Option<Value>;
+    fn next(&mut self, engine: &mut Engine) -> SourceResult<Option<Value>>;
 }
 
 dyn_clone::clone_trait_object!(ValueIterator);
@@ -47,8 +62,8 @@ where
     T: Debug + Send + Sync,
     V: IntoValue,
 {
-    fn next(&mut self) -> Option<Value> {
-        self.next().map(IntoValue::into_value)
+    fn next(&mut self, _engine: &mut Engine) -> SourceResult<Option<Value>> {
+        Ok(self.next().map(IntoValue::into_value))
     }
 }
 
@@ -74,13 +89,5 @@ impl TryFrom<Value> for ValueIter {
 impl PartialEq for ValueIter {
     fn eq(&self, _other: &Self) -> bool {
         false
-    }
-}
-
-impl Iterator for ValueIter {
-    type Item = Value;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
     }
 }

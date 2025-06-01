@@ -1,6 +1,6 @@
 use crate::file::FileId;
 use crate::parser::parse_with_offset;
-use crate::{parse, SyntaxNode};
+use crate::{parse, SyntaxError, SyntaxNode};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -64,6 +64,10 @@ impl Source {
         inner.nodes.extend(parse_with_offset(&new_text, id, current_len));
         inner.line_starts = line_starts(&new_text, 0).collect();
         inner.text = new_text;
+    }
+    
+    pub fn warnings(&self) -> Vec<SyntaxError> {
+        self.nodes().iter().flat_map(SyntaxNode::warnings).collect()
     }
 }
 

@@ -13,6 +13,8 @@ impl Eval for ast::Binary<'_> {
             BinOp::Add => apply_binary(self, vm, ops::add),
             BinOp::Mul => apply_binary(self, vm, ops::mul),
             BinOp::Lt => apply_binary(self, vm, ops::lt),
+            BinOp::Eq => apply_binary(self, vm, ops::eq),
+            BinOp::Neq => apply_binary(self, vm, ops::neq),
             other => bail!(
                 self.span(),
                 "unsupported binary operator `{}`",

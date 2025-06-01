@@ -1,7 +1,7 @@
+use crate::FileArgs;
 use crate::error::CliError;
 use crate::world::SystemWorld;
-use crate::FileArgs;
-use compose_eval::Vm;
+use compose_eval::{EvalConfig, Vm};
 use compose_library::diag::Warned;
 
 pub fn file(args: FileArgs) -> Result<(), CliError> {
@@ -14,7 +14,12 @@ pub fn file(args: FileArgs) -> Result<(), CliError> {
         println!("AST: {:#?}\n", source.nodes());
     }
 
-    let Warned { value, warnings } = compose::eval(&source, &mut vm);
+    let warnings: Vec<_> = source.warnings().into_iter().map(|w| w.into()).collect();
+    if !warnings.is_empty() {
+        crate::print_diagnostics(&world, &[], &warnings).unwrap();
+    }
+
+    let Warned { value, warnings } = compose::eval(&source, &mut vm, &EvalConfig::default());
 
     if let Err(err) = value {
         crate::print_diagnostics(&world, &err, &warnings).unwrap();

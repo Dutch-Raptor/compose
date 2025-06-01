@@ -2,7 +2,7 @@ use crate::world::ExplainWorld;
 use codespan_reporting::term::Config;
 use codespan_reporting::term::termcolor::Ansi;
 use compose_error_codes::ErrorCode;
-use compose_eval::Vm;
+use compose_eval::{EvalConfig, Vm};
 use compose_library::Value;
 use compose_library::diag::{Warned, write_diagnostics};
 use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
@@ -118,7 +118,8 @@ fn execute_with_diagnostics(code: &str) -> String {
     let world = ExplainWorld::from_str(code);
     let mut vm = Vm::new(&world);
 
-    let Warned { value, warnings } = compose_eval::eval(&world.source, &mut vm);
+    let Warned { value, warnings } =
+        compose_eval::eval(&world.source, &mut vm, &EvalConfig::default());
 
     let mut diags_buffer: Vec<u8> = vec![];
     let mut wtr = Ansi::new(&mut diags_buffer);
@@ -132,7 +133,6 @@ fn execute_with_diagnostics(code: &str) -> String {
             s.push_str("\n");
         }
     }
-    
 
     match value {
         Ok(value) => {

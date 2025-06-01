@@ -23,6 +23,10 @@ impl Func {
         }
         self
     }
+    
+    pub(crate) fn span(&self) -> Span {
+        self.span
+    }
 }
 
 impl fmt::Display for Func {

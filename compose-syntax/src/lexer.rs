@@ -111,7 +111,7 @@ impl Lexer<'_> {
             '/' if self.s.eat_if('*') => self.lex_block_comment(start),
 
             '=' if self.s.eat_if('=') => SyntaxKind::EqEq,
-            '!' if self.s.eat_if('=') => SyntaxKind::ExclEq,
+            '!' if self.s.eat_if('=') => SyntaxKind::BangEq,
             '+' if self.s.eat_if('=') => SyntaxKind::PlusEq,
             '-' | '\u{2212}' if self.s.eat_if('=') => SyntaxKind::MinusEq,
             '*' if self.s.eat_if('=') => SyntaxKind::StarEq,

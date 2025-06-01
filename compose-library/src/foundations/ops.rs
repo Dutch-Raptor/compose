@@ -1,6 +1,6 @@
-use ecow::eco_format;
-use crate::diag::StrResult;
 use crate::Value;
+use crate::diag::StrResult;
+use ecow::eco_format;
 
 macro_rules! type_error {
     ($fmt:expr, $($value:expr),* $(,)?) => {
@@ -20,7 +20,7 @@ pub fn mul(lhs: Value, rhs: Value) -> StrResult<Value> {
     use Value::*;
     match (lhs, rhs) {
         (Int(left), Int(right)) => Ok(Int(left * right)),
-        (left, right) => type_error!("cannot multiply {} by {}", left, right),   
+        (left, right) => type_error!("cannot multiply {} by {}", left, right),
     }
 }
 
@@ -30,6 +30,14 @@ pub fn lt(lhs: Value, rhs: Value) -> StrResult<Value> {
         (Int(left), Int(right)) => Ok(Bool(left < right)),
         (left, right) => type_error!("cannot compare {} to {}", left, right),
     }
+}
+
+pub fn neq(lhs: Value, rhs: Value) -> StrResult<Value> {
+    return Ok(Value::Bool(lhs != rhs));
+}
+
+pub fn eq(lhs: Value, rhs: Value) -> StrResult<Value> {
+    return Ok(Value::Bool(lhs == rhs));
 }
 
 pub fn unary_plus(value: Value) -> StrResult<Value> {
