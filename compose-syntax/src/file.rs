@@ -104,6 +104,7 @@ impl FileId {
         id
     }
 
+    #[track_caller]
     pub fn path(&self) -> &'static VirtualPath {
         self.try_path().expect("file id not interned")
     }

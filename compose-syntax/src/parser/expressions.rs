@@ -1,32 +1,14 @@
 use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
-use crate::parser::statements::statement;
 use crate::parser::{funcs, statements, ExprContext};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{syntax_set, SyntaxSet, UNARY_OP};
+use crate::set::{syntax_set, UNARY_OP};
 use crate::{ast, Label};
 use compose_error_codes::{E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT};
 use compose_utils::{trace_fn, trace_log};
 use ecow::eco_format;
-
-pub fn code(p: &mut Parser, end_set: SyntaxSet) {
-    let mut pos = p.current_end();
-    while !p.end() && !p.at_set(end_set) {
-        trace_fn!("code", "loop pos= {}", pos);
-        statement(p);
-
-        p.skip_if(SyntaxKind::Semicolon);
-
-        // If the parser is not progressing, then we have an error
-        if pos == p.current_end() && !p.end() {
-            // Eat the token and continue trying to parse
-            p.unexpected("Expected a statement", None);
-        }
-        pos = p.current_end();
-    }
-}
 
 pub fn code_expression(p: &mut Parser) {
     code_expr_prec(p, ExprContext::Expr, Precedence::Lowest);
@@ -194,7 +176,7 @@ fn block(p: &mut Parser) {
     let m = p.marker();
     p.assert(SyntaxKind::LeftBrace);
 
-    code(p, syntax_set!(End, RightBrace, RightParen, RightBracket));
+    statements::code(p, syntax_set!(End, RightBrace, RightParen, RightBracket));
 
     p.expect_closing_delimiter(m, SyntaxKind::RightBrace);
     p.wrap(m, SyntaxKind::CodeBlock)

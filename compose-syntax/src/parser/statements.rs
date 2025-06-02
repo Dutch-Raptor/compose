@@ -8,7 +8,7 @@ use crate::parser::Parser;
 use crate::precedence::Precedence;
 use crate::set;
 use crate::parser::expressions::{code_expr_prec, code_expression};
-use crate::set::{syntax_set, ASSIGN_OP};
+use crate::set::{syntax_set, SyntaxSet, ASSIGN_OP};
 
 pub(super) fn statement(p: &mut Parser) {
     trace_fn!("parse_statement");
@@ -69,4 +69,21 @@ pub fn let_binding(p: &mut Parser) {
     }
 
     p.wrap(m, SyntaxKind::LetBinding)
+}
+
+pub fn code(p: &mut Parser, end_set: SyntaxSet) {
+    let mut pos = p.current_end();
+    while !p.end() && !p.at_set(end_set) {
+        trace_fn!("code", "loop pos= {}", pos);
+        statement(p);
+
+        p.skip_if(SyntaxKind::Semicolon);
+
+        // If the parser is not progressing, then we have an error
+        if pos == p.current_end() && !p.end() {
+            // Eat the token and continue trying to parse
+            p.unexpected("Expected a statement", None);
+        }
+        pos = p.current_end();
+    }
 }

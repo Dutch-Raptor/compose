@@ -113,7 +113,7 @@ pub fn parse(text: &str, file_id: FileId) -> Vec<SyntaxNode> {
 pub fn parse_with_offset(text: &str, file_id: FileId, offset: usize) -> Vec<SyntaxNode> {
     let mut p = Parser::new(text, offset, file_id);
 
-    expressions::code(&mut p, syntax_set!(End));
+    statements::code(&mut p, syntax_set!(End));
 
     p.finish()
 }
