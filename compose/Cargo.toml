@@ -4,11 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-compose-library = { workspace = true }
 compose-eval = { workspace = true}
-compose-syntax = { workspace = true}
 compose-error-codes = {workspace = true}
-ecow = { workspace = true }
 
 [lints]
 workspace = true

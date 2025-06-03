@@ -4,11 +4,11 @@ mod statement;
 mod vm;
 
 pub use crate::vm::Vm;
-use compose_library::diag::{error, SourceDiagnostic, SourceResult, Warned};
-use compose_library::{IntoResult, Value};
-use compose_syntax::ast::Statement;
+use compose_library::Value;
+use compose_library::diag::{SourceDiagnostic, SourceResult, Warned, error};
 use compose_syntax::Source;
-use ecow::{eco_vec, EcoVec};
+use compose_syntax::ast::Statement;
+use ecow::{EcoVec, eco_vec};
 use std::cmp::min;
 use std::ops::Range;
 
@@ -105,7 +105,7 @@ pub fn build_err(
 
 #[cfg(test)]
 mod test_utils {
-    use compose_library::{library, TestWorld};
+    use compose_library::{TestWorld, library};
     use compose_syntax::Source;
 
     pub(crate) fn test_world(source: impl ToString) -> TestWorld {

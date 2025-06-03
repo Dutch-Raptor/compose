@@ -125,7 +125,7 @@ impl Span {
         
         let range = self.range().unwrap();
         let end = range.end;
-        let at = end + 1;
+        let at = end;
         
         Span::new(self.id().unwrap(), at..at + 1)
     }

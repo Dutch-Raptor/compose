@@ -1,0 +1,7 @@
+let f = (() => (a = (1 + 2), b = (c, d) => (c + d)) => b(a, a))
+
+assert::eq(f()(), 6, message: "The value should be 6!");
+
+let g = (() => (a = v => println(v), c = (b = () => () => {}) => {}) => a(c))
+
+assert::eq(g()(), ()) // prints (b=()=>()=>{}) => ...

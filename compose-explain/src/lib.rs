@@ -118,14 +118,29 @@ fn execute_with_diagnostics(code: &str) -> String {
     let world = ExplainWorld::from_str(code);
     let mut vm = Vm::new(&world);
 
-    let Warned { value, warnings } =
-        compose_eval::eval(&world.source, &mut vm, &EvalConfig::default());
-
-    let mut diags_buffer: Vec<u8> = vec![];
+    let mut diags_buffer = vec![];
     let mut wtr = Ansi::new(&mut diags_buffer);
     let config = Config::default();
 
     let mut output = String::new();
+
+    let warnings: Vec<_> = world
+        .source
+        .warnings()
+        .into_iter()
+        .map(Into::into)
+        .collect();
+
+    if !warnings.is_empty() {
+        let mut warn_buffer = vec![];
+        let mut wtr = Ansi::new(&mut warn_buffer);
+        write_diagnostics(&world, &[], &warnings, &mut wtr, &config).unwrap();
+        output.push_str(String::from_utf8(warn_buffer).unwrap().trim());
+    }
+
+    let Warned { value, warnings } =
+        compose_eval::eval(&world.source, &mut vm, &EvalConfig::default());
+
     let stdout = world.stdout.lock().unwrap();
 
     fn sep(s: &mut String) {

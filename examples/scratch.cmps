@@ -1,3 +1,1 @@
-for c in "abdcddee".chars().map(c => "print this many times") {
-    println(c)
-}
+(() => (a = v => println(v), c = (b = () => () => {}) => {}) => a(c))

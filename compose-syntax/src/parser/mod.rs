@@ -474,10 +474,15 @@ impl<'s> Parser<'s> {
         self.token.kind
     }
 
-    pub(crate) fn last_text(&self) -> Option<&str> {
-        let last = self.nodes.last()?;
-        let range = last.span().range()?;
-        self.text.get(range)
+    pub(crate) fn last_text(&self) -> &str {
+        let Some(last) = self.nodes.last() else {
+            return "";
+        };
+        let Some(range) = last.span().range() else {
+            return "";
+        };
+
+        self.get_text(range).unwrap_or_default()
     }
 
     pub(crate) fn last_node(&self) -> Option<&SyntaxNode> {
@@ -599,7 +604,7 @@ impl<'s> Parser<'s> {
         let prev_end = lexer.cursor();
         let start = prev_end;
         let (mut kind, mut node) = lexer.next();
-        
+
         while kind == SyntaxKind::Comment {
             (kind, node) = lexer.next();
         }

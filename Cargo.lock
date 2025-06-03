@@ -225,9 +225,6 @@ version = "0.1.0"
 dependencies = [
  "compose-error-codes",
  "compose-eval",
- "compose-library",
- "compose-syntax",
- "ecow",
 ]
 
 [[package]]

@@ -68,6 +68,7 @@ pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
     Ident,
     LeftBrace,
     LeftBracket,
+    LeftParen,
     If,
     While,
     Loop,
@@ -82,6 +83,8 @@ pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
     Str,
     Bool,
 ];
+
+pub const EXPR: SyntaxSet = ATOMIC_EXPR.union(UNARY_OP);
 
 pub const PATTERN_LEAF: SyntaxSet = syntax_set![
     Ident,
