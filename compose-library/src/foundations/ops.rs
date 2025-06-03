@@ -33,11 +33,11 @@ pub fn lt(lhs: Value, rhs: Value) -> StrResult<Value> {
 }
 
 pub fn neq(lhs: Value, rhs: Value) -> StrResult<Value> {
-    return Ok(Value::Bool(lhs != rhs));
+    Ok(Value::Bool(lhs != rhs))
 }
 
 pub fn eq(lhs: Value, rhs: Value) -> StrResult<Value> {
-    return Ok(Value::Bool(lhs == rhs));
+    Ok(Value::Bool(lhs == rhs))
 }
 
 pub fn unary_plus(value: Value) -> StrResult<Value> {

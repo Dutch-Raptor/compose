@@ -337,9 +337,10 @@ impl Debug for InnerNode {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{:?}{}: {}",
+            "{:?}{} ({:?}): {}",
             self.kind,
             if self.erroneous { " (err)" } else { "" },
+            self.span,
             self.len
         )?;
         if !self.children.is_empty() {
@@ -447,6 +448,11 @@ pub enum LabelType {
 }
 
 impl SyntaxError {
+    pub fn with_message(&mut self, message: impl Into<EcoString>) -> &mut Self {
+        self.message = message.into();
+        self
+    }
+    
     pub fn with_note(&mut self, note: impl Into<EcoString>) -> &mut Self {
         self.notes.push(note.into());
         self

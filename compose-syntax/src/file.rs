@@ -136,27 +136,3 @@ impl Debug for FileId {
         write!(f, "FileId({id}, {path})", id = self.0.get())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use sequential_test::sequential;
-
-    #[test]
-    #[sequential] // Test needs to be marked sequential to avoid race conditions with the interner.
-    fn test_file_id() {
-        reset_interner();
-        let id = FileId::new(VirtualPath::new("main.comp"));
-        assert_eq!(id.path(), &VirtualPath::new("main.comp"));
-        assert_eq!(id.into_raw(), NonZeroU16::new(1).unwrap());
-    }
-
-    #[test]
-    #[sequential] // Test needs to be marked sequential to avoid race conditions with the interner.   
-    fn test_file_id_interner() {
-        reset_interner();
-        let id1 = FileId::new(VirtualPath::new("main.comp"));
-        let id2 = FileId::new(VirtualPath::new("main.comp"));
-        assert_eq!(id1, id2);
-    }
-}

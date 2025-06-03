@@ -75,11 +75,25 @@ pub fn assert_parse_with_errors(code: &str, expected_errors: &[ErrorCode]) -> No
 
 #[extension(trait SyntaxNodeExt)]
 impl SyntaxNode {
+    #[track_caller]
     fn test_assert(&self, kind: SyntaxKind, text: &str) {
-        assert_eq!(self.kind(), kind);
-        assert_eq!(self.text(), text);
+        assert_eq!(
+            self.kind(),
+            kind,
+            "expected: {:?}, got: {:?}",
+            kind,
+            self.kind()
+        );
+        assert_eq!(
+            self.text(),
+            text,
+            "expected: {:?}, got: {:?}",
+            text,
+            self.text()
+        );
     }
 
+    #[track_caller]
     fn test_children(&self, kind: SyntaxKind) -> NodesTester {
         assert_eq!(self.kind(), kind);
 
@@ -89,53 +103,129 @@ impl SyntaxNode {
 }
 
 pub struct NodesTester {
+    path: Vec<SyntaxKind>,
     pub nodes: Vec<SyntaxNode>,
     pos: usize,
 }
 
 impl NodesTester {
     pub fn new(nodes: Vec<SyntaxNode>) -> Self {
-        Self { nodes, pos: 0 }
+        Self {
+            nodes,
+            pos: 0,
+            path: vec![],
+        }
     }
 
+    pub fn with_path(mut self, path: Vec<SyntaxKind>) -> Self {
+        self.path = path;
+        self
+    }
+
+    #[track_caller]
     pub fn assert_next(&mut self, kind: SyntaxKind, text: &str) -> &mut Self {
-        let node = self.nodes.get(self.pos).expect("No more nodes");
+        let node = self.assert_next_node();
 
-        node.test_assert(kind, text);
-
-        self.pos += 1;
+        assert_eq!(
+            node.kind(),
+            kind,
+            "expected: {:?}, got: {:?} at {:?} ({})",
+            kind,
+            node.kind(),
+            self.path,
+            node.to_text(),
+        );
+        assert_eq!(
+            node.text(),
+            text,
+            "expected: {:?}, got: {:?} at {:?}",
+            text,
+            node.text(),
+            self.path
+        );
 
         self
     }
 
+    #[track_caller]
+    fn assert_next_node(&mut self) -> SyntaxNode {
+        let node = self.nodes.get(self.pos).cloned().expect(&format!(
+            "Expected a node at {:?}. Out of nodes!",
+            self.path
+        ));
+        self.pos += 1;
+        node
+    }
+
+    #[track_caller]
     pub fn assert_next_warning(&mut self, warning: ErrorCode) -> &mut Self {
         let node = self.nodes.get(self.pos).expect("No more nodes");
 
-        assert_eq!(node.kind(), SyntaxKind::Error);
+        assert_eq!(
+            node.kind(),
+            SyntaxKind::Error,
+            "Expected an error, got {:?} at {:?}",
+            node.kind(),
+            self.path
+        );
 
         let warnings = node.warnings();
-        assert_eq!(warnings.len(), 1);
-        assert_eq!(warnings[0].code, Some(&warning));
+        assert_eq!(
+            warnings.len(),
+            1,
+            "Expected an error, got {} warnings at {:?}",
+            warnings.len(),
+            self.path
+        );
+        assert_eq!(
+            warnings[0].code,
+            Some(&warning),
+            "Expected an error with code {:?}, got {:?} at {:?}",
+            warning,
+            warnings[0].code,
+            self.path
+        );
 
         self.pos += 1;
 
         self
     }
-    
+
+    #[track_caller]
     pub fn assert_next_error(&mut self, error: ErrorCode) -> &mut Self {
         let node = self.nodes.get(self.pos).expect("No more nodes");
-        
-        assert_eq!(node.kind(), SyntaxKind::Error);
-        
+
+        assert_eq!(
+            node.kind(),
+            SyntaxKind::Error,
+            "Expected an error, got {:?} at {:?}",
+            node.kind(),
+            self.path
+        );
+
         let errors = node.errors();
-        assert_eq!(errors.len(), 1);
-        assert_eq!(errors[0].code, Some(&error));
-        
+        assert_eq!(
+            errors.len(),
+            1,
+            "Expected an error, got {} errors at {:?}",
+            errors.len(),
+            self.path
+        );
+        assert_eq!(
+            errors[0].code,
+            Some(&error),
+            "Expected an error with code {:?}, got {:?} at {:?}",
+            error,
+            errors[0].code,
+            self.path
+        );
+
         self.pos += 1;
-        
-        self   
+
+        self
     }
 
+    #[track_caller]
     pub fn assert_next_children(
         &mut self,
         kind: SyntaxKind,
@@ -143,13 +233,33 @@ impl NodesTester {
     ) -> &mut Self {
         let node = self.nodes.get(self.pos).expect("No more nodes");
 
-        test_children(&mut node.test_children(kind));
+        assert_eq!(
+            node.kind(),
+            kind,
+            "expected: {:?}, got: {:?} at {:?} ({})",
+            kind,
+            node.kind(),
+            self.path,
+            node.to_text(),
+        );
+
+        let children = node.children().cloned().collect::<Vec<_>>();
+        let mut tester = NodesTester::new(children)
+            .with_path(self.path.iter().copied().chain(vec![kind]).collect());
+
+        test_children(&mut tester);
         self.pos += 1;
 
         self
     }
 
+    #[track_caller]
     pub fn assert_end(&self) {
-        assert_eq!(self.pos, self.nodes.len());
+        assert_eq!(
+            self.pos,
+            self.nodes.len(),
+            "Not all nodes were consumed. at {:?}",
+            self.path
+        );
     }
 }

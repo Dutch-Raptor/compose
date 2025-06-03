@@ -5,10 +5,8 @@ use crate::parser::expressions::code_expression;
 use crate::parser::patterns::pattern;
 use crate::parser::statements::code;
 use crate::set::syntax_set;
-use crate::{Span, SyntaxError, SyntaxNode, set};
-use compose_error_codes::{
-    E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES, W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION,
-};
+use crate::{Label, Span, SyntaxError, SyntaxNode, set};
+use compose_error_codes::{E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES, W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION, W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION};
 use compose_utils::trace_fn;
 use std::collections::HashSet;
 
@@ -93,19 +91,19 @@ pub fn for_loop(p: &mut Parser) {
 
     if wrapped {
         if p.expect_closing_delimiter(left_paren_marker, SyntaxKind::RightParen) {
-            let last = p
+            let open = p[left_paren_marker].span();
+            let close = p
                 .last_node()
                 .map(SyntaxNode::span)
                 .unwrap_or(Span::detached());
-            let first = p[left_paren_marker].span();
-            let span = Span::join(first, last);
+            
             p.insert_error(SyntaxError::new(
-                "unnecessary parentheses around loop pattern",
-                span,
+                "unnecessary parentheses in `for` expression",
+                open,
             ))
             .with_severity(SyntaxErrorSeverity::Warning)
-            .with_code(&W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION)
-            .with_label_message("help: remove these parentheses");
+            .with_code(&W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION)
+            .with_label(Label::primary(close, "help: remove these parentheses"));
         }
     }
 
@@ -219,6 +217,7 @@ mod tests {
             p.assert_next(SyntaxKind::While, "while");
             p.assert_next_children(SyntaxKind::Condition, |p| {
                 p.assert_next(SyntaxKind::Bool, "true");
+                p.assert_end();
             });
             p.assert_next_children(SyntaxKind::CodeBlock, |p| {
                 p.assert_next(SyntaxKind::LeftBrace, "{");
@@ -227,10 +226,13 @@ mod tests {
                     p.assert_next_children(SyntaxKind::Args, |p| {
                         p.assert_next(SyntaxKind::LeftParen, "(");
                         p.assert_next(SyntaxKind::RightParen, ")");
+                        p.assert_end();
                     });
                 });
                 p.assert_next(SyntaxKind::RightBrace, "}");
+                p.assert_end();
             });
+            p.assert_end();
         });
         p.assert_end();
     }
@@ -250,8 +252,11 @@ mod tests {
             p.assert_next(SyntaxKind::While, "while");
             p.assert_next_children(SyntaxKind::Condition, |p| {
                 p.assert_next_children(SyntaxKind::Parenthesized, |_| {});
+                p.assert_next_warning(W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION);
+                p.assert_end();
             });
             p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
+            p.assert_end();
         });
         p.assert_end();
     }
@@ -270,8 +275,10 @@ mod tests {
             p.assert_next(SyntaxKind::If, "if");
             p.assert_next_children(SyntaxKind::Condition, |p| {
                 p.assert_next(SyntaxKind::Bool, "true");
+                p.assert_end();
             });
             p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
+            p.assert_end();
         });
         p.assert_end();
     }
@@ -292,6 +299,7 @@ mod tests {
             p.assert_next_children(SyntaxKind::CodeBlock, |p| {
                 p.assert_next_error(E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES);
             });
+            p.assert_end();
         });
         p.assert_end();
     }
@@ -314,6 +322,7 @@ mod tests {
             p.assert_next(SyntaxKind::If, "if");
             p.assert_next_children(SyntaxKind::Condition, |p| {
                 p.assert_next(SyntaxKind::Ident, "cond1");
+                p.assert_end();
             });
             p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
             p.assert_next_children(SyntaxKind::ConditionalAlternate, |p| {
@@ -321,13 +330,17 @@ mod tests {
                 p.assert_next(SyntaxKind::If, "if");
                 p.assert_next_children(SyntaxKind::Condition, |p| {
                     p.assert_next(SyntaxKind::Ident, "cond2");
+                    p.assert_end();
                 });
                 p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
+                p.assert_end();
             });
             p.assert_next_children(SyntaxKind::ConditionalElse, |p| {
                 p.assert_next(SyntaxKind::Else, "else");
                 p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
+                p.assert_end();
             });
+            p.assert_end();
         });
         p.assert_end();
     }
@@ -340,7 +353,7 @@ mod tests {
             do_thing()
         }
         "#,
-            &[W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION],
+            &[W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION],
         );
 
         p.assert_next_children(SyntaxKind::ForLoop, |p| {
@@ -350,8 +363,9 @@ mod tests {
             p.assert_next(SyntaxKind::In, "in");
             p.assert_next(SyntaxKind::Ident, "items");
             p.assert_next(SyntaxKind::RightParen, ")");
-            p.assert_next_warning(W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION);
+            p.assert_next_warning(W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION);
             p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
+            p.assert_end();
         });
         p.assert_end();
     }
