@@ -6,6 +6,7 @@ use compose_macros::{cast, ty};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{Span, SyntaxNode, ast};
 use compose_utils::Static;
+use dumpster::{Trace, Visitor};
 use std::fmt;
 use std::sync::LazyLock;
 
@@ -14,6 +15,14 @@ use std::sync::LazyLock;
 pub struct Func {
     repr: Repr,
     span: Span,
+}
+
+unsafe impl Trace for Func {
+    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        self.repr.accept(visitor)?;
+
+        Ok(())
+    }
 }
 
 impl Func {
@@ -42,6 +51,15 @@ impl fmt::Display for Func {
 enum Repr {
     Native(Static<NativeFuncData>),
     Closure(Closure),
+}
+
+unsafe impl Trace for Repr {
+    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        match self {
+            Repr::Native(native) => native.0.accept(visitor),
+            Repr::Closure(closure) => closure.accept(visitor),
+        }
+    }
 }
 
 impl Func {
@@ -121,11 +139,32 @@ pub struct NativeFuncData {
     pub fn_type: FuncType,
 }
 
+unsafe impl Trace for NativeFuncData {
+    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        // Safety:
+        // - `fn` type is just a pointer, does not contain any Gc<T>
+        // - `&'static str`, same as above
+        // - We delegate to the `Scope` `trace` impl
+        // - `FnType` is a simple enum, does not contain any Gc<T>
+        self.scope.accept(visitor)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
     pub node: SyntaxNode,
     pub defaults: Vec<Value>,
     pub num_pos_params: usize,
+}
+
+unsafe impl Trace for Closure {
+    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        // Safety: Only defaults may contain Gc<T>
+        self.defaults.accept(visitor)?;
+
+        Ok(())
+    }
 }
 
 impl fmt::Display for Closure {
@@ -137,7 +176,7 @@ impl fmt::Display for Closure {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Trace)]
 pub enum FuncType {
     Method,
     Associated,

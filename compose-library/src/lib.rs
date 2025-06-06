@@ -4,6 +4,7 @@ mod foundations;
 mod sink;
 mod repr;
 mod engine;
+mod gc;
 
 use compose_library::diag::SourceResult;
 pub use foundations::*;
@@ -34,7 +35,9 @@ pub fn library() -> Library {
     global.define_func::<println>();
     global.define_type::<i64>();
     global.define_type::<Type>();
-    global.define_type::<ValueIter>();
+    global.define_type::<IterValue>();
+    global.define_type::<Func>();
+    global.define_type::<Boxed>();
     
     Library {
         global: Module::new("global", global),

@@ -14,4 +14,5 @@ indexmap = { workspace = true }
 strsim = "0.11.1"
 tap = { workspace = true }
 dyn-clone = { workspace = true }
+dumpster = "1.1.0"
 

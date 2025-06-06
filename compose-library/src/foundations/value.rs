@@ -1,17 +1,21 @@
-use std::fmt;
-use ecow::{eco_format, EcoString};
-use crate::diag::{At, SourceResult};
-use crate::IntoValue;
 use crate::Reflect;
+use crate::diag::{At, SourceResult};
+use crate::foundations::boxed::Boxed;
+use crate::foundations::iterator::IterValue;
 use crate::{CastInfo, Str, UnitValue};
 use crate::{FromValue, Func};
+use crate::{IntoValue, ValueRef};
 use crate::{Sink, Type};
-use compose_library::diag::{bail, StrResult};
+use compose_library::diag::{StrResult, bail};
 use compose_library::repr::Repr;
 use compose_syntax::Span;
-use crate::foundations::iterator::ValueIter;
+use dumpster::{Trace, Visitor};
+use ecow::{EcoString, eco_format};
+use std::collections::HashSet;
+use std::fmt;
+use std::ops::Deref;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Int(i64),
     Bool(bool),
@@ -19,7 +23,98 @@ pub enum Value {
     Str(Str),
     Func(Func),
     Type(Type),
-    Iterator(ValueIter),
+    Iterator(IterValue),
+    Box(Boxed),
+}
+
+fn eq_internal(l_ref: ValueRef, r_ref: ValueRef, visited: &mut HashSet<(usize, usize)>) -> bool {
+    use Value::*;
+
+    let l = l_ref.deref();
+    let r = r_ref.deref();
+
+    // If both are boxes, compare the inner pointers
+    if let (Box(boxed_l), Box(boxed_r)) = (l, r) {
+        let ptr_l = boxed_l.as_ptr() as usize;
+        let ptr_r = boxed_r.as_ptr() as usize;
+
+        if !visited.insert((ptr_l, ptr_r)) {
+            return true; // we've seen this pair already
+        }
+
+        let Ok(inner_l) = boxed_l.as_ref() else {
+            return false;
+        };
+        let Ok(inner_r) = boxed_r.as_ref() else {
+            return false;
+        };
+        return eq_internal(inner_l, inner_r, visited);
+    }
+
+    // If one is a box and the other isn't, unwrap and compare
+    if let Box(boxed_l) = l {
+        let Ok(inner_l) = boxed_l.as_ref() else {
+            return false;
+        };
+        return eq_internal(inner_l, r_ref, visited);
+    }
+
+    if let Box(boxed_r) = r {
+        let Ok(inner_r) = boxed_r.as_ref() else {
+            return false;
+        };
+        return eq_internal(l_ref, inner_r, visited);
+    }
+
+
+    macro_rules! cmp {
+            ($($variant:ident),* $(,)?) => {
+                match (l.deref(), r.deref()) {
+                    // If the unboxed value is still a boxed value, unbox it
+                    (Value::Box(_), _) |
+                    (_, Value::Box(_)) => unreachable!("Boxes should have been unboxed before comparing"),
+
+                    $((Value::$variant(l), Value::$variant(r)) => l == r),*,
+
+                    // Write out $variant, _ and _, $variant to keep the match exhaustive so that
+                    // new variants will cause a compile error here.
+                    $((Value::$variant(_), _) => false),*,
+                    $((_, Value::$variant(_)) => false),*,
+                }
+            }
+        }
+
+    cmp![Int, Bool, Unit, Str, Func, Type, Iterator]
+
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        // A boxed value can be the same as another unboxed value
+        // so we need to unbox both values before comparing them
+        let Ok(l) = self.as_ref() else { return false };
+        let Ok(r) = other.as_ref() else { return false };
+        
+        let mut visited = HashSet::new();
+        eq_internal(l, r, &mut visited)
+    }
+}
+
+unsafe impl Trace for Value {
+    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        match self {
+            Value::Int(_) => {}
+            Value::Bool(_) => {}
+            Value::Unit(_) => {}
+            Value::Str(_) => {}
+            Value::Func(_) => {}
+            Value::Type(_) => {}
+            Value::Iterator(i) => i.accept(visitor)?,
+            Value::Box(b) => b.accept(visitor)?,
+        }
+
+        Ok(())
+    }
 }
 
 impl Value {
@@ -31,10 +126,11 @@ impl Value {
             Value::Str(_) => Type::of::<Str>(),
             Value::Func(_) => Type::of::<Func>(),
             Value::Type(_) => Type::of::<Type>(),
-            Value::Iterator(_) => Type::of::<ValueIter>(),       
+            Value::Iterator(_) => Type::of::<IterValue>(),
+            Value::Box(_) => Type::of::<Boxed>(),
         }
     }
-    
+
     pub fn unit() -> Value {
         Value::Unit(UnitValue)
     }
@@ -75,7 +171,12 @@ impl Value {
         match self {
             Self::Type(ty) => ty.path(path, access_span, sink).cloned().at(access_span),
             Self::Func(func) => func.path(path, access_span, sink).cloned().at(access_span),
-            _ => bail!(access_span, "no associated field or method named `{}` on `{}`", path, self.ty()),
+            _ => bail!(
+                access_span,
+                "no associated field or method named `{}` on `{}`",
+                path,
+                self.ty()
+            ),
         }
     }
 }
@@ -89,7 +190,8 @@ impl fmt::Display for Value {
             Value::Str(v) => write!(f, "{}", v),
             Value::Func(v) => write!(f, "{}", v),
             Value::Type(v) => write!(f, "{}", v),
-            Value::Iterator(v) => write!(f, "{:?}", v),       
+            Value::Iterator(v) => write!(f, "{:?}", v),
+            Value::Box(v) => write!(f, "{}", v),
         }
     }
 }
@@ -103,7 +205,8 @@ impl Repr for Value {
             Value::Str(v) => v.repr(),
             Value::Func(v) => eco_format!("{v}"),
             Value::Type(v) => eco_format!("{v}"),
-            Value::Iterator(v) => eco_format!("iterator({v:?})"),      
+            Value::Iterator(v) => eco_format!("iterator({v:?})"),
+            Value::Box(v) => eco_format!("{v}"),
         }
     }
 }
@@ -162,4 +265,26 @@ primitive!(Str: "str", Str);
 primitive!(Func: "func", Func);
 primitive!(Type: "type", Type);
 primitive!(UnitValue: "unit", Unit);
-primitive!(ValueIter: "iterator", Iterator);
+primitive!(IterValue: "iterator", Iterator);
+primitive!(Boxed: "box", Box);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unbox_partial_eq() {
+        let a = Value::Box(Boxed::new(Value::Box(Boxed::new(Value::Int(5)))));
+        let b = Value::Int(5);
+        assert_eq!(a, b);
+    }
+    
+    #[test]
+    fn test_unbox_partial_eq_cycles() {
+        let mut boxed = Value::Box(Boxed::new(Value::Int(5)));
+        // now reassign the boxed value to itself
+        *boxed.as_mut().unwrap() = boxed.clone();
+        
+        assert_eq!(boxed, boxed);
+    }
+}
