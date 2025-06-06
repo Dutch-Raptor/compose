@@ -6,7 +6,10 @@ use crate::parser::patterns::pattern;
 use crate::parser::statements::code;
 use crate::set::syntax_set;
 use crate::{Label, Span, SyntaxError, SyntaxNode, set};
-use compose_error_codes::{E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES, W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION, W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION};
+use compose_error_codes::{
+    E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES, W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION,
+    W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION,
+};
 use compose_utils::trace_fn;
 use std::collections::HashSet;
 
@@ -89,22 +92,21 @@ pub fn for_loop(p: &mut Parser) {
     // parse the iterable
     code_expression(p);
 
-    if wrapped {
-        if p.expect_closing_delimiter(left_paren_marker, SyntaxKind::RightParen) {
-            let open = p[left_paren_marker].span();
-            let close = p
-                .last_node()
-                .map(SyntaxNode::span)
-                .unwrap_or(Span::detached());
-            
-            p.insert_error(SyntaxError::new(
-                "unnecessary parentheses in `for` expression",
-                open,
-            ))
-            .with_severity(SyntaxErrorSeverity::Warning)
-            .with_code(&W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION)
-            .with_label(Label::primary(close, "help: remove these parentheses"));
-        }
+    // if an unnecessary open paren, we expect a closing one, then if it was there, warn that it was unnecessary
+    if wrapped && p.expect_closing_delimiter(left_paren_marker, SyntaxKind::RightParen) {
+        let open = p[left_paren_marker].span();
+        let close = p
+            .last_node()
+            .map(SyntaxNode::span)
+            .unwrap_or(Span::detached());
+
+        p.insert_error(SyntaxError::new(
+            "unnecessary parentheses in `for` expression",
+            open,
+        ))
+        .with_severity(SyntaxErrorSeverity::Warning)
+        .with_code(&W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION)
+        .with_label(Label::primary(close, "help: remove these parentheses"));
     }
 
     parse_control_flow_block(p, ControlFlow::For);

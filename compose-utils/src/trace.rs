@@ -8,7 +8,7 @@ pub static ENABLE_TRACE: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new
 
 // Per-thread indentation tracking.
 thread_local! {
-    static INDENT: RefCell<usize> = RefCell::new(0);
+    static INDENT: RefCell<usize> = const { RefCell::new(0) };
 }
 
 static CALL_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);

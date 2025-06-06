@@ -181,23 +181,19 @@ impl Keybinding for EditorReader<'_> {
             KeyCode::Down => {
                 if editor.focus.ln + 1 < editor.line_count() {
                     editor.move_down(shifted)
-                } else {
-                    if let Some(s) = self.history_down() {
-                        editor.set_contents(s.as_bytes())?;
-                        editor.focus.ln = 0;
-                        editor.move_to_line_end(false);
-                    }
+                } else if let Some(s) = self.history_down() {
+                    editor.set_contents(s.as_bytes())?;
+                    editor.focus.ln = 0;
+                    editor.move_to_line_end(false);
                 }
             }
             KeyCode::Up => {
                 if editor.focus.ln > 0 {
                     editor.move_up(shifted)
-                } else {
-                    if let Some(s) = self.history_up(|| editor.contents()) {
-                        editor.set_contents(s.as_bytes())?;
-                        editor.focus.ln = 0;
-                        editor.move_to_line_end(false);
-                    }
+                } else if let Some(s) = self.history_up(|| editor.contents()) {
+                    editor.set_contents(s.as_bytes())?;
+                    editor.focus.ln = 0;
+                    editor.move_to_line_end(false);
                 }
             }
             KeyCode::Left => editor.move_left(shifted),

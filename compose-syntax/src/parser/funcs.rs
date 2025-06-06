@@ -15,12 +15,10 @@ pub fn args(p: &mut Parser) {
     while !p.current().is_terminator() {
         arg(p);
 
-        if !p.current().is_terminator() {
-            if !p.eat_if(SyntaxKind::Comma) {
-                p.insert_error_before("expected a comma between the function arguments")
-                    .with_code(&E0009_ARGS_MISSING_COMMAS)
-                    .with_label_message("help: insert a comma here");
-            }
+        if !p.current().is_terminator() && !p.eat_if(SyntaxKind::Comma) {
+            p.insert_error_before("expected a comma between the function arguments")
+                .with_code(&E0009_ARGS_MISSING_COMMAS)
+                .with_label_message("help: insert a comma here");
         }
     }
 

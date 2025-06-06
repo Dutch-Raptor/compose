@@ -23,7 +23,7 @@ pub fn file(args: FileArgs) -> Result<(), CliError> {
 
     if let Err(err) = value {
         crate::print_diagnostics(&world, &err, &warnings).unwrap();
-        return Err(CliError::ExecutionError);
+        return Err(CliError::Execution);
     }
 
     crate::print_diagnostics(&world, &[], &warnings).unwrap();

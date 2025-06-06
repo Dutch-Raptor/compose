@@ -12,7 +12,7 @@ pub struct TakeIter {
 
 impl ValueIterator for TakeIter {
     fn next(&mut self, engine: &mut Engine) -> SourceResult<Option<Value>> {
-        if self.take <= 0 {
+        if self.take == 0 {
             return Ok(None);
         }
         self.take -= 1;

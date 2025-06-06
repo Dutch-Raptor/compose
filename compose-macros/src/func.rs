@@ -48,9 +48,9 @@ fn create(func: &Func, item: &ItemFn) -> TokenStream {
     }
 }
 
-fn rewrite_fn_item(item: &ItemFn) -> syn::ItemFn {
+fn rewrite_fn_item(item: &ItemFn) -> ItemFn {
     let inputs = item.sig.inputs.iter().cloned().filter_map(|mut input| {
-        if let syn::FnArg::Typed(typed) = &mut input {
+        if let FnArg::Typed(typed) = &mut input {
             if typed.attrs.iter().any(|attr| attr.path().is_ident("external")) {
                 return None;
             }
@@ -110,7 +110,7 @@ fn create_wrapper_closure(func: &Func) -> TokenStream {
             .special
             .self_
             .as_ref()
-            .map(|param| create_param_parser(param));
+            .map(create_param_parser);
 
         quote! {
             #self_handler
@@ -223,7 +223,7 @@ enum Binding {
     RefMut,
 }
 
-fn parse(stream: TokenStream, item: &syn::ItemFn) -> Result<Func> {
+fn parse(stream: TokenStream, item: &ItemFn) -> Result<Func> {
     let meta: Meta = syn::parse2(stream)?;
     let name = determine_name(&item.sig.ident, meta.name);
 
@@ -260,12 +260,12 @@ fn parse(stream: TokenStream, item: &syn::ItemFn) -> Result<Func> {
 pub struct Meta {
     /// Whether this function has an associated scope defined by the `#[scope]` macro.
     pub scope: bool,
-    /// The function's name as exposed to Typst.
+    /// The function's name as exposed to Compose.
     pub name: Option<String>,
     /// The parent type of this function.
     ///
     /// Used for functions in a scope.
-    pub parent: Option<syn::Type>,
+    pub parent: Option<Type>,
 }
 
 impl Parse for Meta {
@@ -300,7 +300,7 @@ fn parse_param(
 
             special_params.self_ = Some(Param {
                 binding,
-                ident: syn::Ident::new("self_", recv.self_token.span()),
+                ident: Ident::new("self_", recv.self_token.span()),
                 ty: match parent {
                     Some(ty) => ty.clone(),
                     None => bail!(

@@ -54,7 +54,7 @@ impl<R: Renderer> Editor<R> {
         self.buf.to_string()
     }
 
-    /// Activate the editor and renderer, and read the input.
+    /// Activate the editor and renderer and read the input.
     pub fn read(mut self, keybinding: impl Keybinding) -> Result<String> {
         loop {
             self.renderer
@@ -108,7 +108,7 @@ impl<R> Editor<R> {
     /// Anchor if there was not already an anchor, or unanchor.
     pub fn set_anchor(&mut self, anchored: bool) {
         if anchored {
-            if self.anchor == None {
+            if self.anchor.is_none() {
                 self.anchor = Some(self.focus);
             }
         } else {
@@ -116,7 +116,7 @@ impl<R> Editor<R> {
         }
     }
 
-    /// Clamp the cursor into valid indexing range on the current line.
+    /// Clamp the cursor into a valid indexing range on the current line.
     pub fn clamp(&mut self) {
         self.focus.col = self.focus.col.min(self.curr_ln_len());
     }
@@ -300,7 +300,7 @@ impl<R> Editor<R> {
             self.focus.col = 0;
             self.focus.ln += 1;
         } else {
-            self.focus.col = self.focus.col + 1;
+            self.focus.col += 1;
         }
     }
 
@@ -316,7 +316,7 @@ impl<R> Editor<R> {
         let lines = str.lines().count().max(1);
 
         self.focus.ln += lines - 1;
-        self.focus.col = self.focus.col + str.lines().last().unwrap_or_default().len();
+        self.focus.col += str.lines().last().unwrap_or_default().len();
     }
 
     fn rope_idx(&self, cursor: Cursor, offset: isize) -> usize {
@@ -324,7 +324,7 @@ impl<R> Editor<R> {
         let line_start = self.buf.line_to_char(cursor.ln);
         let z = line_start + idx;
         // Take good care to not underflow subtract.
-        // Also I'm keeping this and assuming that
+        // Also, I'm keeping this and assuming that
         // all machines will use Two's Complement.
         z.wrapping_add(offset as usize)
     }

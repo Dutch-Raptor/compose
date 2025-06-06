@@ -55,7 +55,7 @@ pub fn repl(args: ReplArgs) -> Result<(), CliError> {
 
         let input = Editor::with_renderer(renderer)
             .read(EditorReader::new(&history))
-            .map_err(|e| CliError::EditorError(eco_format!("{e}")))?;
+            .map_err(|e| CliError::Editor(eco_format!("{e}")))?;
 
         match handle_repl_commands(&mut vm, &world, &input) {
             Some(ReplCommand::Quit) => break,

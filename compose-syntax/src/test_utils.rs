@@ -149,10 +149,8 @@ impl NodesTester {
 
     #[track_caller]
     fn assert_next_node(&mut self) -> SyntaxNode {
-        let node = self.nodes.get(self.pos).cloned().expect(&format!(
-            "Expected a node at {:?}. Out of nodes!",
-            self.path
-        ));
+        let node = self.nodes.get(self.pos).cloned().unwrap_or_else(|| panic!("Expected a node at {:?}. Out of nodes!",
+            self.path));
         self.pos += 1;
         node
     }

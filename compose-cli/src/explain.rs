@@ -6,7 +6,7 @@ pub fn explain(args: ExplainArgs) -> Result<(), CliError> {
     match compose::error_codes::lookup(&args.code) {
         None => {
             eprintln!("No error code found for {}", args.code);
-            Err(CliError::ExecutionError)
+            Err(CliError::Execution)
         }
         Some(code) => {
             let explained = code.explain();

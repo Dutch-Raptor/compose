@@ -18,18 +18,12 @@ pub trait Eval {
     fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output>;
 }
 
+#[derive(Default)]
 pub struct EvalConfig {
     /// Whether to include syntax warnings in the returned result.
     include_syntax_warnings: bool,
 }
 
-impl Default for EvalConfig {
-    fn default() -> Self {
-        Self {
-            include_syntax_warnings: false,
-        }
-    }
-}
 
 pub fn eval(source: &Source, vm: &mut Vm, eval_config: &EvalConfig) -> Warned<SourceResult<Value>> {
     eval_range(source, 0..usize::MAX, vm, eval_config)

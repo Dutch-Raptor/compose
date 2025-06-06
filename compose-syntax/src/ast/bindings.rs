@@ -1,5 +1,5 @@
 use crate::ast::{node, AstNode, Expr, Ident};
-use crate::ast::closure::Pattern;
+use crate::ast::func::Pattern;
 use crate::kind::SyntaxKind;
 use crate::{Span, SyntaxNode};
 
@@ -26,7 +26,7 @@ impl<'a> LetBinding<'a> {
     }
 
     pub fn is_mut(self) -> bool {
-        self.0.children().find(|&n| n.kind() == SyntaxKind::Mut).is_some()
+        self.0.children().any(|n| n.kind() == SyntaxKind::Mut)
     }
     
     pub fn eq_span(self) -> Span {

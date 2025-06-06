@@ -197,7 +197,7 @@ where
             let term_rows = self
                 .max_height
                 .unwrap_or(usize::MAX)
-                .min(rows.try_into().unwrap())
+                .min(rows.into())
                 .saturating_sub(self.header.rows())
                 .saturating_sub(self.footer.rows());
             if term_rows == 0 {
@@ -258,7 +258,7 @@ where
         self.cursor_to_left_term_edge()?;
         self.header.draw(self.write, data)?;
         if self.header.rows() > 0 {
-            self.write.write(b"\n")?;
+            self.write.write_all(b"\n")?;
         }
         Ok(())
     }
@@ -280,7 +280,7 @@ where
 
         self.cursor_to_left_term_edge()?;
         if self.footer.rows() > 0 {
-            self.write.write(b"\n")?;
+            self.write.write_all(b"\n")?;
         }
         // write!(self.write, "{} {} {}", self.draw_state.low, self.draw_state.high, data.cursor.ln)?;
         self.footer.draw(self.write, data)?;
@@ -290,10 +290,10 @@ where
     fn draw_range(&mut self, data: &RenderData, low: usize, high: usize) -> Result<()> {
         // Print out the contents.
         for i in low..high {
-            self.draw_line(&data, i)?;
+            self.draw_line(data, i)?;
             if i < high - 1 {
                 // The last line should not have any new-line attached to it.
-                self.write.write(b"\n")?;
+                self.write.write_all(b"\n")?;
             }
         }
         Ok(())
@@ -306,7 +306,7 @@ where
     }
 
     fn usize_to_u16(n: usize) -> u16 {
-        n.try_into().unwrap_or(std::u16::MAX)
+        n.try_into().unwrap_or(u16::MAX)
     }
 }
 

@@ -55,8 +55,8 @@ impl Span {
 
         let range_start = Self::min(range.start, max) as u64;
         let range_end = Self::min(range.end, max) as u64;
-        let range_as_number = (range_start << Self::RANGE_PART_BITS) | range_end;
-        range_as_number
+        
+        (range_start << Self::RANGE_PART_BITS) | range_end
     }
 
     /// Packs a file id and a range
