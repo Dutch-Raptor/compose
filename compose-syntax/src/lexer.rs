@@ -78,6 +78,7 @@ impl Lexer<'_> {
 }
 
 impl Lexer<'_> {
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> (SyntaxKind, SyntaxNode) {
         debug_assert!(self.error.is_none());
 
@@ -207,7 +208,7 @@ impl Lexer<'_> {
 
         let number = self.s.from(start);
 
-        if i64::from_str_radix(number, 10).is_ok() {
+        if number.parse::<i64>().is_ok() {
             SyntaxKind::Int
         } else if number.parse::<f64>().is_ok() {
             SyntaxKind::Float
@@ -274,7 +275,7 @@ impl Lexer<'_> {
     }
 
     fn skip_whitespace(&mut self, start: usize) -> bool {
-        self.s.eat_while(|c| is_space(c));
+        self.s.eat_while(is_space);
 
         // count newlines
         let mut newline_count = 0;
@@ -479,7 +480,7 @@ mod tests {
                 SyntaxNode::leaf(SyntaxKind::Ident, "a", Span::new(file_id, 0..1))
             )
         );
-        assert_eq!(lexer.newline(), false);
+        assert!(lexer.newline());
         assert_eq!(
             lexer.next(),
             (
@@ -487,7 +488,7 @@ mod tests {
                 SyntaxNode::leaf(SyntaxKind::Ident, "b", Span::new(file_id, 2..3))
             )
         );
-        assert_eq!(lexer.newline(), true);
+        assert!(lexer.newline());
     }
 
     #[test]

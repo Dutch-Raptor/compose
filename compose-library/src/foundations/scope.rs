@@ -54,9 +54,11 @@ impl<'a> Scopes<'a> {
     }
 
     pub fn get_mut(&mut self, name: &str) -> Result<&mut Binding, VariableAccessError> {
-        if let Err(err) = self.get(name) {
-            return Err(err);
-        }
+        // Check if the variable is defined in the current scope first.
+        // This is done separately because creating an error requires access to `&self`,
+        // but we need a mutable borrow later.
+        // So we call `get(name)?` here to handle errors, then search mutably afterward.
+        let _ = self.get(name)?;
 
         iter::once(&mut self.top)
             .chain(self.stack.iter_mut().rev())
@@ -265,7 +267,7 @@ impl Scope {
     }
 }
 
-fn similar_idents<'a>(
+fn similar_idents(
     name: &str,
     idents: impl IntoIterator<Item = impl AsRef<str>>,
 ) -> Vec<EcoString> {

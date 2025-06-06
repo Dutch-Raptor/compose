@@ -1,5 +1,5 @@
 use crate::Value;
-use compose_library::diag::{At, SourceResult, error};
+use compose_library::diag::{SourceResult, error};
 use compose_library::gc::GcValue;
 use compose_library::{Engine, Func, IntoValue};
 use compose_macros::func;

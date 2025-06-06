@@ -43,7 +43,7 @@ fn main() {
         // Create the documentation
         out.push_str("/**");
         out.push_str(contents.as_str());
-        out.push_str("*/\n");
+        out.push_str("*/");
         out.push_str(&format!(
             r#"
             pub const {name}: ErrorCode = ErrorCode {{

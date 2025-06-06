@@ -361,7 +361,7 @@ struct ErrorNode {
 }
 
 impl ErrorNode {
-    fn new(error: SyntaxError, text: impl Into<EcoString> + Sized) -> ErrorNode {
+    fn new(error: SyntaxError, text: impl Into<EcoString>) -> ErrorNode {
         Self {
             text: text.into(),
             error,
@@ -485,7 +485,7 @@ impl SyntaxError {
 }
 
 impl SyntaxError {
-    pub(crate) fn new(message: impl Into<EcoString> + Sized, span: Span) -> SyntaxError {
+    pub(crate) fn new(message: impl Into<EcoString>, span: Span) -> SyntaxError {
         SyntaxError {
             span,
             message: message.into(),

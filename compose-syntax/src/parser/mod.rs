@@ -217,7 +217,7 @@ impl ExpectResult<'_> {
     /// Applies a function to the inner `SyntaxError` if one exists.
     ///
     /// This is useful for annotating or augmenting syntax errors in-place.
-    pub fn map(self, f: impl FnOnce(&mut SyntaxError) -> ()) -> Self {
+    pub fn map(self, f: impl FnOnce(&mut SyntaxError)) -> Self {
         match self {
             Self::Ok => self,
             Self::SyntaxError(err) => {
@@ -495,7 +495,7 @@ impl<'s> Parser<'s> {
 
     pub(crate) fn current_text(&self) -> &'s str {
         match self.token.node.span().range() {
-            Some(s) => &self.text.get(s).expect("text should exist"),
+            Some(s) => self.text.get(s).expect("text should exist"),
             None => &self.text[self.token.start..self.current_end()],
         }
     }

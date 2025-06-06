@@ -1,6 +1,6 @@
-use crate::SyntaxNode;
 use crate::ast::{AstNode, Expr, Ident, node};
 use crate::kind::SyntaxKind;
+use crate::{Span, SyntaxNode};
 
 node! {
     struct Closure
@@ -21,7 +21,7 @@ node! {
 }
 
 impl<'a> Params<'a> {
-    pub fn children(self) -> impl DoubleEndedIterator<Item = Param<'a>> {
+    pub fn children(self) -> impl DoubleEndedIterator<Item = ParamKind<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }
 }
@@ -34,7 +34,13 @@ pub enum Param<'a> {
     Named(Named<'a>),
 }
 
-impl<'a> AstNode<'a> for Param<'a> {
+impl<'a> Default for ParamKind<'a> {
+    fn default() -> Self {
+        Self::Pos(Pattern::default())
+    }
+}
+
+impl<'a> AstNode<'a> for ParamKind<'a> {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self> {
         match node.kind() {
             SyntaxKind::Named => Some(Self::Named(Named::from_untyped(node)?)),
@@ -169,8 +175,8 @@ mod tests {
         assert_eq!(closure.params().children().count(), 1);
         let first_param = closure.params().children().next().unwrap();
         let pat = match first_param {
-            Param::Pos(p) => p,
-            Param::Named(n) => panic!("Expected positional param, got named param {n:?}"),
+            ParamKind::Pos(p) => p,
+            ParamKind::Named(n) => panic!("Expected positional param, got named param {n:?}"),
         };
 
         let expr = match pat {
@@ -196,9 +202,9 @@ mod tests {
         let params = closure.params();
         assert_eq!(params.children().count(), 2);
 
-        let first = params.children().nth(0).unwrap();
+        let first = params.children().next().unwrap();
         match first {
-            Param::Pos(p) => {
+            ParamKind::Pos(p) => {
                 let pat = match p {
                     Pattern::Single(e) => e,
                     other => panic!("Expected single pattern, got {other:?}"),
@@ -218,7 +224,7 @@ mod tests {
 
         let second = params.children().nth(1).unwrap();
         match second {
-            Param::Pos(p) => {
+            ParamKind::Pos(p) => {
                 let pat = match p {
                     Pattern::Single(e) => e,
                     other => panic!("Expected single pattern, got {other:?}"),

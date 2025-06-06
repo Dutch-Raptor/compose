@@ -11,7 +11,7 @@ impl Eval for ast::Closure<'_> {
     fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
         let mut defaults = Vec::new();
         for param in self.params().children() {
-            if let ast::Param::Named(named) = param {
+            if let ast::ParamKind::Named(named) = param {
                 defaults.push(named.expr().eval(vm)?);
             }
         }
@@ -22,7 +22,7 @@ impl Eval for ast::Closure<'_> {
             num_pos_params: self
                 .params()
                 .children()
-                .filter(|p| matches!(p, ast::Param::Pos(_)))
+                .filter(|p| matches!(p, ast::ParamKind::Pos(_)))
                 .count(),
         };
 
@@ -48,13 +48,13 @@ pub fn eval_closure(
     let mut defaults = closure.defaults.iter();
     for p in params.children() {
         match p {
-            ast::Param::Pos(pattern) => match pattern {
+            ast::ParamKind::Pos(pattern) => match pattern {
                 ast::Pattern::Single(ast::Expr::Ident(ident)) => {
                     inner_vm.define(ident, args.expect::<Value>(&ident)?)?;
                 }
                 pattern => bail!(pattern.span(), "Patterns not supported in closures yet")
             }
-            ast::Param::Named(named) => {
+            ast::ParamKind::Named(named) => {
                 let name = named.name();
                 let default = defaults.next().unwrap();
                 let value =

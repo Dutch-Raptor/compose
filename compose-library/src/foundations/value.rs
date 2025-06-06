@@ -74,12 +74,13 @@ fn eq_internal(l_ref: ValueRef, r_ref: ValueRef, visited: &mut HashSet<(usize, u
                     (Value::Box(_), _) |
                     (_, Value::Box(_)) => unreachable!("Boxes should have been unboxed before comparing"),
 
-                    $((Value::$variant(l), Value::$variant(r)) => l == r),*,
+                    $(
+                        (Value::$variant(l), Value::$variant(r)) => l == r,
+                    )*
 
-                    // Write out $variant, _ and _, $variant to keep the match exhaustive so that
+                    // Write out $variant, _ to keep the match exhaustive so that
                     // new variants will cause a compile error here.
                     $((Value::$variant(_), _) => false),*,
-                    $((_, Value::$variant(_)) => false),*,
                 }
             }
         }

@@ -22,7 +22,7 @@ impl FromValue for Value {
 
 impl<T: FromValue> FromValue<Spanned<Value>> for T {
     fn from_value(value: Spanned<Value>) -> StrResult<Self> {
-        Ok(T::from_value(value.value)?)
+        T::from_value(value.value)
     }
 }
 

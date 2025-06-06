@@ -16,25 +16,25 @@ pub trait Explain {
 
 impl Explain for ErrorCode {
     fn explain(&self) -> String {
-        process_markdown(&self.description)
+        process_markdown(self.description)
     }
 }
 
-/// Processes markdown text by executing special code blocks marked with 'compose' and injecting their output.
+/// Processes Markdown text by executing special code blocks marked with 'compose' and injecting their output.
 ///
-/// Takes markdown text as input and processes it, looking for fenced code blocks that start with
+/// Takes Markdown text as input and processes it, looking for fenced code blocks that start with
 /// `compose label` where `label` is any non-whitespace string. When such a block is found:
 /// 1. The code inside the block is executed using the Compose language interpreter
-/// 2. The original code block is preserved with just "compose" as its info string
+/// 2. The original code block is preserved with only "compose" as its info string
 /// 3. A new code block with "output label" is inserted after it containing the execution results
 ///
 /// # Arguments
 ///
-/// * `input` - A string slice containing markdown text to process
+/// * `input` - A string slice containing Markdown text to process
 ///
 /// # Returns
 ///
-/// A String containing the processed markdown with executed code blocks and their outputs
+/// A String containing the processed Markdown with executed code blocks and their outputs
 ///
 /// # Example
 ///
@@ -70,7 +70,7 @@ fn process_markdown(input: &str) -> String {
                     current_label = captures[1].to_string();
                     code_buffer.clear();
 
-                    // Push a cleaned code block (just `compose`)
+                    // Push a cleaned code block (`compose`)
                     events.push(Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(
                         "compose".into(),
                     ))));
@@ -145,7 +145,7 @@ fn execute_with_diagnostics(code: &str) -> String {
 
     fn sep(s: &mut String) {
         if !s.is_empty() {
-            s.push_str("\n");
+            s.push('\n');
         }
     }
 
