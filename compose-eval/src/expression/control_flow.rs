@@ -2,7 +2,7 @@ use crate::expression::bindings::destructure_pattern;
 use crate::vm::FlowEvent;
 use crate::{Eval, Vm};
 use compose_library::diag::{At, SourceResult};
-use compose_library::{BindingKind, Value, ValueIter, ValueIterator};
+use compose_library::{BindingKind, Value, IterValue, ValueIterator};
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 
@@ -49,7 +49,7 @@ impl Eval for ast::ForLoop<'_> {
         let iterable_expr = self.iterable();
         let mut iterator = {
             let value = iterable_expr.eval(vm)?;
-            ValueIter::try_from(value).at(iterable_expr.span())?
+            IterValue::try_from(value).at(iterable_expr.span())?
         };
         let body = self.body();
 
@@ -61,7 +61,7 @@ impl Eval for ast::ForLoop<'_> {
                     vm,
                     pattern,
                     v,
-                    BindingKind::Immutable { first_assign: None },
+                    BindingKind::Variable { first_assign: None },
                 )?;
 
                 output = body.eval(vm)?;

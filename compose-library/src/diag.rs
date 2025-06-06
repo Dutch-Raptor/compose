@@ -1,3 +1,5 @@
+use codespan_reporting::term::termcolor::WriteColor;
+use codespan_reporting::{diagnostic, term};
 use compose_syntax::{FileId, Label, LabelType, Span, SyntaxError, SyntaxErrorSeverity};
 use ecow::{EcoVec, eco_vec};
 use std::fmt::{Display, Formatter};
@@ -5,8 +7,6 @@ use std::path::{Path, PathBuf};
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 use std::{fmt, io};
-use codespan_reporting::{diagnostic, term};
-use codespan_reporting::term::termcolor::WriteColor;
 
 pub fn write_diagnostics(
     world: &dyn World,
@@ -20,18 +20,20 @@ pub fn write_diagnostics(
             Severity::Error => diagnostic::Diagnostic::error(),
             Severity::Warning => diagnostic::Diagnostic::warning(),
         }
-            .with_message(diag.message.clone())
-            .with_notes(diag.notes.iter().map(|n| format!("note: {n}")).collect())
-            .with_notes(diag.hints.iter().map(|h| format!("help: {h}")).collect())
-            .with_labels_iter(
-                diag_label(diag)
-                    .into_iter()
-                    .chain(diag.labels.iter().flat_map(create_label)),
-            );
+        .with_message(diag.message.clone())
+        .with_notes(diag.notes.iter().map(|n| format!("note: {n}")).collect())
+        .with_notes(diag.hints.iter().map(|h| format!("help: {h}")).collect())
+        .with_labels_iter(
+            diag_label(diag)
+                .into_iter()
+                .chain(diag.labels.iter().flat_map(create_label)),
+        );
 
         if let Some(code) = &diag.code {
-            diagnostic = diagnostic.with_code(code.code)
-                .with_note(eco_format!("help: for more information about this error, try `compose explain {}`", code.code))
+            diagnostic = diagnostic.with_code(code.code).with_note(eco_format!(
+                "help: for more information about this error, try `compose explain {}`",
+                code.code
+            ))
         }
 
         term::emit(writer, config, &world, &diagnostic)?;
@@ -62,7 +64,6 @@ fn create_label(label: &Label) -> Option<diagnostic::Label<FileId>> {
 
     Some(diagnostic::Label::new(style, id, range).with_message(label.message.clone()))
 }
-
 
 /// Early-return with a [`StrResult`] or [`SourceResult`].
 ///
@@ -240,14 +241,14 @@ impl SourceDiagnostic {
         self.label_message = Some(message.into());
         self
     }
-    
+
     pub fn code(&mut self, code: &'static ErrorCode) {
         self.code = Some(code);
     }
-    
+
     pub fn with_code(mut self, code: &'static ErrorCode) -> Self {
         self.code(code);
-        self   
+        self
     }
 
     pub fn hint(&mut self, hint: impl Into<EcoString>) {
@@ -408,6 +409,31 @@ impl<T> Spanned<T> {
             value: &self.value,
             span: self.span,
         }
+    }
+}
+
+pub struct UnSpanned<T> {
+    pub value: T,
+}
+
+impl<T> UnSpanned<T> {
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
+}
+
+impl<T> From<T> for UnSpanned<T> {
+    fn from(value: T) -> Self {
+        Self { value }
+    }
+}
+
+impl<T> At<T> for Result<T, UnSpanned<SourceDiagnostic>> {
+    fn at(self, span: Span) -> SourceResult<T> {
+        self.map_err(|mut err| {
+            err.value.span = span;
+            eco_vec![err.value]
+        })
     }
 }
 

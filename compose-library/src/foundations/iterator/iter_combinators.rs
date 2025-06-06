@@ -1,11 +1,12 @@
-use crate::{Args, ValueIterator};
+use crate::{Args, IterValue, ValueIterator};
 use compose_library::diag::{At, SourceResult};
 use compose_library::{Engine, Func, Value};
+use dumpster::Trace;
 use std::iter;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Trace)]
 pub struct TakeIter {
-    pub(crate) inner: Box<dyn ValueIterator>,
+    pub(crate) inner: IterValue,
     pub(crate) take: usize,
 }
 
@@ -19,10 +20,10 @@ impl ValueIterator for TakeIter {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Trace)]
 pub struct SkipIter {
-    inner: Box<dyn ValueIterator>,
-    skip: usize,
+    pub(crate) inner: IterValue,
+    pub(crate) skip: usize,
 }
 
 impl ValueIterator for SkipIter {
@@ -35,9 +36,9 @@ impl ValueIterator for SkipIter {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Trace)]
 pub struct TakeWhileIter {
-    pub(crate) inner: Box<dyn ValueIterator>,
+    pub(crate) inner: IterValue,
     pub(crate) predicate: Func,
 }
 
@@ -65,9 +66,9 @@ impl ValueIterator for TakeWhileIter {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Trace)]
 pub struct MapIter {
-    pub(crate) inner: Box<dyn ValueIterator>,
+    pub(crate) inner: IterValue,
     pub(crate) map: Func,
 }
 

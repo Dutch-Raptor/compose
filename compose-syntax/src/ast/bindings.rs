@@ -1,7 +1,7 @@
-use crate::ast::{node, Expr, Ident};
+use crate::ast::{node, AstNode, Expr, Ident};
 use crate::ast::closure::Pattern;
 use crate::kind::SyntaxKind;
-use crate::SyntaxNode;
+use crate::{Span, SyntaxNode};
 
 node! {
     struct LetBinding
@@ -24,9 +24,21 @@ impl<'a> LetBinding<'a> {
     pub fn pattern(self) -> Pattern<'a> {
         self.0.cast_first()
     }
-    
+
     pub fn is_mut(self) -> bool {
         self.0.children().find(|&n| n.kind() == SyntaxKind::Mut).is_some()
+    }
+    
+    pub fn eq_span(self) -> Span {
+        self.0.children().find(|&n| n.kind() == SyntaxKind::Eq).map(|n| n.span()).unwrap_or_else(|| self.0.span())
+    }
+    
+    pub fn mut_span(self) -> Option<Span> {
+        self.0.children().find(|&n| n.kind() == SyntaxKind::Mut).map(|n| n.span())
+    }
+    
+    pub fn initial_value_span(self) -> Option<Span> {
+        self.initial_value().map(|e| e.span())
     }
 }
 

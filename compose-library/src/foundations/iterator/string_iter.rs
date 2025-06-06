@@ -1,11 +1,16 @@
-use crate::{IntoValue, ValueIter};
-use compose_library::Value;
 use ecow::EcoString;
 
 #[derive(Debug, Clone)]
 pub struct StringIterator {
     s: EcoString,
     byte_pos: usize,
+}
+
+// Safety: StringIterator contains no Gc<T> values, and therefore its trace can be empty.
+unsafe impl dumpster::Trace for StringIterator {
+    fn accept<V: dumpster::Visitor>(&self, _visitor: &mut V) -> Result<(), ()> {
+        Ok(())
+    }
 }
 
 impl StringIterator {
@@ -25,11 +30,5 @@ impl Iterator for StringIterator {
         let c = self.s[self.byte_pos..].chars().next()?;
         self.byte_pos += c.len_utf8();
         Some(c)
-    }
-}
-
-impl IntoValue for StringIterator {
-    fn into_value(self) -> Value {
-        Value::Iterator(ValueIter::from_dyn(Box::new(self)))
     }
 }

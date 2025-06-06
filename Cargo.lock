@@ -297,6 +297,7 @@ dependencies = [
  "compose-macros",
  "compose-syntax",
  "compose-utils",
+ "dumpster",
  "dyn-clone",
  "ecow",
  "indexmap",
@@ -399,6 +400,27 @@ checksum = "73770f8e1fe7d64df17ca66ad28994a0a623ea497fa69486e14984e715c5d174"
 dependencies = [
  "adler32",
  "byteorder",
+]
+
+[[package]]
+name = "dumpster"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77902e64468b086c084e1a3dc7e9a0aa72a8b2504780a41af147b654b3b63e63"
+dependencies = [
+ "dumpster_derive",
+ "parking_lot 0.12.3",
+]
+
+[[package]]
+name = "dumpster_derive"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb960d3bd081f2b17973fb33fc50c31a0cf0e90513e9962b41858306b35fd45c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
 ]
 
 [[package]]

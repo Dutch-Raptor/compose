@@ -12,6 +12,8 @@ mod int;
 mod bool;
 mod unit;
 mod iterator;
+mod boxed;
+mod value_ref;
 
 pub use value::*;
 pub use scope::*;
@@ -24,3 +26,5 @@ pub use ty::*;
 pub use unit::*;
 pub use str::*;
 pub use iterator::*;
+pub use boxed::*;
+pub use value_ref::*;

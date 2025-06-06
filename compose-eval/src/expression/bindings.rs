@@ -1,9 +1,9 @@
-use crate::Eval;
 use crate::vm::Vm;
+use crate::Eval;
 use compose_library::diag::{At, SourceResult};
-use compose_library::{Binding, Value, diag};
-use compose_syntax::ast;
+use compose_library::{diag, Binding, Value};
 use compose_syntax::ast::{AstNode, Expr, Pattern};
+use compose_syntax::ast;
 use ecow::eco_vec;
 
 impl<'a> Eval for ast::Ident<'a> {
@@ -29,13 +29,15 @@ impl<'a> Eval for ast::LetBinding<'a> {
 
         let binding_kind = match (self.is_mut(), has_init) {
             (true, true) => compose_library::BindingKind::Mutable,
-            (false, true) => compose_library::BindingKind::Immutable { first_assign: None },
+            (false, true) => compose_library::BindingKind::Variable { first_assign: None },
             (true, false) => compose_library::BindingKind::UninitializedMutable,
             (false, false) => compose_library::BindingKind::Uninitialized,
         };
 
         let value = match init {
-            Some(expr) => expr.eval(vm)?,
+            Some(expr) => {
+                expr.eval(vm)?
+            }
             None => Value::unit(),
         };
 
@@ -105,10 +107,7 @@ mod tests {
         let binding = vm.scopes.top.get("a").unwrap();
 
         assert_eq!(binding.read(), &Value::Int(3));
-        assert_eq!(
-            binding.kind(),
-            BindingKind::Immutable { first_assign: None }
-        );
+        assert_eq!(binding.kind(), BindingKind::Variable { first_assign: None });
     }
 
     #[test]
@@ -244,7 +243,7 @@ mod tests {
 
         // should now be immutable
         let binding = vm.scopes.get("a").unwrap();
-        assert!(matches!(binding.kind(), BindingKind::Immutable { .. }));
+        assert!(matches!(binding.kind(), BindingKind::Variable { .. }));
     }
 
     #[test]
@@ -253,10 +252,7 @@ mod tests {
         let mut vm = Vm::new(&world);
         eval_code_with_vm(&mut vm, "let a = 3").expect("failed to evaluate");
         let binding = vm.scopes.get("a").unwrap();
-        assert_eq!(
-            binding.kind(),
-            BindingKind::Immutable { first_assign: None }
-        );
+        assert_eq!(binding.kind(), BindingKind::Variable { first_assign: None });
         assert_eq!(binding.read(), &Value::Int(3));
 
         let errs = eval_code_with_vm(&mut vm, "a = 4").expect_err("expected error");

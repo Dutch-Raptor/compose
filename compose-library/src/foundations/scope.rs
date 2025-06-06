@@ -1,9 +1,11 @@
 use crate::IntoValue;
 use crate::diag::{At, SourceDiagnostic, SourceResult, error, warning};
 use crate::{Library, NativeFuncData, NativeType, Sink, Type, Value};
+use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
 use compose_library::diag::{StrResult, bail};
 use compose_library::{Func, NativeFunc};
 use compose_syntax::{Label, Span};
+use dumpster::{Trace, Visitor};
 use ecow::{EcoString, eco_format, eco_vec};
 use indexmap::IndexMap;
 use indexmap::map::Entry;
@@ -12,7 +14,6 @@ use std::hash::Hash;
 use std::iter;
 use strsim::jaro_winkler;
 use tap::Pipe;
-use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
 
 pub trait NativeScope {
     fn scope() -> Scope;
@@ -181,6 +182,18 @@ pub struct Scope {
     map: IndexMap<EcoString, Binding>,
 }
 
+// Safety: Each binding can contain a Gc<T> Value, so each needs to be traced.
+// An EcoString cannot contain a Gc<T> Value, so it does not need to be traced.
+unsafe impl Trace for Scope {
+    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        for (_k, v) in &self.map {
+            v.accept(visitor)?;
+        }
+
+        Ok(())
+    }
+}
+
 impl Scope {
     pub fn try_bind(&mut self, name: EcoString, binding: Binding) -> StrResult<&mut Binding> {
         Ok(match self.map.entry(name) {
@@ -287,9 +300,16 @@ pub struct Binding {
     kind: BindingKind,
 }
 
+unsafe impl Trace for Binding {
+    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        self.value.accept(visitor)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BindingKind {
-    Immutable { first_assign: Option<Span> },
+    Variable { first_assign: Option<Span> },
     Mutable,
     Uninitialized,
     UninitializedMutable,
@@ -299,7 +319,7 @@ pub enum BindingKind {
 impl Binding {
     pub fn new(value: impl IntoValue, span: Span) -> Self {
         Self {
-            kind: BindingKind::Immutable { first_assign: None },
+            kind: BindingKind::Variable { first_assign: None },
             value: value.into_value(),
             span,
         }
@@ -309,20 +329,8 @@ impl Binding {
         Self { kind, ..self }
     }
 
-    pub fn new_mutable(value: impl IntoValue, span: Span) -> Self {
-        Self {
-            kind: BindingKind::Mutable,
-            value: value.into_value(),
-            span,
-        }
-    }
-
     pub fn detached(value: impl IntoValue) -> Self {
         Self::new(value, Span::detached())
-    }
-
-    pub fn detached_mutable(value: impl IntoValue) -> Self {
-        Self::new_mutable(value, Span::detached())
     }
 
     pub fn read(&self) -> &Value {
@@ -338,7 +346,10 @@ impl Binding {
                 warning!(access_span, "use of variable before it has been initialized";)
                     .with_code(&W0001_USED_UNINITIALIZED_VARIABLE)
                     .with_label_message("use of uninitialized variable")
-                    .with_label(Label::secondary(self.span, "variable declared here without an initial value"))
+                    .with_label(Label::secondary(
+                        self.span,
+                        "variable declared here without an initial value",
+                    ))
                     .with_note("uninitialised variables evaluate to `()` by default"),
             )
         }
@@ -353,7 +364,7 @@ impl Binding {
     /// initialized kind.
     pub fn write(&mut self, access_span: Span) -> SourceResult<&mut Value> {
         match self.kind {
-            BindingKind::Immutable { first_assign } => Err(eco_vec![
+            BindingKind::Variable { first_assign } => Err(eco_vec![
                 error!(
                     access_span,
                     "cannot reassign to a variable declared as immutable"
@@ -362,8 +373,11 @@ impl Binding {
                 .with_label(Label::secondary(self.span, "was defined as immutable here"))
                 .pipe(|diag| {
                     if let Some(first_assign) = first_assign {
-                        diag.with_label(Label::secondary(first_assign, "first assignment occurred here"))
-                            .with_label_message("cannot reassign an immutable variable")
+                        diag.with_label(Label::secondary(
+                            first_assign,
+                            "first assignment occurred here",
+                        ))
+                        .with_label_message("cannot reassign an immutable variable")
                     } else {
                         diag.with_label_message("is immutable")
                     }
@@ -378,7 +392,7 @@ impl Binding {
             ]),
             BindingKind::Mutable => Ok(&mut self.value),
             BindingKind::Uninitialized => {
-                self.kind = BindingKind::Immutable {
+                self.kind = BindingKind::Variable {
                     first_assign: Some(access_span),
                 };
                 Ok(&mut self.value)
@@ -403,5 +417,9 @@ impl Binding {
 
     pub fn kind(&self) -> BindingKind {
         self.kind
+    }
+    
+    pub fn is_mutable(&self) -> bool {
+        matches!(self.kind, BindingKind::Mutable | BindingKind::UninitializedMutable)
     }
 }

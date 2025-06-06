@@ -1,1 +1,16 @@
-(() => (a = v => println(v), c = (b = () => () => {}) => {}) => a(c))
+let repeat = (n, f) => {
+    while n > 0 {
+        n -= 1;
+        f()
+    }
+}
+
+let times_ref = box::new(4);
+println(times_ref)
+repeat(times_ref, () => println("Hi"))
+assert::eq(times_ref, 0)
+
+let times = 4
+println(times)
+repeat(times, () => println("Hi"))
+assert::eq(times, 0)

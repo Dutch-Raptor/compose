@@ -15,3 +15,9 @@ impl<T: IntoValue> IntoValue for fn() -> T {
         self().into_value()
     }
 }
+
+impl<T: IntoValue> IntoValue for Option<T> {
+    fn into_value(self) -> Value {
+        self.map(IntoValue::into_value).unwrap_or(Value::unit())
+    }
+}

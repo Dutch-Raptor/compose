@@ -1,7 +1,7 @@
 use crate::Eval;
 use crate::vm::Vm;
 use compose_library::diag::{At, SourceResult, StrResult, bail};
-use compose_library::{Value, ops};
+use compose_library::{Value, ValueRef, ops};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
 
@@ -13,6 +13,7 @@ impl Eval for ast::Binary<'_> {
             BinOp::Add => apply_binary(self, vm, ops::add),
             BinOp::Mul => apply_binary(self, vm, ops::mul),
             BinOp::Lt => apply_binary(self, vm, ops::lt),
+            BinOp::Gt => apply_binary(self, vm, ops::gt),
             BinOp::Eq => apply_binary(self, vm, ops::eq),
             BinOp::Neq => apply_binary(self, vm, ops::neq),
             other => bail!(
@@ -27,16 +28,21 @@ impl Eval for ast::Binary<'_> {
 fn apply_binary(
     binary: ast::Binary,
     vm: &mut Vm,
-    op: fn(Value, Value) -> StrResult<Value>,
+    op: fn(ValueRef, ValueRef) -> StrResult<Value>,
 ) -> SourceResult<Value> {
-    let lhs = binary.lhs().eval(vm)?;
+    let l = binary.lhs();
+    let lhs = l.eval(vm)?;
 
     // make sure we dont evaluate rhs when short-circuiting
     if binary.op().short_circuits(&lhs) {
         return Ok(lhs);
     }
 
-    let rhs = binary.rhs().eval(vm)?;
+    let r = binary.rhs();
+    let rhs = r.eval(vm)?;
+
+    let rhs = rhs.as_ref().at(r.span())?;
+    let lhs = lhs.as_ref().at(l.span())?;
     op(lhs, rhs).at(binary.span())
 }
 
