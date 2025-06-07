@@ -17,7 +17,6 @@ compose = { workspace = true }
 compose-explain = {workspace = true}
 codespan-reporting = { workspace = true}
 clap = { version = "4.5.37", features = ["derive"] }
-ecow = { workspace = true }
 indoc = "2.0.6"
 tap = "1.0.1"
 parking_lot = "0.12.3"

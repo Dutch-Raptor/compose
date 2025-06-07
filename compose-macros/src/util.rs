@@ -25,7 +25,7 @@ use syn::Token;
 use syn::token::Token;
 
 /// Extract documentation comments from an attribute list.
-pub fn documentation(attrs: &[syn::Attribute]) -> String {
+pub fn documentation(attrs: &[Attribute]) -> String {
     let mut doc = String::new();
 
     // Parse doc comments.
@@ -51,7 +51,7 @@ pub fn documentation(attrs: &[syn::Attribute]) -> String {
 pub fn determine_name_and_title(
     specified_name: Option<String>,
     specified_title: Option<String>,
-    ident: &syn::Ident,
+    ident: &Ident,
     trim: Option<fn(&str) -> &str>,
 ) -> Result<(String, String)> {
     let name = {
@@ -88,7 +88,7 @@ impl quote::ToTokens for foundations {
 
 /// Parse a metadata key-value pair, separated by `=`.
 pub fn parse_key_value<K: Token + Default + Parse, V: Parse>(
-    input: ParseStream,
+    input: ParseStream<'_>,
 ) -> Result<Option<V>> {
     if !input.peek(|_| K::default()) {
         return Ok(None);
@@ -103,21 +103,21 @@ pub fn parse_key_value<K: Token + Default + Parse, V: Parse>(
 
 /// Parse a metadata key-array pair, separated by `=`.
 pub fn parse_key_value_array<K: Token + Default + Parse, V: Parse>(
-    input: ParseStream,
+    input: ParseStream<'_>,
 ) -> Result<Vec<V>> {
     Ok(parse_key_value::<K, Array<V>>(input)?.map_or(vec![], |array| array.0))
 }
 
 /// Parse a metadata key-string pair, separated by `=`.
 pub fn parse_string<K: Token + Default + Parse>(
-    input: ParseStream,
+    input: ParseStream<'_>,
 ) -> Result<Option<String>> {
     Ok(parse_key_value::<K, syn::LitStr>(input)?.map(|s| s.value()))
 }
 
 /// Parse a metadata key-string pair, separated by `=`.
 pub fn parse_string_array<K: Token + Default + Parse>(
-    input: ParseStream,
+    input: ParseStream<'_>,
 ) -> Result<Vec<String>> {
     Ok(parse_key_value_array::<K, syn::LitStr>(input)?
         .into_iter()
@@ -126,7 +126,7 @@ pub fn parse_string_array<K: Token + Default + Parse>(
 }
 
 /// Parse a metadata flag that can be present or not.
-pub fn parse_flag<K: Token + Default + Parse>(input: ParseStream) -> Result<bool> {
+pub fn parse_flag<K: Token + Default + Parse>(input: ParseStream<'_>) -> Result<bool> {
     if input.peek(|_| K::default()) {
         let _: K = input.parse()?;
         eat_comma(input);
@@ -137,9 +137,9 @@ pub fn parse_flag<K: Token + Default + Parse>(input: ParseStream) -> Result<bool
 
 
 /// Parse a comma if there is one.
-pub fn eat_comma(input: ParseStream) {
+pub fn eat_comma(input: ParseStream<'_>) {
     if input.peek(Token![,]) {
-        let _: Token![,] = input.parse().unwrap();
+        let _: Token![,] = input.parse().expect("expected comma");
     }
 }
 
@@ -148,7 +148,7 @@ pub fn eat_comma(input: ParseStream) {
 struct Array<T>(Vec<T>);
 
 impl<T: Parse> Parse for Array<T> {
-    fn parse(input: ParseStream) -> Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         let content;
         syn::bracketed!(content in input);
 
@@ -176,7 +176,7 @@ pub struct BareType {
 }
 
 impl Parse for BareType {
-    fn parse(input: ParseStream) -> Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         Ok(Self {
             attrs: input.call(Attribute::parse_outer)?,
             type_token: input.parse()?,
@@ -187,31 +187,15 @@ impl Parse for BareType {
 }
 
 /// Whether an attribute list has a specified attribute.
-pub fn has_attr(attrs: &mut Vec<syn::Attribute>, target: &str) -> bool {
+pub fn has_attr(attrs: &mut Vec<Attribute>, target: &str) -> bool {
     take_attr(attrs, target).is_some()
 }
 
 /// Whether an attribute list has a specified attribute.
-pub fn parse_attr<T: Parse>(
-    attrs: &mut Vec<syn::Attribute>,
-    target: &str,
-) -> Result<Option<Option<T>>> {
-    take_attr(attrs, target)
-        .map(|attr| {
-            Ok(match attr.meta {
-                syn::Meta::Path(_) => None,
-                syn::Meta::List(list) => Some(list.parse_args()?),
-                syn::Meta::NameValue(meta) => bail!(meta, "not valid here"),
-            })
-        })
-        .transpose()
-}
-
-/// Whether an attribute list has a specified attribute.
 pub fn take_attr(
-    attrs: &mut Vec<syn::Attribute>,
+    attrs: &mut Vec<Attribute>,
     target: &str,
-) -> Option<syn::Attribute> {
+) -> Option<Attribute> {
     attrs
         .iter()
         .position(|attr| attr.path().is_ident(target))

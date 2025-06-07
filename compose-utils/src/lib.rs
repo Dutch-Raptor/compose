@@ -34,6 +34,6 @@ impl<T> PartialEq for Static<T> {
 
 impl<T> Hash for Static<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        state.write_usize(self.0 as *const _ as _);
+        state.write_usize(std::ptr::from_ref(self.0) as _);
     }
 }

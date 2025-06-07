@@ -15,10 +15,6 @@ where
         GcValue(Gc::new(RwLock::new(value)))
     }
 
-    pub fn get(&self) -> RwLockReadGuard<T> {
-        self.0.read().unwrap()
-    }
-
     pub fn get_mut(&self) -> RwLockWriteGuard<T> {
         self.0.write().unwrap()
     }
@@ -33,11 +29,5 @@ where
 
     pub fn as_ptr(&self) -> *const RwLock<T> {
         Gc::<RwLock<T>>::as_ptr(&self.0)
-    }
-}
-
-impl<T: Trace + Send + Sync + Clone + 'static> GcValue<T> {
-    pub fn clone_value(&self) -> T {
-        self.get().clone()
     }
 }

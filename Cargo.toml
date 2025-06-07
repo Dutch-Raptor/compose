@@ -38,31 +38,37 @@ codespan-reporting = "0.12.0"
 dyn-clone = "1.0.19"
 
 [workspace.lints.rust]
-#unsafe_code = "deny"
-#unused_must_use = "deny"
-#unreachable_pub = "deny"
-#missing_docs = "deny"
-#rust_2018_idioms = "warn"
-#future_incompatible = "warn"
-#
-#[workspace.lints.clippy]
-#all = "deny"
-#pedantic = "warn"
-#nursery = "warn"
+unsafe_code = "deny"
+unused_must_use = "deny"
+unreachable_pub = "deny"
+#missing_docs = "deny" // enable this later for a full docs pass
+rust_2018_idioms = { level = "warn", priority = 1 }
+future_incompatible = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = 5 }
+pedantic = "warn"
+nursery = "warn"
 #cargo = "warn"
-#unwrap_used = "warn"
-#expect_used = "warn"
-#panic = "warn"
-#todo = "warn"
-#unimplemented = "warn"
-#dbg_macro = "warn"
-#print_stdout = "warn"
-#print_stderr = "warn"
-#missing_const_for_fn = "warn"
-#missing_errors_doc = "warn"
-#missing_panics_doc = "warn"
-#wildcard_dependencies = "warn"
-#multiple_crate_versions = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+missing_const_for_fn = "warn"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+wildcard_dependencies = "warn"
+
+# Overrides
+unwrap_used = {level = "deny", priority = 1 }
+redundant_pub_crate = {level = "allow", priority = 1}
+needless_raw_string_hashes = {level = "allow", priority = 1}
+single_match_else = { level = "allow", priority = 1}
+option_if_let_else= { level = "allow", priority = 1}
+manual_let_else = { level = "allow", priority = 1}
+
 
 [profile.release]
 lto = true

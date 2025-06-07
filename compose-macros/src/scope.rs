@@ -30,11 +30,11 @@ pub fn scope(_: TokenStream, item: syn::Item) -> Result<TokenStream> {
         let bare: BareType;
 
         let def = match child {
-            ImplItem::Const(item) => handle_const(&self_ty_expr, item)?,
+            ImplItem::Const(item) => handle_const(&self_ty_expr, item),
             ImplItem::Fn(item) => handle_fn(self_ty, item)?,
             ImplItem::Verbatim(item) => {
                 bare = syn::parse2(item.clone())?;
-                handle_type(&bare)?
+                handle_type(&bare)
             }
             _ => bail!(child, "Unexpected item in scope block"),
         };
@@ -46,7 +46,7 @@ pub fn scope(_: TokenStream, item: syn::Item) -> Result<TokenStream> {
         None => quote! { #item },
         Some(ident_ext) => rewrite_primitive_base(&item, ident_ext),
     };
-    
+
     Ok(quote! {
         #base
         impl #foundations::NativeScope for #self_ty {
@@ -65,7 +65,7 @@ fn rewrite_primitive_base(item: &ItemImpl, ident_ext: &Ident) -> TokenStream {
     let mut items = vec![];
     for sub in &item.items {
         match sub.clone() {
-            syn::ImplItem::Fn(mut func) => {
+            ImplItem::Fn(mut func) => {
                 func.vis = syn::Visibility::Inherited;
                 items.push(func.clone());
 
@@ -85,7 +85,7 @@ fn rewrite_primitive_base(item: &ItemImpl, ident_ext: &Ident) -> TokenStream {
                 });
             }
 
-            syn::ImplItem::Const(cons) => {
+            ImplItem::Const(cons) => {
                 sigs.push(quote! { #cons });
             }
 
@@ -106,9 +106,9 @@ fn rewrite_primitive_base(item: &ItemImpl, ident_ext: &Ident) -> TokenStream {
     }
 }
 
-fn handle_type(bare: &BareType) -> Result<TokenStream> {
+fn handle_type(bare: &BareType) -> proc_macro2::TokenStream {
     let ident = &bare.ident;
-    Ok(quote! { scope.define_type::<#ident>() })
+    quote! { scope.define_type::<#ident>() }
 }
 
 fn handle_fn(self_ty: &syn::Type, item: &mut ImplItemFn) -> Result<TokenStream> {
@@ -138,11 +138,11 @@ fn handle_fn(self_ty: &syn::Type, item: &mut ImplItemFn) -> Result<TokenStream> 
     })
 }
 
-fn handle_const(self_ty: &TokenStream, item: &mut ImplItemConst) -> Result<TokenStream> {
+fn handle_const(self_ty: &TokenStream, item: &ImplItemConst) -> TokenStream {
     let ident = &item.ident;
     let name = ident.to_string();
 
-    Ok(quote! { scope.define(#name, #self_ty::#ident)})
+    quote! { scope.define(#name, #self_ty::#ident)}
 }
 
 fn is_primitive(ident: &Ident) -> bool {

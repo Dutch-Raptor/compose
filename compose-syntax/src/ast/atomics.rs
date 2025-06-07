@@ -103,7 +103,7 @@ impl<'a> Str<'a> {
                         .and_then(std::char::from_u32)
                     {
                         Some(c) => out.push(c),
-                        Option::None => out.push_str(s.from(start)),
+                        None => out.push_str(s.from(start)),
                     }
                 }
                 _ => out.push_str(s.from(start)),

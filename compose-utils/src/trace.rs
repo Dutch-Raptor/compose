@@ -1,3 +1,4 @@
+#![allow(clippy::print_stdout)]
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::LazyLock;

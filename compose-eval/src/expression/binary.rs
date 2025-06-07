@@ -1,10 +1,10 @@
-use std::ops::Deref;
-use crate::Eval;
 use crate::vm::Vm;
-use compose_library::diag::{At, SourceResult, StrResult, bail};
-use compose_library::{Value, ValueRef, ops};
+use crate::Eval;
+use compose_library::diag::{bail, At, SourceResult, StrResult};
+use compose_library::{ops, Value};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
+use std::ops::Deref;
 
 impl Eval for ast::Binary<'_> {
     type Output = Value;

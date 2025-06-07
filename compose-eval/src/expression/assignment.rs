@@ -1,7 +1,7 @@
 use crate::access::Access;
 use crate::{Eval, Vm};
-use compose_library::diag::{At, SourceResult, StrResult, bail};
-use compose_library::{Value, ValueRef, ops};
+use compose_library::diag::{bail, At, SourceResult, StrResult};
+use compose_library::{ops, Value};
 use compose_syntax::ast;
 use compose_syntax::ast::{AssignOp, AstNode};
 use std::ops::Deref;
