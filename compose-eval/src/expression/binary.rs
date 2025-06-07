@@ -12,6 +12,7 @@ impl Eval for ast::Binary<'_> {
     fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
         match self.op() {
             BinOp::Add => apply_binary(self, vm, ops::add),
+            BinOp::Sub => apply_binary(self, vm, ops::sub),
             BinOp::Mul => apply_binary(self, vm, ops::mul),
             BinOp::Lt => apply_binary(self, vm, ops::lt),
             BinOp::Gt => apply_binary(self, vm, ops::gt),
