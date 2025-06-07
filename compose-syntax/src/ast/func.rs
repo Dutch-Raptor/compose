@@ -21,13 +21,36 @@ node! {
 }
 
 impl<'a> Params<'a> {
-    pub fn children(self) -> impl DoubleEndedIterator<Item = ParamKind<'a>> {
+    pub fn children(self) -> impl DoubleEndedIterator<Item = Param<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }
 }
 
+node! {
+    struct Param
+}
+
+impl<'a> Param<'a> {
+    pub fn kind(self) -> ParamKind<'a> {
+        self.0.cast_first()
+    }
+
+    pub fn is_ref(self) -> bool {
+        self.0
+            .children()
+            .any(|n| n.kind() == SyntaxKind::Ref)
+    }
+
+    pub fn ref_span(self) -> Option<Span> {
+        self.0
+            .children()
+            .find(|n| n.kind() == SyntaxKind::Ref)
+            .map(|n| n.span())
+    }
+}
+
 #[derive(Debug)]
-pub enum Param<'a> {
+pub enum ParamKind<'a> {
     // A positional parameter `x`
     Pos(Pattern<'a>),
     // A named parameter `help = "try it like this"`
@@ -174,7 +197,7 @@ mod tests {
 
         assert_eq!(closure.params().children().count(), 1);
         let first_param = closure.params().children().next().unwrap();
-        let pat = match first_param {
+        let pat = match first_param.kind() {
             ParamKind::Pos(p) => p,
             ParamKind::Named(n) => panic!("Expected positional param, got named param {n:?}"),
         };
@@ -203,7 +226,7 @@ mod tests {
         assert_eq!(params.children().count(), 2);
 
         let first = params.children().next().unwrap();
-        match first {
+        match first.kind() {
             ParamKind::Pos(p) => {
                 let pat = match p {
                     Pattern::Single(e) => e,
@@ -223,7 +246,7 @@ mod tests {
         }
 
         let second = params.children().nth(1).unwrap();
-        match second {
+        match second.kind() {
             ParamKind::Pos(p) => {
                 let pat = match p {
                     Pattern::Single(e) => e,

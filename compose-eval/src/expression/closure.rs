@@ -11,7 +11,7 @@ impl Eval for ast::Closure<'_> {
     fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
         let mut defaults = Vec::new();
         for param in self.params().children() {
-            if let ast::ParamKind::Named(named) = param {
+            if let ast::ParamKind::Named(named) = param.kind() {
                 defaults.push(named.expr().eval(vm)?);
             }
         }
@@ -22,7 +22,7 @@ impl Eval for ast::Closure<'_> {
             num_pos_params: self
                 .params()
                 .children()
-                .filter(|p| matches!(p, ast::ParamKind::Pos(_)))
+                .filter(|p| matches!(p.kind(), ast::ParamKind::Pos(_)))
                 .count(),
         };
 
@@ -42,12 +42,12 @@ pub fn eval_closure(
     let params = ast_closure.params();
     let body = ast_closure.body();
 
-    // Dont use the scope from the call site
+    // Don't use the scope from the call site
     let mut inner_vm = Vm::new(world);
 
     let mut defaults = closure.defaults.iter();
     for p in params.children() {
-        match p {
+        match p.kind() {
             ast::ParamKind::Pos(pattern) => match pattern {
                 ast::Pattern::Single(ast::Expr::Ident(ident)) => {
                     inner_vm.define(ident, args.expect::<Value>(&ident)?)?;

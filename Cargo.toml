@@ -37,8 +37,32 @@ compose-explain = { path = "compose-explain" }
 codespan-reporting = "0.12.0"
 dyn-clone = "1.0.19"
 
-[workspace.lints]
-
+[workspace.lints.rust]
+#unsafe_code = "deny"
+#unused_must_use = "deny"
+#unreachable_pub = "deny"
+#missing_docs = "deny"
+#rust_2018_idioms = "warn"
+#future_incompatible = "warn"
+#
+#[workspace.lints.clippy]
+#all = "deny"
+#pedantic = "warn"
+#nursery = "warn"
+#cargo = "warn"
+#unwrap_used = "warn"
+#expect_used = "warn"
+#panic = "warn"
+#todo = "warn"
+#unimplemented = "warn"
+#dbg_macro = "warn"
+#print_stdout = "warn"
+#print_stderr = "warn"
+#missing_const_for_fn = "warn"
+#missing_errors_doc = "warn"
+#missing_panics_doc = "warn"
+#wildcard_dependencies = "warn"
+#multiple_crate_versions = "warn"
 
 [profile.release]
 lto = true

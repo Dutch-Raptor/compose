@@ -480,7 +480,7 @@ mod tests {
                 SyntaxNode::leaf(SyntaxKind::Ident, "a", Span::new(file_id, 0..1))
             )
         );
-        assert!(lexer.newline());
+        assert!(!lexer.newline());
         assert_eq!(
             lexer.next(),
             (

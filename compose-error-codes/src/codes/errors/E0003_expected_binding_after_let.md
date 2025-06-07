@@ -44,3 +44,10 @@ let x = 5;
 ```compose
 let { a, b } = some_object;
 ```
+
+#### ✅ Use `mut` if mutation is needed:
+
+```compose
+let mut count = 10;
+count = 20;
+```

@@ -17,6 +17,7 @@ pub fn test_parse(code: &str) -> Vec<SyntaxNode> {
     nodes
 }
 
+#[track_caller]
 pub fn assert_parse(code: &str) -> NodesTester {
     let nodes = test_parse(code);
 
