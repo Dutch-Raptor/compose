@@ -6,14 +6,14 @@ use std::io::{Read, Write};
 use std::sync::Mutex;
 
 #[derive(Debug)]
-pub struct ExplainWorld {
+pub(crate) struct ExplainWorld {
     pub source: Source,
     library: Library,
     pub stdout: Mutex<String>
 }
 
 impl ExplainWorld {
-    pub fn from_str(text: &str) -> Self {
+    pub(crate) fn from_str(text: &str) -> Self {
         let entrypoint = FileId::new("main.comp");
         let source = Source::new(entrypoint, text.to_string());
 
@@ -42,8 +42,8 @@ impl World for ExplainWorld {
     fn write(&self, f: &dyn Fn(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
         let mut buffer: Vec<u8> = Vec::new();
         f(&mut buffer)?;
-        let output = String::from_utf8(buffer).unwrap();
-        self.stdout.lock().unwrap().push_str(&output);
+        let output = String::from_utf8(buffer).expect("Invalid UTF-8");
+        self.stdout.lock().expect("failed to lock stdout").push_str(&output);
         Ok(())
     }
 

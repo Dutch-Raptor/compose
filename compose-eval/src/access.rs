@@ -1,8 +1,8 @@
+use crate::vm::Vm;
 use compose_library::diag::{At, SourceResult};
-use compose_library::{Value, ValueRefMut};
+use compose_library::ValueRefMut;
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
-use crate::vm::Vm;
 
 pub(crate) trait Access {
     fn access<'a>(self, vm: &'a mut Vm) -> SourceResult<ValueRefMut<'a>>;

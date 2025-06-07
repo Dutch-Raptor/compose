@@ -21,22 +21,21 @@ fn create(func: &Func, item: &ItemFn) -> TokenStream {
     let function_type = create_func_ty(func);
     let data = create_func_data(func);
 
-    let data_impl = match function_type {
-        Some(_) => quote! {
+    let data_impl = if function_type.is_some() {
+        quote! {
             impl ::compose_library::foundations::NativeFunc for #rust_name {
                 fn data() -> &'static ::compose_library::foundations::NativeFuncData {
                     static DATA: ::compose_library::foundations::NativeFuncData = #data;
                     &DATA
                 }
             }
-        },
-        None => {
-            let ident_data = quote::format_ident!("{rust_name}_data");
-            quote! {
-                #vis fn #ident_data() -> &'static #foundations::NativeFuncData {
-                    static DATA: #foundations::NativeFuncData = #data;
-                    &DATA
-                }
+        }
+    } else {
+        let ident_data = quote::format_ident!("{rust_name}_data");
+        quote! {
+            #vis fn #ident_data() -> &'static #foundations::NativeFuncData {
+                static DATA: #foundations::NativeFuncData = #data;
+                &DATA
             }
         }
     };
@@ -51,7 +50,11 @@ fn create(func: &Func, item: &ItemFn) -> TokenStream {
 fn rewrite_fn_item(item: &ItemFn) -> ItemFn {
     let inputs = item.sig.inputs.iter().cloned().filter_map(|mut input| {
         if let FnArg::Typed(typed) = &mut input {
-            if typed.attrs.iter().any(|attr| attr.path().is_ident("external")) {
+            if typed
+                .attrs
+                .iter()
+                .any(|attr| attr.path().is_ident("external"))
+            {
                 return None;
             }
             typed.attrs.clear();
@@ -106,11 +109,7 @@ fn create_wrapper_closure(func: &Func) -> TokenStream {
     let arg_handlers = {
         let args = func.params.iter().map(create_param_parser);
 
-        let self_handler = func
-            .special
-            .self_
-            .as_ref()
-            .map(create_param_parser);
+        let self_handler = func.special.self_.as_ref().map(create_param_parser);
 
         quote! {
             #self_handler
@@ -269,7 +268,7 @@ pub struct Meta {
 }
 
 impl Parse for Meta {
-    fn parse(input: ParseStream) -> Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         Ok(Self {
             scope: parse_flag::<kw::scope>(input)?,
             name: parse_string::<kw::name>(input)?,

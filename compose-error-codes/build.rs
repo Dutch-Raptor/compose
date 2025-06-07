@@ -1,17 +1,18 @@
+use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 
 fn main() {
     let mut files = walkdir::WalkDir::new("src/codes")
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
         .filter(|e| e.file_type().is_file() && e.path().extension().unwrap_or_default() == "md")
         .collect::<Vec<_>>();
 
     // Sort for build determinism
     files.sort_by_key(|f| f.path().to_owned());
 
-    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR is always set during builds");
     let codes_path = "src/codes";
     println!("cargo:rerun-if-changed={codes_path}");
 
@@ -32,19 +33,19 @@ fn main() {
         let split = name.split('_').collect::<Vec<_>>();
         assert!(
             split.len() >= 2,
-            "invalid file name: {}. Expected CODE_NAME.md",
-            name
+            "invalid file name: {name}. Expected CODE_NAME.md",
         );
         let code = split[0];
         let title = split[1..].join(" ");
 
-        let contents = fs::read_to_string(file.path()).unwrap();
+        let contents = fs::read_to_string(file.path()).expect("Failed to read file");
 
         // Create the documentation
         out.push_str("/**");
         out.push_str(contents.as_str());
         out.push_str("*/");
-        out.push_str(&format!(
+        write!(
+            out,
             r#"
             pub const {name}: ErrorCode = ErrorCode {{
                 code: "{code}",
@@ -53,19 +54,24 @@ fn main() {
             }};
         "#,
             contents = escape(&contents),
-        ));
+        )
+        .expect("writing to a string is infallible");
         out.push_str("\n\n");
 
-        lookup_matches.push_str(&format!(
+        write!(
+            lookup_matches,
             r#"
                 "{code}" => &{name},
             "#,
-        ));
+        )
+        .expect("writing to a string is infallible");
     }
 
-    out.push_str(&format!(
+    write!(
+        out,
         r#"
         /// Find an error code by its code.
+        #[must_use]
         pub fn lookup(code: &str) -> Option<&'static ErrorCode> {{
             Some(match code {{
                 {lookup_matches}
@@ -73,8 +79,9 @@ fn main() {
             }})
         }}
     "#
-    ));
-
+    )
+    .expect("writing to a string is infallible");
+    
     fs::write(Path::new(&out_dir).join("error_codes.rs"), out)
         .expect("failed to write error_codes.rs");
 }

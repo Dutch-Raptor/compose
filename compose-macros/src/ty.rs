@@ -7,7 +7,7 @@ use quote::quote;
 use syn::Result;
 use syn::parse::{Parse, ParseStream};
 
-pub fn ty(stream: TokenStream, item: syn::Item) -> Result<TokenStream> {
+pub fn ty(stream: TokenStream, item: &syn::Item) -> Result<TokenStream> {
     let meta: Meta = syn::parse2(stream)?;
 
     let bare: BareType;
@@ -24,7 +24,7 @@ pub fn ty(stream: TokenStream, item: syn::Item) -> Result<TokenStream> {
 
     let ty = parse(meta, ident.clone(), attrs)?;
 
-    Ok(create(&ty, keep.then_some(&item)))
+    Ok(create(&ty, keep.then_some(item)))
 }
 
 fn create(ty: &Type, item: Option<&syn::Item>) -> TokenStream {
@@ -110,7 +110,7 @@ pub struct Meta {
 }
 
 impl Parse for Meta {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         Ok(Self {
             scope: parse_flag::<kw::scope>(input)?,
             cast: parse_flag::<kw::cast>(input)?,

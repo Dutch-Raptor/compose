@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use crate::world::ExplainWorld;
 use codespan_reporting::term::Config;
 use codespan_reporting::term::termcolor::Ansi;
@@ -54,13 +55,13 @@ impl Explain for ErrorCode {
 /// ````
 fn process_markdown(input: &str) -> String {
     let parser = pulldown_cmark::Parser::new(input);
-    let compose_block_re = Regex::new(r"^compose\s+(\S+)$").unwrap();
+    let compose_block_re = Regex::new(r"^compose\s+(\S+)$").expect("is a valid regex");
 
     let mut in_compose_block = false;
     let mut current_label = String::new();
     let mut code_buffer = String::new();
 
-    let mut events: Vec<Event> = Vec::new();
+    let mut events: Vec<Event<'_>> = Vec::new();
 
     for event in parser {
         match &event {
@@ -96,7 +97,7 @@ fn process_markdown(input: &str) -> String {
 
                     // Inject output block events
                     events.push(Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(
-                        format!("output {}", current_label).into(),
+                        format!("output {current_label}").into(),
                     ))));
                     events.push(Event::Text(result.into()));
                     events.push(Event::End(TagEnd::CodeBlock));
@@ -110,7 +111,7 @@ fn process_markdown(input: &str) -> String {
     }
 
     let mut result = String::new();
-    pulldown_cmark_to_cmark::cmark(events.into_iter(), &mut result).unwrap();
+    pulldown_cmark_to_cmark::cmark(events.into_iter(), &mut result).expect("invalid Markdown");
     result
 }
 
@@ -134,28 +135,38 @@ fn execute_with_diagnostics(code: &str) -> String {
     if !warnings.is_empty() {
         let mut warn_buffer = vec![];
         let mut wtr = Ansi::new(&mut warn_buffer);
-        write_diagnostics(&world, &[], &warnings, &mut wtr, &config).unwrap();
-        output.push_str(String::from_utf8(warn_buffer).unwrap().trim());
+        write_diagnostics(&world, &[], &warnings, &mut wtr, &config)
+            .expect("failed to write diagnostics");
+        output.push_str(
+            String::from_utf8(warn_buffer)
+                .expect("invalid string")
+                .trim(),
+        );
     }
 
     let Warned { value, warnings } =
         compose_eval::eval(&world.source, &mut vm, &EvalConfig::default());
 
-    let stdout = world.stdout.lock().unwrap();
+    let stdout = world.stdout.lock().expect("failed to lock stdout");
 
-    fn sep(s: &mut String) {
+    let sep = |s: &mut String| {
         if !s.is_empty() {
             s.push('\n');
         }
-    }
+    };
 
     match value {
         Ok(value) => {
-            write_diagnostics(&world, &[], &warnings, &mut wtr, &config).unwrap();
+            write_diagnostics(&world, &[], &warnings, &mut wtr, &config)
+                .expect("failed to write diagnostics");
 
             if !diags_buffer.is_empty() {
                 sep(&mut output);
-                output.push_str(String::from_utf8(diags_buffer).unwrap().trim());
+                output.push_str(
+                    String::from_utf8(diags_buffer)
+                        .expect("invalid string")
+                        .trim(),
+                );
             }
 
             if !stdout.is_empty() {
@@ -163,26 +174,33 @@ fn execute_with_diagnostics(code: &str) -> String {
                 sep(&mut output);
                 output.push_str("stdout:\n");
                 output.push_str(stdout.as_str());
+                drop(stdout);
             }
 
             if value != Value::unit() {
                 sep(&mut output);
-                output.push_str(&format!("{value:?}"));
+                write!(output, "{value:?}").expect("writing to string is infallible");
             }
             output
         }
         Err(err) => {
-            write_diagnostics(&world, &err, &warnings, &mut wtr, &config).unwrap();
+            write_diagnostics(&world, &err, &warnings, &mut wtr, &config)
+                .expect("failed to write diagnostics");
 
             if !stdout.is_empty() {
                 sep(&mut output);
                 output.push_str("stdout:\n");
                 output.push_str(stdout.as_str());
+                drop(stdout);
             }
 
             if !diags_buffer.is_empty() {
                 sep(&mut output);
-                output.push_str(String::from_utf8(diags_buffer).unwrap().trim());
+                output.push_str(
+                    String::from_utf8(diags_buffer)
+                        .expect("invalid string")
+                        .trim(),
+                );
             }
             output
         }

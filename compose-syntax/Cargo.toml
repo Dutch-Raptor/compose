@@ -11,4 +11,3 @@ unscanny = "0.1.0"
 extension-traits = { workspace = true }
 
 [dev-dependencies]
-sequential-test = "0.2.4"

@@ -72,7 +72,7 @@ pub mod test_utils {
         for node in nodes {
             value = node
                 .cast::<Statement>()
-                .expect(&format!("{node:#?} is not a valid statement"))
+                .unwrap_or_else(|| panic!("{node:#?} is not a valid statement"))
                 .eval(vm)?;
         }
 

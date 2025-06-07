@@ -109,7 +109,7 @@ fn create_castable_body(input: &CastData) -> TokenStream {
 }
 
 impl Parse for CastData {
-    fn parse(input: ParseStream) -> Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         let ty = input.parse()?;
         let _: Token![,] = input.parse()?;
 
@@ -145,7 +145,7 @@ struct Cast {
 }
 
 impl Parse for Cast {
-    fn parse(input: ParseStream) -> Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         let attrs = input.call(syn::Attribute::parse_outer)?;
 
         // Pat: Ty

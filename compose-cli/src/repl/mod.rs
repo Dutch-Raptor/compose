@@ -141,7 +141,7 @@ fn handle_repl_commands(vm: &mut Vm, world: &SystemWorld, input: &str) -> Option
             let source = world.source(world.entry_point()).unwrap();
             let text = source.text();
 
-            if let Err(e) = std::fs::write(&filename, text) {
+            if let Err(e) = fs::write(&filename, text) {
                 eprintln!("Failed to write to {filename}: {e}");
                 return Some(ReplCommand::Handled);
             }
