@@ -2,6 +2,8 @@ mod access;
 mod expression;
 mod statement;
 mod vm;
+#[cfg(test)]
+mod tests;
 
 pub use crate::vm::Vm;
 use compose_library::Value;
@@ -114,3 +116,4 @@ mod test_utils {
         test_world("")
     }
 }
+

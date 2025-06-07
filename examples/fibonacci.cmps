@@ -1,0 +1,12 @@
+let mut a = 1;
+let mut b = 0;
+let mut i = 1;
+
+while i < 92 {
+    println(i, a);
+    a += b;
+    b = a - b;
+    i += 1;
+}
+
+a

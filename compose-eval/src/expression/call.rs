@@ -20,7 +20,7 @@ impl Eval for ast::FuncCall<'_> {
     }
 }
 
-#[extension(trait FuncCalExt)]
+#[extension(trait FuncCallExt)]
 impl ast::FuncCall<'_> {
     fn eval_callee_and_args(&self, vm: &mut Vm) -> SourceResult<(Value, Args)> {
         if let ast::Expr::FieldAccess(field_access) = self.callee() {
