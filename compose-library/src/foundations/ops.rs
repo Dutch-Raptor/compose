@@ -1,7 +1,6 @@
 use crate::diag::StrResult;
-use crate::{Value, ValueRef};
+use crate::Value;
 use ecow::eco_format;
-use std::ops::Deref;
 
 macro_rules! type_error {
     ($fmt:expr, $($value:expr),* $(,)?) => {
@@ -9,47 +8,47 @@ macro_rules! type_error {
     };
 }
 
-pub fn add(lhs: ValueRef, rhs: ValueRef) -> StrResult<Value> {
-    match (lhs.deref(), rhs.deref()) {
+pub fn add(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    match (lhs, rhs) {
         (Value::Int(left), Value::Int(right)) => Ok(Value::Int(left + right)),
         (left, right) => type_error!("cannot add {} to {}", left, right),
     }
 }
 
-pub fn sub(lhs: ValueRef, rhs: ValueRef) -> StrResult<Value> {
-    match (lhs.deref(), rhs.deref()) {
+pub fn sub(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    match (lhs, rhs) {
         (Value::Int(left), Value::Int(right)) => Ok(Value::Int(left - right)),
         (left, right) => type_error!("cannot subtract {} from {}", left, right),
     }
 }
 
-pub fn mul(lhs: ValueRef, rhs: ValueRef) -> StrResult<Value> {
-    match (lhs.deref(), rhs.deref()) {
+pub fn mul(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    match (lhs, rhs) {
         (Value::Int(left), Value::Int(right)) => Ok(Value::Int(left * right)),
         (left, right) => type_error!("cannot multiply {} by {}", left, right),
     }
 }
 
-pub fn lt(lhs: ValueRef, rhs: ValueRef) -> StrResult<Value> {
-    match (lhs.deref(), rhs.deref()) {
+pub fn lt(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    match (lhs, rhs) {
         (Value::Int(left), Value::Int(right)) => Ok(Value::Bool(left < right)),
         (left, right) => type_error!("cannot compare {} to {}", left, right),
     }
 }
 
-pub fn gt(lhs: ValueRef, rhs: ValueRef) -> StrResult<Value> {
-    match (lhs.deref(), rhs.deref()) {
+pub fn gt(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    match (lhs, rhs) {
         (Value::Int(left), Value::Int(right)) => Ok(Value::Bool(left > right)),
         (left, right) => type_error!("cannot compare {} to {}", left, right),
     }
 }
 
-pub fn neq(lhs: ValueRef, rhs: ValueRef) -> StrResult<Value> {
-    Ok(Value::Bool(lhs.deref() != rhs.deref()))
+pub fn neq(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    Ok(Value::Bool(lhs != rhs))
 }
 
-pub fn eq(lhs: ValueRef, rhs: ValueRef) -> StrResult<Value> {
-    Ok(Value::Bool(lhs.deref() == rhs.deref()))
+pub fn eq(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    Ok(Value::Bool(lhs == rhs))
 }
 
 pub fn unary_plus(value: Value) -> StrResult<Value> {

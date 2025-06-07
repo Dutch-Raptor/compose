@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use crate::Eval;
 use crate::vm::Vm;
 use compose_library::diag::{At, SourceResult, StrResult, bail};
@@ -28,7 +29,7 @@ impl Eval for ast::Binary<'_> {
 fn apply_binary(
     binary: ast::Binary,
     vm: &mut Vm,
-    op: fn(ValueRef, ValueRef) -> StrResult<Value>,
+    op: fn(&Value, &Value) -> StrResult<Value>,
 ) -> SourceResult<Value> {
     let l = binary.lhs();
     let lhs = l.eval(vm)?;
@@ -43,7 +44,7 @@ fn apply_binary(
 
     let rhs = rhs.as_ref().at(r.span())?;
     let lhs = lhs.as_ref().at(l.span())?;
-    op(lhs, rhs).at(binary.span())
+    op(lhs.deref(), rhs.deref()).at(binary.span())
 }
 
 trait ShortCircuits {
@@ -52,6 +53,7 @@ trait ShortCircuits {
 
 impl ShortCircuits for BinOp {
     fn short_circuits(&self, val: &Value) -> bool {
+        #[allow(clippy::match_like_matches_macro)] 
         match (self, val) {
             (BinOp::And, Value::Bool(false)) => true,
             (BinOp::Or, Value::Bool(true)) => true,

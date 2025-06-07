@@ -1,9 +1,10 @@
-use compose_library::diag::{bail, At, SourceResult, StrResult};
-use compose_library::{ops, Value, ValueRef};
+use crate::access::Access;
+use crate::{Eval, Vm};
+use compose_library::diag::{At, SourceResult, StrResult, bail};
+use compose_library::{Value, ValueRef, ops};
 use compose_syntax::ast;
 use compose_syntax::ast::{AssignOp, AstNode};
-use crate::{Eval, Vm};
-use crate::access::Access;
+use std::ops::Deref;
 
 impl Eval for ast::Assignment<'_> {
     type Output = Value;
@@ -14,7 +15,7 @@ impl Eval for ast::Assignment<'_> {
             AssignOp::AddAssign => apply_assignment(self, vm, ops::add),
             AssignOp::SubAssign => apply_assignment(self, vm, ops::sub),
             AssignOp::MulAssign => apply_assignment(self, vm, ops::mul),
-            other => bail!(self.span(), "unsupported assignment operator: {:?}", other),       
+            other => bail!(self.span(), "unsupported assignment operator: {:?}", other),
         }
     }
 }
@@ -22,18 +23,15 @@ impl Eval for ast::Assignment<'_> {
 fn apply_assignment(
     binary: ast::Assignment,
     vm: &mut Vm,
-    op: fn(ValueRef, ValueRef) -> StrResult<Value>,
+    op: fn(&Value, &Value) -> StrResult<Value>,
 ) -> SourceResult<Value> {
     // assignments are right associative
     let rhs = binary.rhs().eval(vm)?;
-
-    let lhs = binary.lhs().access(vm)?;
-    let lhs_ref = lhs.as_ref().at(binary.lhs().span())?;
     let rhs_ref = rhs.as_ref().at(binary.rhs().span())?;
 
-    let value = op(lhs_ref, rhs_ref).at(binary.span())?;
-    let mut dst = lhs.as_mut().at(binary.lhs().span())?;
-    *dst = value;
+    let mut lhs = binary.lhs().access(vm)?;
+    let value = op(lhs.deref(), rhs_ref.deref()).at(binary.span())?;
+    *lhs = value;
 
     Ok(Value::default())
 }

@@ -89,6 +89,9 @@ fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
     trace_fn!("parse_param");
     let m = p.marker();
 
+    p.eat_if(SyntaxKind::Ref);
+    p.eat_if(SyntaxKind::Mut);
+
     let was_at_pat = p.at_set(set::PATTERN);
     patterns::pattern(p, false, seen, Some("parameter"));
 
@@ -101,6 +104,8 @@ fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
         expressions::code_expression(p);
         p.wrap(m, SyntaxKind::Named)
     }
+
+    p.wrap(m, SyntaxKind::Param)
 }
 
 #[cfg(test)]
@@ -120,11 +125,17 @@ mod tests {
         p.assert_next_children(SyntaxKind::Closure, |p| {
             p.assert_next_children(SyntaxKind::Params, |p| {
                 p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next_children(SyntaxKind::Param, |p| {
+                    p.assert_next(SyntaxKind::Ident, "a");
+                });
                 p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next(SyntaxKind::Ident, "b");
+                p.assert_next_children(SyntaxKind::Param, |p| {
+                    p.assert_next(SyntaxKind::Ident, "b");
+                });
                 p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next(SyntaxKind::Ident, "c");
+                p.assert_next_children(SyntaxKind::Param, |p| {
+                    p.assert_next(SyntaxKind::Ident, "c");
+                });
                 p.assert_next(SyntaxKind::RightParen, ")");
                 p.assert_end();
             });
@@ -146,7 +157,10 @@ mod tests {
         p.assert_next_children(SyntaxKind::Closure, |p| {
             p.assert_next_children(SyntaxKind::Params, |p| {
                 p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next_children(SyntaxKind::Param, |p| {
+                    p.assert_next(SyntaxKind::Ident, "a");
+                    p.assert_end();
+                });
                 p.assert_next(SyntaxKind::RightParen, ")");
                 p.assert_end();
             });
@@ -167,7 +181,10 @@ mod tests {
 
         p.assert_next_children(SyntaxKind::Closure, |p| {
             p.assert_next_children(SyntaxKind::Params, |p| {
-                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next_children(SyntaxKind::Param, |p| {
+                    p.assert_next(SyntaxKind::Ident, "a");
+                    p.assert_end();
+                });
                 p.assert_end();
             });
             p.assert_next(SyntaxKind::Arrow, "=>");
@@ -185,7 +202,10 @@ mod tests {
         let mut p = assert_parse(input);
         p.assert_next_children(SyntaxKind::Closure, |p| {
             p.assert_next_children(SyntaxKind::Params, |p| {
-                p.assert_next(SyntaxKind::Underscore, "_");
+                p.assert_next_children(SyntaxKind::Param, |p| {
+                    p.assert_next(SyntaxKind::Underscore, "_");
+                    p.assert_end();
+                });
                 p.assert_end();
             });
             p.assert_next(SyntaxKind::Arrow, "=>");
@@ -206,10 +226,13 @@ mod tests {
         p.assert_next_children(SyntaxKind::Closure, |p| {
             p.assert_next_children(SyntaxKind::Params, |p| {
                 p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next_children(SyntaxKind::Named, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                    p.assert_next(SyntaxKind::Eq, "=");
-                    p.assert_next(SyntaxKind::Ident, "b");
+                p.assert_next_children(SyntaxKind::Param, |p| {
+                    p.assert_next_children(SyntaxKind::Named, |p| {
+                        p.assert_next(SyntaxKind::Ident, "a");
+                        p.assert_next(SyntaxKind::Eq, "=");
+                        p.assert_next(SyntaxKind::Ident, "b");
+                    });
+                    p.assert_end();
                 });
                 p.assert_next(SyntaxKind::RightParen, ")");
                 p.assert_end();

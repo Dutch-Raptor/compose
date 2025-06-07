@@ -78,6 +78,20 @@ impl<'a> ValueRefMut<'a> {
     pub fn boxed(guard: RwLockWriteGuard<'a, Value>) -> Self {
         ValueRefMut(ReprMut::Boxed(guard))
     }
+    
+    pub fn as_value(&self) -> &Value {
+        match &self.0 {
+            ReprMut::Direct(v) => v,
+            ReprMut::Boxed(v) => v,
+        }
+    }
+    
+    pub fn as_value_mut(&mut self) -> &mut Value {
+        match &mut self.0 {
+            ReprMut::Direct(v) => v,
+            ReprMut::Boxed(v) => v,
+        }   
+    }
 }
 
 impl Deref for ValueRefMut<'_> {

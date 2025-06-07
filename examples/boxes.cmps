@@ -1,7 +1,7 @@
-let boxed = box::new(4) // not mut
-let mut boxed2 = boxed // maybe error here already?
+let boxed = box::new(4)
+let mut boxed2 = boxed
 
-boxed2 += 1 // Can this change or not?
+boxed2 += 1
 
 assert::eq(boxed, 5)
 assert::eq(boxed2, 5)
@@ -28,7 +28,7 @@ println(times_ref)
 repeat(times_ref, () => println("Hi"))
 assert::eq(times_ref, 0)
 
-// let times = 4
-// println(times)
-// repeat(times, () => println("Hi"))
-// assert::eq(times, 4)
+let times = 4
+println(times)
+repeat(times, () => println("Hi"))
+assert::eq(times, 4)
