@@ -1,5 +1,5 @@
-use compose_library::diag::{eco_format, FileError, FileResult};
-use compose_library::{library, Library, World};
+use compose_library::diag::{FileError, FileResult, eco_format};
+use compose_library::{Library, World, library};
 use compose_syntax::{FileId, Source};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -54,7 +54,7 @@ impl SystemWorld {
             library: library(),
         })
     }
-    
+
     pub fn from_str(text: &str) -> Self {
         let entrypoint = FileId::new("main.comp");
         let source = Source::new(entrypoint, text.to_string());
@@ -68,13 +68,14 @@ impl SystemWorld {
             library: library(),
         }
     }
+    
 
     pub fn edit_source(&self, file_id: FileId, editor: impl FnOnce(&mut Source)) {
         let mut sources = self.sources.lock().unwrap();
         let source = sources.get_mut(&file_id).unwrap();
         editor(source);
     }
-    
+
     pub fn entry_point_source(&self) -> FileResult<Source> {
         self.source(self.entrypoint)
     }
@@ -106,5 +107,14 @@ impl World for SystemWorld {
 
     fn read(&self, f: &dyn Fn(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()> {
         f(&mut std::io::stdin())
+    }
+
+    fn name(&self, id: FileId) -> String {
+        id.path()
+            .0
+            .strip_prefix(&self.root)
+            .unwrap_or(&id.path().0)
+            .display()
+            .to_string()
     }
 }

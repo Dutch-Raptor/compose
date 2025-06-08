@@ -33,11 +33,11 @@ impl Eval for CodeBlock<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::test_utils::eval_code;
+    use crate::tests::assert_eval;
 
     #[test]
     fn test_block() {
-        let result = eval_code(
+        let result = assert_eval(
             r#"
             let a = 4
             let val = {
@@ -46,15 +46,14 @@ mod tests {
             }
             a + val
         "#,
-        )
-        .expect("eval failed");
+        );
 
         assert_eq!(result, Value::Int(12));
     }
 
     #[test]
     fn access_outer_scope() {
-        let result = eval_code(
+        let result = assert_eval(
             r#"
             let a = 4
             let val = {
@@ -62,8 +61,7 @@ mod tests {
             }
             val
         "#,
-        )
-        .expect("eval failed");
+        );
 
         assert_eq!(result, Value::Int(9));
     }

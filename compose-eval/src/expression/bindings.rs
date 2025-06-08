@@ -2,8 +2,8 @@ use crate::vm::Vm;
 use crate::Eval;
 use compose_library::diag::{At, SourceResult};
 use compose_library::{diag, Binding, Value};
-use compose_syntax::ast::{AstNode, Expr, Pattern};
 use compose_syntax::ast;
+use compose_syntax::ast::{AstNode, Expr, Pattern};
 use ecow::eco_vec;
 
 impl<'a> Eval for ast::Ident<'a> {
@@ -35,9 +35,7 @@ impl<'a> Eval for ast::LetBinding<'a> {
         };
 
         let value = match init {
-            Some(expr) => {
-                expr.eval(vm)?
-            }
+            Some(expr) => expr.eval(vm)?,
             None => Value::unit(),
         };
 
@@ -93,16 +91,17 @@ fn destructure_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::test_utils::eval_code_with_vm;
-    use crate::test_utils::test_world;
+    use crate::tests::{assert_eval, assert_eval_with_vm, eval_code_with_vm, TestWorld};
     use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
     use compose_library::{BindingKind, UnitValue};
 
     #[test]
     fn test_let_binding() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
-        eval_code_with_vm(&mut vm, "let a = 3").expect("failed to evaluate");
+        eval_code_with_vm(&mut vm, &world, "let a = 3")
+            .value
+            .expect("failed to evaluate");
 
         let binding = vm.scopes.top.get("a").unwrap();
 
@@ -112,9 +111,9 @@ mod tests {
 
     #[test]
     fn test_let_mut_binding() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
-        eval_code_with_vm(&mut vm, "let mut a = 3").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "let mut a = 3");
 
         let binding = vm.scopes.top.get("a").unwrap();
 
@@ -124,9 +123,9 @@ mod tests {
 
     #[test]
     fn test_let_binding_without_value() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
-        eval_code_with_vm(&mut vm, "let a").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "let a");
 
         let binding = vm.scopes.top.get("a").unwrap();
 
@@ -136,9 +135,9 @@ mod tests {
 
     #[test]
     fn test_let_mut_binding_without_value() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
-        eval_code_with_vm(&mut vm, "let mut a").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "let mut a");
 
         let binding = vm.scopes.top.get("a").unwrap();
         assert_eq!(binding.read(), &Value::unit());
@@ -147,60 +146,55 @@ mod tests {
 
     #[test]
     fn test_read_ident() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
         // define the variable
-        eval_code_with_vm(&mut vm, "let a = 3").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "let a = 3");
         // read the variable
-        let result = eval_code_with_vm(&mut vm, "a").expect("failed to evaluate");
+        let result = assert_eval_with_vm(&mut vm, &world, "a");
         assert_eq!(result, Value::Int(3));
     }
 
     #[test]
     fn test_read_uninitialised_variable() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
         // set up the variable
-        eval_code_with_vm(&mut vm, "let a").expect("failed to evaluate");
-        let result = eval_code_with_vm(&mut vm, "a").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "let a");
+        // reading emits warning
+        let result = eval_code_with_vm(&mut vm, &world, "a")
+            .assert_warnings(&[W0001_USED_UNINITIALIZED_VARIABLE])
+            .assert_no_errors()
+            .get_value();
+
         assert_eq!(result, Value::unit());
-
-        // should have emitted a warning
-        assert_eq!(vm.engine.sink.warnings.len(), 1);
-
-        let warning = &vm.engine.sink.warnings[0];
-        assert_eq!(warning.code, Some(&W0001_USED_UNINITIALIZED_VARIABLE))
     }
 
     #[test]
     fn integration() {
-        let world = test_world("");
-        let mut vm = Vm::new(&world);
-        let result = eval_code_with_vm(
-            &mut vm,
+        let result = assert_eval(
             r#"
             let a = 3
             let b = 4
             let c = a + b
             c * 2
         "#,
-        )
-        .expect("failed to evaluate");
+        );
 
         assert_eq!(result, Value::Int(14));
     }
 
     #[test]
     fn assign_mut() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
-        eval_code_with_vm(&mut vm, "let mut a = 3").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "let mut a = 3");
 
         let binding = vm.scopes.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::Mutable);
 
-        eval_code_with_vm(&mut vm, "a = 4").expect("failed to evaluate");
-        let result = eval_code_with_vm(&mut vm, "a").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "a = 4");
+        let result = assert_eval_with_vm(&mut vm, &world, "a");
         assert_eq!(result, Value::Int(4));
 
         // should still be mutable
@@ -210,16 +204,16 @@ mod tests {
 
     #[test]
     fn assign_mut_uninitialised() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
-        eval_code_with_vm(&mut vm, "let mut a").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "let mut a");
 
         let binding = vm.scopes.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::UninitializedMutable);
         assert_eq!(binding.read(), &Value::Unit(UnitValue));
 
-        eval_code_with_vm(&mut vm, "a = 4").expect("failed to evaluate");
-        let result = eval_code_with_vm(&mut vm, "a").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "a = 4");
+        let result = assert_eval_with_vm(&mut vm, &world, "a");
         assert_eq!(result, Value::Int(4));
 
         // should now be mutable
@@ -229,16 +223,16 @@ mod tests {
 
     #[test]
     fn assign_uninitialised() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
-        eval_code_with_vm(&mut vm, "let a").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "let a");
 
         let binding = vm.scopes.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::Uninitialized);
         assert_eq!(binding.read(), &Value::unit());
 
-        eval_code_with_vm(&mut vm, "a = 4").expect("failed to evaluate");
-        let result = eval_code_with_vm(&mut vm, "a").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "a = 4");
+        let result = assert_eval_with_vm(&mut vm, &world, "a");
         assert_eq!(result, Value::Int(4));
 
         // should now be immutable
@@ -248,18 +242,14 @@ mod tests {
 
     #[test]
     fn assign_immut_error() {
-        let world = test_world("");
+        let world = TestWorld::new();
         let mut vm = Vm::new(&world);
-        eval_code_with_vm(&mut vm, "let a = 3").expect("failed to evaluate");
+        assert_eval_with_vm(&mut vm, &world, "let a = 3");
         let binding = vm.scopes.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::Variable { first_assign: None });
         assert_eq!(binding.read(), &Value::Int(3));
 
-        let errs = eval_code_with_vm(&mut vm, "a = 4").expect_err("expected error");
-
-        assert_eq!(errs.len(), 1);
-        let err = &errs[0];
-
-        assert_eq!(err.code, Some(&E0004_MUTATE_IMMUTABLE_VARIABLE))
+        eval_code_with_vm(&mut vm, &world, "a = 4")
+            .assert_errors(&[E0004_MUTATE_IMMUTABLE_VARIABLE]);
     }
 }

@@ -313,6 +313,7 @@ fn keyword(ident: &str) -> Option<SyntaxKind> {
         "let" => SyntaxKind::Let,
         "loop" => SyntaxKind::Loop,
         "mut" => SyntaxKind::Mut,
+        "ref" => SyntaxKind::Ref,
         "pub" => SyntaxKind::Pub,
         "return" => SyntaxKind::Return,
         "true" => SyntaxKind::Bool,

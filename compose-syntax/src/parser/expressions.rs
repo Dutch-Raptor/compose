@@ -4,7 +4,7 @@ use crate::parser::control_flow::{conditional, for_loop, while_loop};
 use crate::parser::{ExprContext, funcs, statements};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{UNARY_OP, syntax_set};
+use crate::set::{UNARY_OP, syntax_set, SyntaxSet};
 use crate::{Label, ast, set};
 use compose_error_codes::{
     E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT, E0008_EXPECTED_EXPRESSION,
@@ -94,6 +94,13 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
 }
 
 fn err_assign_in_expr_context(p: &mut Parser) {
+    debug_assert!(
+        AssignOp::from_kind(p.current()).is_some(),
+        "Not at an assignment"
+    );
+    let current = p.current();
+    let op = current.descriptive_name();
+    let is_eq = current == SyntaxKind::Eq;
     let lhs_text = p.last_text().to_owned();
 
     let error_marker = p.marker();
@@ -101,19 +108,28 @@ fn err_assign_in_expr_context(p: &mut Parser) {
     p.insert_error_here("assignments are not allowed in expression contexts")
         .with_code(&E0002_INVALID_ASSIGNMENT)
         .with_label_message("assignment is not allowed here");
-    p.eat();
-    code_expression(p);
+    p.eat(); // eat the AssignOp
+    code_expression(p); // parse the rhs
 
     let rhs_text = p.last_text().to_owned();
 
     let err = p.err_at(error_marker).expect("An error was added");
     err.with_note(eco_format!(
-        "assignments like `{lhs_text} = ...` are only valid as standalone statements"
+        "assignments like `{lhs_text} {op} ...` are only valid as standalone statements"
     ));
-    err.with_hint(eco_format!(
-        "if you meant to compare `{lhs_text}` and `{rhs_text}`, use `==` instead of `=`"
-    ));
-    err.with_hint(eco_format!("if you meant to assign to `{lhs_text}`, consider using `let` for new bindings or wrapping the assignment in a block: `{{ {lhs_text} = ... }}`"));
+    if is_eq {
+        err.with_hint(eco_format!(
+            "if you meant to compare `{lhs_text}` and `{rhs_text}`, use `==` instead of `=`"
+        ));
+        err.with_hint(eco_format!("if you meant to assign to `{lhs_text}`, wrap the statement in a block: `{{ {lhs_text} {op} ... }}`"));
+        err.with_hint(eco_format!(
+            "or introduce a new variable with `let`: `{{ let {lhs_text} = ... }}`"
+        ));
+    } else {
+        err.with_hint(eco_format!(
+            "to use `{op}` here, wrap the assignment in a block: `{{ {lhs_text} {op} ... }}`"
+        ));
+    }
 }
 
 /// Parse a primary expression.
@@ -151,7 +167,7 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
                 code_expression(p);
                 p.wrap(m, SyntaxKind::DestructureAssignment);
             } else {
-                err_expected_expression(p);
+                err_expected_expression(p, Some(syntax_set!(NewLine, Semicolon, RightBrace, RightParen, RightBracket)));
             }
         }
         SyntaxKind::LeftBrace => block(p),
@@ -168,7 +184,7 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
         SyntaxKind::Let => statements::let_binding(p),
         // Already fully handled in the lexer
         SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str => p.eat(),
-        _ => err_expected_expression(p),
+        _ => err_expected_expression(p, Some(syntax_set!(NewLine, Semicolon, RightBrace, RightParen, RightBracket))),
     }
 }
 
@@ -183,14 +199,14 @@ fn block(p: &mut Parser) {
     p.wrap(m, SyntaxKind::CodeBlock)
 }
 
-fn err_expected_expression(p: &mut Parser) {
+fn err_expected_expression(p: &mut Parser, recover_set: Option<SyntaxSet>) {
     p.unexpected(
         "expected the start of an expression",
-        Some(syntax_set!(NewLine, Semicolon, RightBrace)),
+        recover_set,
     )
-    .with_code(&E0008_EXPECTED_EXPRESSION)
-    .with_label_message("expected an expression here")
-    .with_hint("expressions can be values, operations, function calls, blocks, etc.");
+        .with_code(&E0008_EXPECTED_EXPRESSION)
+        .with_label_message("expected an expression here")
+        .with_hint("expressions can be values, operations, function calls, blocks, etc.");
 }
 
 fn expr_with_parens(p: &mut Parser, ctx: ExprContext) {
@@ -241,7 +257,7 @@ fn parenthesized(p: &mut Parser) {
     if p.at_set(set::EXPR) {
         code_expr_prec(p, ExprContext::Expr, Precedence::Lowest);
     } else if !p.at(SyntaxKind::RightParen) {
-        err_expected_expression(p);
+        err_expected_expression(p, None);
     }
 
     if !p.expect_closing_delimiter(m, SyntaxKind::RightParen) {
@@ -638,5 +654,36 @@ mod tests {
         p.assert_next_error(E0008_EXPECTED_EXPRESSION);
         p.assert_next_children(SyntaxKind::LetBinding, |_| {});
         p.assert_end();
+    }
+
+    #[test]
+    fn test_parse_assignment_in_expression_context() {
+        let input = r#"
+            let inc = v => v += 1;
+        "#;
+
+        let mut p = assert_parse_with_errors(input, &[E0002_INVALID_ASSIGNMENT]);
+
+        p.assert_next_children(SyntaxKind::LetBinding, |p| {
+            p.assert_next(SyntaxKind::Let, "let");
+            p.assert_next(SyntaxKind::Ident, "inc");
+            p.assert_next(SyntaxKind::Eq, "=");
+            p.assert_next_children(SyntaxKind::Closure, |p| {
+                p.assert_next_children(SyntaxKind::Params, |p| {
+                    p.assert_next_children(SyntaxKind::Param, |p| {
+                        p.assert_next(SyntaxKind::Ident, "v");
+                        p.assert_end();
+                    });
+                    p.assert_end();
+                });
+                p.assert_next(SyntaxKind::Arrow, "=>");
+                p.assert_next(SyntaxKind::Ident, "v");
+                p.assert_next_error(E0002_INVALID_ASSIGNMENT);
+                p.assert_next(SyntaxKind::PlusEq, "+=");
+                p.assert_next(SyntaxKind::Int, "1");
+                p.assert_end();
+                p.assert_end();
+            });
+        });
     }
 }

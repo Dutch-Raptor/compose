@@ -1,7 +1,7 @@
-use crate::vm::Vm;
 use crate::Eval;
-use compose_library::diag::{bail, At, SourceResult, StrResult};
-use compose_library::{ops, Value};
+use crate::vm::Vm;
+use compose_library::diag::{At, SourceResult, StrResult, bail};
+use compose_library::{Value, ops};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
 use std::ops::Deref;
@@ -54,7 +54,7 @@ trait ShortCircuits {
 
 impl ShortCircuits for BinOp {
     fn short_circuits(&self, val: &Value) -> bool {
-        #[allow(clippy::match_like_matches_macro)] 
+        #[allow(clippy::match_like_matches_macro)]
         match (self, val) {
             (BinOp::And, Value::Bool(false)) => true,
             (BinOp::Or, Value::Bool(true)) => true,
@@ -65,31 +65,31 @@ impl ShortCircuits for BinOp {
 
 #[cfg(test)]
 mod tests {
-    use crate::expression::test_utils::eval_code;
+    use crate::tests::assert_eval;
     use compose_library::Value;
 
     #[test]
     fn test_addition() {
-        assert_eq!(eval_code("2 + 4"), Ok(Value::Int(6)));
-        assert_eq!(eval_code("2 + 4 + 6"), Ok(Value::Int(12)));
-        assert_eq!(eval_code("0 + 9884 + 2171"), Ok(Value::Int(12055)));
+        assert_eq!(assert_eval("2 + 4"), Value::Int(6));
+        assert_eq!(assert_eval("2 + 4 + 6"), Value::Int(12));
+        assert_eq!(assert_eval("0 + 9884 + 2171"), Value::Int(12055));
     }
 
     #[test]
     fn test_multiplication() {
-        assert_eq!(eval_code("2 * 4"), Ok(Value::Int(8)));
-        assert_eq!(eval_code("2 * 4 * 6"), Ok(Value::Int(48)));
-        assert_eq!(eval_code("0 * 9884 * 2171"), Ok(Value::Int(0)));
+        assert_eq!(assert_eval("2 * 4"), Value::Int(8));
+        assert_eq!(assert_eval("2 * 4 * 6"), Value::Int(48));
+        assert_eq!(assert_eval("0 * 9884 * 2171"), Value::Int(0));
     }
 
     #[test]
     fn test_mixed() {
-        assert_eq!(eval_code("2 + 4 * 6"), Ok(Value::Int(26)));
-        assert_eq!(eval_code("2 * 4 + 6"), Ok(Value::Int(14)));
+        assert_eq!(assert_eval("2 + 4 * 6"), Value::Int(26));
+        assert_eq!(assert_eval("2 * 4 + 6"), Value::Int(14));
     }
 
     #[test]
     fn test_assignment() {
-        assert_eq!(eval_code("let x; x = 6; x"), Ok(Value::Int(6)));
+        assert_eq!(assert_eval("let x; x = 6; x"), Value::Int(6));
     }
 }

@@ -21,6 +21,10 @@ impl<'a> Vm<'a> {
         self.scopes.exit();   
         result
     }
+    
+    pub fn world(&self) -> &dyn World {
+        self.engine.world
+    }
 }
 
 impl Debug for Vm<'_> {

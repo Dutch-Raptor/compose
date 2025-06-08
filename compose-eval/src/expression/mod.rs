@@ -1,5 +1,5 @@
-use crate::vm::Vm;
 use crate::Eval;
+use crate::vm::Vm;
 use compose_library::diag::SourceResult;
 use compose_library::{UnitValue, Value};
 use compose_syntax::ast::{AstNode, Expr};
@@ -11,11 +11,11 @@ mod bindings;
 mod block;
 mod call;
 mod closure;
+mod control_flow;
 mod field_access;
 mod parenthesized;
 mod path_access;
 mod unary;
-mod control_flow;
 
 pub use closure::eval_closure;
 
@@ -46,36 +46,5 @@ impl Eval for Expr<'_> {
         .spanned(span);
 
         Ok(v)
-    }
-}
-
-#[cfg(test)]
-pub mod test_utils {
-    use crate::test_utils::test_world;
-    use crate::vm::Vm;
-    use crate::Eval;
-    use compose_library::diag::SourceResult;
-    use compose_library::{UnitValue, Value};
-    use compose_syntax::ast::Statement;
-    use compose_syntax::FileId;
-
-    pub fn eval_code(code: &str) -> SourceResult<Value> {
-        eval_code_with_vm(&mut Vm::new(&test_world(code)), code)
-    }
-
-    pub fn eval_code_with_vm(vm: &mut Vm, code: &str) -> SourceResult<Value> {
-        let file_id = FileId::new("test.comp");
-        let nodes = compose_syntax::parse(code, file_id);
-
-        let mut value = Value::Unit(UnitValue);
-
-        for node in nodes {
-            value = node
-                .cast::<Statement>()
-                .unwrap_or_else(|| panic!("{node:#?} is not a valid statement"))
-                .eval(vm)?;
-        }
-
-        Ok(value)
     }
 }
