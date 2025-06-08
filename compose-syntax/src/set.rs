@@ -100,4 +100,4 @@ pub const PATTERN: SyntaxSet = syntax_set![
     Ident,
 ];
 
-pub const PARAM: SyntaxSet = PATTERN;
+pub const PARAM: SyntaxSet = PATTERN.union(syntax_set![Ref, Mut]);

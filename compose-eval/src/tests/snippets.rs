@@ -1,5 +1,6 @@
+use crate::tests::assert_eval;
 use compose_library::Value;
-use crate::expression::test_utils::eval_code;
+
 #[test]
 fn fibonacci() {
     let input = r#"
@@ -8,7 +9,6 @@ fn fibonacci() {
         let mut i = 1;
 
         while i < 92 {
-            println(i, a);
             a += b;
             b = a - b;
             i += 1;
@@ -16,6 +16,25 @@ fn fibonacci() {
 
         a
     "#;
-    
-    assert_eq!(eval_code(input).unwrap(), Value::Int(7540113804746346429));
+
+    assert_eq!(assert_eval(input), Value::Int(7540113804746346429));
+}
+
+#[test]
+fn shared_state() {
+    let input = r#"
+        let mut i = box::new(0);
+        
+        let inc = (ref mut v) => { v += 1; };
+        
+        inc(i);
+        
+        assert::eq(i, 1);
+        
+        inc(i);
+        
+        assert::eq(i, 2);
+    "#;
+
+    assert_eval(input);
 }

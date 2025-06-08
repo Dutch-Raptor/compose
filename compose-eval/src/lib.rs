@@ -3,7 +3,7 @@ mod expression;
 mod statement;
 mod vm;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 pub use crate::vm::Vm;
 use compose_library::Value;
@@ -98,22 +98,3 @@ pub fn build_err(
 
     Warned::new(Err(errs)).with_warnings(warnings)
 }
-
-#[cfg(test)]
-mod test_utils {
-    use compose_library::{TestWorld, library};
-    use compose_syntax::Source;
-
-    pub(crate) fn test_world(source: impl ToString) -> TestWorld {
-        TestWorld {
-            main: Source::from_string("mail.comp", source.to_string()),
-            files: Default::default(),
-            library: library(),
-        }
-    }
-
-    pub(crate) fn empty_world() -> TestWorld {
-        test_world("")
-    }
-}
-

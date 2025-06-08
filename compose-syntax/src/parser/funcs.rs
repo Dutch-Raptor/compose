@@ -378,4 +378,37 @@ mod tests {
 
         p.assert_end();
     }
+
+    #[test]
+    fn test_parse_params_ref_mut_combinations() {
+        for (ref_, mut_) in [(true, false), (false, true), (true, true), (false, false)] {
+            let input = format!(
+                r#"
+                    ({ref} {mut} a) => {{}}
+                "#,
+                ref = if ref_ { "ref " } else { "" },
+                mut = if mut_ { "mut " } else { "" }
+            );
+
+            let mut p = assert_parse(&input);
+            p.assert_next_children(SyntaxKind::Closure, |p| {
+                p.assert_next_children(SyntaxKind::Params, |p| {
+                    p.assert_next(SyntaxKind::LeftParen, "(");
+                    p.assert_next_children(SyntaxKind::Param, |p| {
+                        if ref_ {
+                            p.assert_next(SyntaxKind::Ref, "ref");
+                        }
+                        if mut_ {
+                            p.assert_next(SyntaxKind::Mut, "mut");
+                        }
+                        p.assert_next(SyntaxKind::Ident, "a");
+                        p.assert_end();
+                    });
+                    p.assert_next(SyntaxKind::RightParen, ")");
+                    p.assert_end();
+                });
+            });
+            p.assert_end();
+        }
+    }
 }

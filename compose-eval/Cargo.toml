@@ -9,3 +9,4 @@ compose-syntax = { workspace = true }
 compose-error-codes = { workspace = true }
 ecow = { workspace = true }
 extension-traits = { workspace = true }
+tap = {workspace = true}

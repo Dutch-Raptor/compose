@@ -1,8 +1,10 @@
+pub use codespan_reporting;
 use codespan_reporting::term::termcolor::WriteColor;
 use codespan_reporting::{diagnostic, term};
 use compose_syntax::{FileId, Label, LabelType, Span, SyntaxError, SyntaxErrorSeverity};
 use ecow::{EcoVec, eco_vec};
 use std::fmt::{Display, Formatter};
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
@@ -306,6 +308,7 @@ impl From<SyntaxErrorSeverity> for Severity {
     }
 }
 
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct Warned<T> {
     pub value: T,
     pub warnings: EcoVec<SourceDiagnostic>,
@@ -330,6 +333,20 @@ impl<T> Warned<T> {
     pub fn with_warnings(mut self, warnings: EcoVec<SourceDiagnostic>) -> Warned<T> {
         self.extend_warnings(warnings);
         self
+    }
+}
+
+impl<T> Deref for Warned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T> DerefMut for Warned<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
     }
 }
 

@@ -1,10 +1,9 @@
-use crate::diag::{FileError, FileResult};
-use compose_syntax::{FileId, Source};
-use std::collections::HashMap;
-use std::io::{stdin, stdout, Read, Write};
-use std::ops::Range;
-use codespan_reporting::files::Files;
+use crate::diag::FileResult;
 use crate::Library;
+use codespan_reporting::files::Files;
+use compose_syntax::{FileId, Source};
+use std::io::{Read, Write};
+use std::ops::Range;
 
 pub trait World {
     /// The entrypoint file of the program to execute
@@ -16,6 +15,10 @@ pub trait World {
     
     fn write(&self, f: &dyn Fn(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()>;
     fn read(&self, f: &dyn Fn(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()>;
+
+    fn name(&self, id: FileId) -> String {
+        id.path().0.display().to_string()
+    }
 }
 
 
@@ -25,7 +28,7 @@ impl<'a> Files<'a> for &dyn World {
     type Source = Source;
 
     fn name(&'a self, id: Self::FileId) -> Result<Self::Name, codespan_reporting::files::Error> {
-        Ok(id.path().0.display().to_string())
+        Ok(World::name(*self, id))
     }
 
     fn source(&'a self, id: Self::FileId) -> Result<Self::Source, codespan_reporting::files::Error> {
@@ -58,37 +61,5 @@ impl<'a> Files<'a> for &dyn World {
             .unwrap_or(source.text().len());
 
         Ok(start..end)
-    }
-}
-
-
-pub struct TestWorld {
-    pub main: Source,
-    pub files: HashMap<FileId, Source>,
-    pub library: Library,
-}
-
-impl World for TestWorld {
-    fn entry_point(&self) -> FileId {
-        self.main.id()
-    }
-
-    fn source(&self, file_id: FileId) -> FileResult<Source> {
-        self.files
-            .get(&file_id)
-            .ok_or(FileError::NotFound(file_id.path().0.clone()))
-            .cloned()
-    }
-
-    fn library(&self) -> &Library {
-        &self.library
-    }
-
-    fn write(&self, f: &dyn Fn(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
-        f(&mut stdout())
-    }
-
-    fn read(&self, f: &dyn Fn(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()> {
-        f(&mut stdin())   
     }
 }
