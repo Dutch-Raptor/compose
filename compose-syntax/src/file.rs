@@ -36,11 +36,12 @@ type FileRef = &'static VirtualPath;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct VirtualPath(pub PathBuf);
 
-impl<T> From<T> for VirtualPath 
-where T: Into<PathBuf>
+impl<T> From<T> for VirtualPath
+where
+    T: Into<PathBuf>,
 {
     fn from(value: T) -> Self {
-        Self(value.into())   
+        Self(value.into())
     }
 }
 
@@ -72,7 +73,7 @@ impl FileId {
     pub fn new(path: impl Into<VirtualPath>) -> Self {
         // Check if the file is already in the interner.
         let path = path.into();
-        let mut interner = INTERNER.write().unwrap();
+        let interner = INTERNER.read().unwrap();
         if let Some(&id) = interner.to_id.get(&path) {
             return id;
         }
@@ -80,9 +81,12 @@ impl FileId {
         let num = u16::try_from(interner.from_id.len() + 1)
             .and_then(NonZeroU16::try_from)
             .expect("out of file ids");
+        drop(interner);
 
         let id = FileId(num);
         let leaked = Box::leak(Box::new(path));
+        
+        let mut interner = INTERNER.write().unwrap();
         interner.to_id.insert(leaked, id);
         interner.from_id.push(leaked);
         id
