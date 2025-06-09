@@ -1,5 +1,5 @@
-use dumpster::Trace;
 use dumpster::sync::Gc;
+use dumpster::Trace;
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[derive(Debug, Clone, Trace)]
@@ -29,5 +29,14 @@ where
 
     pub fn as_ptr(&self) -> *const RwLock<T> {
         Gc::<RwLock<T>>::as_ptr(&self.0)
+    }
+}
+
+impl<T> GcValue<T>
+where
+    T: Trace + Send + Sync + Clone + 'static,
+{
+    pub fn try_clone_inner(&self) -> Option<T> {
+        self.0.try_read().map(|v| v.clone()).ok()
     }
 }

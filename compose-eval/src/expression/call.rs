@@ -1,9 +1,9 @@
 use crate::{Eval, Vm};
-use compose_library::diag::{error, At, SourceResult, Spanned};
+use compose_library::diag::{bail, At, SourceResult, Spanned};
 use compose_library::{Arg, Args, Func, Type, UnboundItem, Value};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{ast, Span};
-use ecow::{eco_vec, EcoVec};
+use ecow::EcoVec;
 use extension_traits::extension;
 
 impl Eval for ast::FuncCall<'_> {
@@ -41,19 +41,28 @@ impl ast::FuncCall<'_> {
         let target = target_expr.eval(vm)?;
         let mut args = self.args().eval(vm)?;
 
-        let callee_binding = target.ty().scope().try_get(&field).map_err(|e| {
-            e.with_item(UnboundItem::FieldOrMethod(Some(target.ty().name().into())))
-        }).at(field.span())?;
+        let callee_binding = target
+            .ty()
+            .scope()
+            .try_get(&field)
+            .map_err(|e| e.with_item(UnboundItem::FieldOrMethod(Some(target.ty().name().into()))))
+            .at(field.span())?;
 
         let target_ty = target.ty();
 
         args.insert(0, target_expr.span(), target);
 
-        let callee = callee_binding.read_checked(target_expr.span(), vm.sink_mut()).clone();
+        let callee = callee_binding
+            .read_checked(target_expr.span(), vm.sink_mut())
+            .clone();
 
         if let Value::Func(func) = &callee {
             if func.is_associated_function() {
-                return err_call_associated_function_as_method(&target_ty, field.as_str(), field.span());
+                return err_call_associated_function_as_method(
+                    &target_ty,
+                    field.as_str(),
+                    field.span(),
+                );
             }
         }
 
@@ -72,17 +81,13 @@ fn err_call_associated_function_as_method<T>(
     field: &str,
     span: Span,
 ) -> SourceResult<T> {
-    Err(eco_vec![
-        error!(
-            span,
-            "cannot call associated function `{}::{}` as a method",
-            target_ty.name(),
-            field,
-        )
-        .with_label_message(format!("not a method on `{}`", target_ty.name()))
-        .with_note(format!("`{}` is an associated function of `{}`, not a method", field, target_ty.name()))
-        .with_hint(format!("use path syntax instead: `{}::{}(args)`", target_ty.name(), field))
-    ])
+    bail!(
+        span,
+        "cannot call associated function `{}::{}` as a method", target_ty.name(), field;
+        label_message: "not a method on `{}`", target_ty.name();
+        note: "`{}` is an associated function of `{}`, not a method", field, target_ty.name();
+        hint: "use path syntax instead: `{}::{}(args)`", target_ty.name(), field;
+    )
 }
 
 impl Eval for ast::Args<'_> {
@@ -99,13 +104,11 @@ impl Eval for ast::Args<'_> {
                     name: None,
                     value: Spanned::new(expr.eval(vm)?, expr.span()),
                 }),
-                ast::Arg::Named(named) => {
-                    items.push(Arg {
-                        span,
-                        name: Some(named.name().get().into()),
-                        value: Spanned::new(named.expr().eval(vm)?, named.expr().span()),
-                    })
-                }
+                ast::Arg::Named(named) => items.push(Arg {
+                    span,
+                    name: Some(named.name().get().into()),
+                    value: Spanned::new(named.expr().eval(vm)?, named.expr().span()),
+                }),
             }
         }
 
@@ -116,4 +119,3 @@ impl Eval for ast::Args<'_> {
         })
     }
 }
-

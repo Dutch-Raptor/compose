@@ -11,9 +11,6 @@ pub struct Args {
 }
 
 impl Args {
-}
-
-impl Args {
     pub fn new<T: IntoValue>(span: Span, items: impl IntoIterator<Item = T>) -> Self {
         let items = items
             .into_iter()

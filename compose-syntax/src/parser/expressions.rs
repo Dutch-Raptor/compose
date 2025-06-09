@@ -1,10 +1,11 @@
 use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
+use crate::parser::funcs::closure;
 use crate::parser::{ExprContext, funcs, statements};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{UNARY_OP, syntax_set, SyntaxSet};
+use crate::set::{SyntaxSet, UNARY_OP, syntax_set};
 use crate::{Label, ast, set};
 use compose_error_codes::{
     E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT, E0008_EXPECTED_EXPRESSION,
@@ -139,36 +140,17 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
     trace_fn!("parse_primary_expr");
     let m = p.marker();
     match p.current() {
-        SyntaxKind::Ident => {
+        // handle an ident that is not a closure
+        SyntaxKind::Ident if ctx.is_atomic() || p.peek() != SyntaxKind::Arrow => {
             trace_fn!("parse_primary_expr: ident");
             p.eat();
-            // Parse a closure like `a => a + 1`
-            if !ctx.is_atomic() && p.at(SyntaxKind::Arrow) {
-                p.wrap(m, SyntaxKind::Param);
-                p.wrap(m, SyntaxKind::Params);
-                p.assert(SyntaxKind::Arrow);
-                code_expression(p);
-                p.wrap(m, SyntaxKind::Closure)
-            }
         }
-        SyntaxKind::Underscore if !ctx.is_atomic() => {
-            trace_fn!("parse_primary_expr: underscore");
-            // Parse closure like `_ => 1` or destructure like `_ = foo()`
-            if p.peek() == SyntaxKind::Arrow {
-                p.assert(SyntaxKind::Underscore);
-                p.wrap(m, SyntaxKind::Param);
-                p.wrap(m, SyntaxKind::Params);
-                p.assert(SyntaxKind::Arrow);
-                code_expression(p);
-                p.wrap(m, SyntaxKind::Closure)
-            } else if p.peek() == SyntaxKind::Eq {
-                p.assert(SyntaxKind::Underscore);
-                p.assert(SyntaxKind::Eq);
-                code_expression(p);
-                p.wrap(m, SyntaxKind::DestructureAssignment);
-            } else {
-                err_expected_expression(p, Some(syntax_set!(NewLine, Semicolon, RightBrace, RightParen, RightBracket)));
-            }
+        // `_ = something`
+        SyntaxKind::Underscore if !ctx.is_atomic() && p.peek() == SyntaxKind::Eq => {
+            p.assert(SyntaxKind::Underscore);
+            p.assert(SyntaxKind::Eq);
+            code_expression(p);
+            p.wrap(m, SyntaxKind::DestructureAssignment);
         }
         SyntaxKind::LeftBrace => block(p),
         SyntaxKind::LeftParen if at_unit_literal(p) => {
@@ -181,10 +163,21 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
         SyntaxKind::While => while_loop(p),
         SyntaxKind::For => for_loop(p),
         SyntaxKind::LeftParen => expr_with_parens(p, ctx),
-        SyntaxKind::Let => statements::let_binding(p),
         // Already fully handled in the lexer
         SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str => p.eat(),
-        _ => err_expected_expression(p, Some(syntax_set!(NewLine, Semicolon, RightBrace, RightParen, RightBracket))),
+        SyntaxKind::Ref | SyntaxKind::Mut | SyntaxKind::Ident | SyntaxKind::Underscore => {
+            closure(p)
+        }
+        _ => err_expected_expression(
+            p,
+            Some(syntax_set!(
+                NewLine,
+                Semicolon,
+                RightBrace,
+                RightParen,
+                RightBracket
+            )),
+        ),
     }
 }
 
@@ -200,10 +193,7 @@ fn block(p: &mut Parser) {
 }
 
 fn err_expected_expression(p: &mut Parser, recover_set: Option<SyntaxSet>) {
-    p.unexpected(
-        "expected the start of an expression",
-        recover_set,
-    )
+    p.unexpected("expected the start of an expression", recover_set)
         .with_code(&E0008_EXPECTED_EXPRESSION)
         .with_label_message("expected an expression here")
         .with_hint("expressions can be values, operations, function calls, blocks, etc.");
@@ -227,13 +217,12 @@ fn expr_with_parens(p: &mut Parser, ctx: ExprContext) {
     let prev_len = checkpoint.nodes_len;
 
     // The most common and simple expr with parens is the parenthesized expression, so we try that first.
-    parenthesized(p);
-
-    if p.at(SyntaxKind::Arrow) {
+    if !parenthesized(p) || p.at(SyntaxKind::Arrow) {
+        // if not, retry as a closure
         trace_fn!("parse_expr_with_parens: found closure");
         // It looks like it was a closure instead! Let's rewind and parse as a closure instead
         p.restore(checkpoint);
-        funcs::closure(p)
+        closure(p);
     }
 
     p.memoize_parsed_nodes(memo_key, prev_len)
@@ -250,22 +239,27 @@ fn at_unit_literal(p: &Parser) -> bool {
         && !matches!(next_next, SyntaxKind::Arrow)
 }
 
-fn parenthesized(p: &mut Parser) {
+fn parenthesized(p: &mut Parser) -> bool {
     trace_fn!("parse_parenthesized");
+    let mut okay = true;
     let m = p.marker();
     p.assert(SyntaxKind::LeftParen);
     if p.at_set(set::EXPR) {
         code_expr_prec(p, ExprContext::Expr, Precedence::Lowest);
     } else if !p.at(SyntaxKind::RightParen) {
         err_expected_expression(p, None);
+        okay = false;
     }
 
     if !p.expect_closing_delimiter(m, SyntaxKind::RightParen) {
         // If the closing parenthesis is missing or incorrect, try to recover
         p.recover_until(syntax_set!(RightParen, NewLine, Semicolon));
         p.eat_if(SyntaxKind::RightParen);
+        okay = false;
     }
-    p.wrap(m, SyntaxKind::Parenthesized)
+    p.wrap(m, SyntaxKind::Parenthesized);
+
+    okay
 }
 
 pub(in crate::parser) fn err_unclosed_delim(

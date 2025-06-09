@@ -1,5 +1,5 @@
 use crate::Reflect;
-use crate::diag::{At, SourceResult};
+use crate::diag::{At, SourceResult, Spanned};
 use crate::foundations::boxed::Boxed;
 use crate::foundations::iterator::IterValue;
 use crate::{CastInfo, Str, UnitValue};
@@ -25,6 +25,12 @@ pub enum Value {
     Type(Type),
     Iterator(IterValue),
     Box(Boxed),
+}
+
+impl Value {
+    pub fn is_box(&self) -> bool {
+        matches!(self, Value::Box(_))
+    }
 }
 
 fn eq_internal(l_ref: ValueRef, r_ref: ValueRef, visited: &mut HashSet<(usize, usize)>) -> bool {
@@ -143,6 +149,13 @@ impl Value {
     pub fn spanned(self, span: Span) -> Self {
         match self {
             Value::Func(v) => Value::Func(v.spanned(span)),
+            _ => self,
+        }
+    }
+
+    pub fn named(self, name: Spanned<EcoString>) -> Self {
+        match self {
+            Value::Func(v) => Value::Func(v.named(name)),
             _ => self,
         }
     }

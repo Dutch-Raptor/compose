@@ -1,5 +1,5 @@
 use crate::IntoValue;
-use crate::diag::{At, SourceDiagnostic, SourceResult, error, warning};
+use crate::diag::{At, SourceDiagnostic, SourceResult, error, warning, IntoSourceDiagnostic};
 use crate::{Library, NativeFuncData, NativeType, Sink, Type, Value};
 use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
 use compose_library::diag::{StrResult, bail};
@@ -99,18 +99,16 @@ pub enum VariableAccessError {
     MutateConstant(EcoString),
 }
 
-impl<T> At<T> for Result<T, VariableAccessError> {
-    fn at(self, span: Span) -> SourceResult<T> {
-        self.map_err(|err| match err {
-            VariableAccessError::Unbound(err) => {
-                eco_vec!(err.to_diag(span))
-            }
-            VariableAccessError::MutateConstant(name) => eco_vec![
-                error!(span, "Cannot mutate constant `{name}`")
-                    .with_label_message("is a constant from the standard library")
-                    .with_hint("Constants can be shadowed, but not mutated.")
-            ],
-        })
+impl IntoSourceDiagnostic for VariableAccessError {
+    fn into_source_diagnostic(self, span: Span) -> SourceDiagnostic {
+        match self {
+            VariableAccessError::Unbound(err) => err.to_diag(span),
+            VariableAccessError::MutateConstant(name) => error!(
+                span, "Cannot mutate constant `{name}`";
+                label_message: "is a constant from the standard library";
+                hint: "Constants can be shadowed, but not mutated.";
+            ),
+        }
     }
 }
 
@@ -135,24 +133,22 @@ impl UnBoundError {
     }
     pub fn to_diag(self, span: Span) -> SourceDiagnostic {
         let mut diag = match &self.item {
-            UnboundItem::Variable => error!(span, "Unbound variable: `{}`", self.name)
-                .with_label_message("this variable is unbound here"),
+            UnboundItem::Variable => error!(
+                span, "Unbound variable: `{}`", self.name;
+                label_message: "this variable is unbound here"
+            ),
             UnboundItem::FieldOrMethod(Some(ty)) => error!(
-                span,
-                "type `{ty}` has no field or method named `{}`", self.name
-            )
-            .with_label_message(eco_format!(
-                "this field or method does not exist on type `{ty}`"
-            )),
-            UnboundItem::FieldOrMethod(_) => {
-                error!(span, "Unbound field or method: `{}`", self.name)
-                    .with_label_message("this field or method is unbound here")
-            }
+                span, "type `{ty}` has no field or method named `{}`", self.name;
+                label_message: "this field or method does not exist on type `{ty}`"
+            ),
+            UnboundItem::FieldOrMethod(_) => error!(
+                span, "Unbound field or method: `{}`", self.name;
+                label_message: "this field or method is unbound here"
+            ),
             UnboundItem::AssociatedFieldOrFunction(assoc) => error!(
-                span,
-                "no associated function or field named `{}` found for type `{}`", self.name, assoc
-            )
-            .with_label_message("unknown function or field"),
+                span, "no associated function or field named `{}` found for type `{}`", self.name, assoc;
+                label_message: "this field or method is unbound here"
+            ),
         };
 
         self.apply_hint(&mut diag);
@@ -267,10 +263,7 @@ impl Scope {
     }
 }
 
-fn similar_idents(
-    name: &str,
-    idents: impl IntoIterator<Item = impl AsRef<str>>,
-) -> Vec<EcoString> {
+fn similar_idents(name: &str, idents: impl IntoIterator<Item = impl AsRef<str>>) -> Vec<EcoString> {
     let mut similar_idents: Vec<_> = idents
         .into_iter()
         .filter_map(|ident| {
@@ -311,17 +304,19 @@ unsafe impl Trace for Binding {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BindingKind {
-    Variable { first_assign: Option<Span> },
+    Immutable { first_assign: Option<Span> },
     Mutable,
     Uninitialized,
     UninitializedMutable,
     Constant,
+    Param,
+    ParamMut,
 }
 
 impl Binding {
     pub fn new(value: impl IntoValue, span: Span) -> Self {
         Self {
-            kind: BindingKind::Variable { first_assign: None },
+            kind: BindingKind::Immutable { first_assign: None },
             value: value.into_value(),
             span,
         }
@@ -366,7 +361,8 @@ impl Binding {
     /// initialized kind.
     pub fn write(&mut self, access_span: Span) -> SourceResult<&mut Value> {
         match self.kind {
-            BindingKind::Variable { first_assign } => Err(eco_vec![
+            BindingKind::ParamMut | BindingKind::Mutable => Ok(&mut self.value),
+            BindingKind::Immutable { first_assign } => Err(eco_vec![
                 error!(
                     access_span,
                     "cannot reassign to a variable declared as immutable"
@@ -387,14 +383,21 @@ impl Binding {
                 .with_note("variables are immutable by default")
                 .with_hint("make the variable mutable by writing `let mut`")
             ]),
+            BindingKind::Param => Err(eco_vec![
+                error!(access_span, "cannot assign to an immutable parameter")
+                    .with_label_message("is an immutable parameter")
+                    .with_label(Label::secondary(
+                        self.span,
+                        "this parameter is immutable, add `mut` to make it mutable"
+                    ))
+            ]),
             BindingKind::Constant => Err(eco_vec![
                 error!(access_span, "cannot assign to a constant variable")
                     .with_label_message("is constant")
                     .with_label(Label::secondary(self.span, "was defined as constant here"))
             ]),
-            BindingKind::Mutable => Ok(&mut self.value),
             BindingKind::Uninitialized => {
-                self.kind = BindingKind::Variable {
+                self.kind = BindingKind::Immutable {
                     first_assign: Some(access_span),
                 };
                 Ok(&mut self.value)
@@ -420,8 +423,11 @@ impl Binding {
     pub fn kind(&self) -> BindingKind {
         self.kind
     }
-    
+
     pub fn is_mutable(&self) -> bool {
-        matches!(self.kind, BindingKind::Mutable | BindingKind::UninitializedMutable)
+        matches!(
+            self.kind,
+            BindingKind::Mutable | BindingKind::UninitializedMutable
+        )
     }
 }

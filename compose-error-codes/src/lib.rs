@@ -16,6 +16,6 @@ pub struct ErrorCode {
 
 impl Debug for ErrorCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ErrorCode {{ code: {}, name: {} }}", self.code, self.name)
+        write!(f, "{}({})", self.code, self.name)
     }   
 }

@@ -61,7 +61,7 @@ impl Eval for ast::ForLoop<'_> {
                     vm,
                     pattern,
                     v,
-                    BindingKind::Variable { first_assign: None },
+                    BindingKind::Immutable { first_assign: None },
                 )?;
 
                 output = body.eval(vm)?;

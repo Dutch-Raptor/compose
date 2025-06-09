@@ -1,7 +1,10 @@
-use compose_library::diag::{error, At, SourceDiagnostic, SourceResult};
-use compose_library::{Binding, Engine, IntoValue, Routines, Scopes, Sink, Value, World};
+use compose_library::diag::{At, SourceDiagnostic, SourceResult, error};
+use compose_library::{
+    Binding, BindingKind, Engine, IntoValue, Routines, Scopes, Sink, Value, World,
+};
 use compose_syntax::ast::AstNode;
-use compose_syntax::{ast, Span};
+use compose_syntax::{Span, ast};
+use ecow::EcoString;
 use std::fmt::Debug;
 
 pub struct Vm<'a> {
@@ -14,14 +17,14 @@ impl<'a> Vm<'a> {
     pub(crate) fn sink_mut(&mut self) -> &mut Sink {
         &mut self.engine.sink
     }
-    
+
     pub(crate) fn in_scope<T>(&mut self, f: impl FnOnce(&mut Vm<'a>) -> T) -> T {
         self.scopes.enter();
         let result = f(self);
-        self.scopes.exit();   
+        self.scopes.exit();
         result
     }
-    
+
     pub fn world(&self) -> &dyn World {
         self.engine.world
     }
@@ -36,7 +39,6 @@ impl Debug for Vm<'_> {
             .finish()
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub enum FlowEvent {
@@ -74,17 +76,22 @@ impl<'a> Vm<'a> {
         }
     }
 
-    pub fn define(&mut self, var: ast::Ident, value: impl IntoValue) -> SourceResult<()> {
-        self.try_bind(var, Binding::new(value, var.span()))
+    pub fn define(
+        &mut self,
+        var: ast::Ident,
+        value: impl IntoValue,
+        binding_kind: BindingKind,
+    ) -> SourceResult<()> {
+        self.try_bind(
+            var.get().clone(),
+            Binding::new(value, var.span()).with_kind(binding_kind),
+        )?;
+        Ok(())
     }
 
-    pub fn try_bind(&mut self, var: ast::Ident, binding: Binding) -> SourceResult<()> {
-        self.scopes
-            .top
-            .try_bind(var.get().clone(), binding)
-            .at(var.span())?;
-
-        Ok(())
+    pub fn try_bind(&mut self, name: EcoString, binding: Binding) -> SourceResult<&mut Binding> {
+        let span = binding.span();
+        self.scopes.top.try_bind(name, binding).at(span)
     }
 }
 

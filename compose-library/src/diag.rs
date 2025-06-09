@@ -94,12 +94,20 @@ macro_rules! __bail {
     // For bail!("just a {}", "string")
     (
         $fmt:literal $(, $arg:expr)*
+        $(; label_message: $label_message:literal $(, $label_message_arg:expr)*)?
+        $(; label: $label:expr)*
+        $(; note: $note:literal $(, $note_arg:expr)*)*
         $(; hint: $hint:literal $(, $hint_arg:expr)*)*
+        $(; code: $code:expr)?
         $(,)?
     ) => {
         return Err($crate::diag::error!(
             $fmt $(, $arg)*
-            $(; hint: $hint $(, $hint_arg)*)*
+            $(; label_message: $label_message:literal $(, $label_message_arg:expr)*)?
+            $(; label: $label:expr)*
+            $(; note: $note:literal $(, $note_arg:expr)*)*
+            $(; hint: $hint:literal $(, $hint_arg:expr)*)*
+            $(; code: $code:expr)?
         ))
     };
 
@@ -138,13 +146,23 @@ macro_rules! __error {
     // For bail!(span, ...)
     (
         $span:expr, $fmt:literal $(, $arg:expr)*
+        $(; label_message: $label_message:literal $(, $label_message_arg:expr)*)?
+        $(; label: $label:expr)*
+        $(; note: $note:literal $(, $note_arg:expr)*)*
         $(; hint: $hint:literal $(, $hint_arg:expr)*)*
+        $(; code: $code:expr)?
         $(,)?
+        $(;)?
     ) => {
         $crate::diag::SourceDiagnostic::error(
             $span,
             $crate::diag::eco_format!($fmt, $($arg),*),
         )  $(.with_hint($crate::diag::eco_format!($hint, $($hint_arg),*)))*
+        $(.with_label_message($crate::diag::eco_format!($label_message, $($label_message_arg),*)))*
+        $(.with_note($crate::diag::eco_format!($note, $($note_arg),*)))*
+        $(.with_label($label))*
+        $(.with_code($code))*
+
     };
 }
 
@@ -170,13 +188,22 @@ macro_rules! __warning {
     (
         $span:expr,
         $fmt:literal $(, $arg:expr)*
+        $(; label_message: $label_message:literal $(, $label_message_arg:expr)*)?
+        $(; label: $label:expr)*
+        $(; note: $note:literal $(, $note_arg:expr)*)*
         $(; hint: $hint:literal $(, $hint_arg:expr)*)*
-        $(,)? $(;)?
+        $(; code: $code:expr)?
+        $(,)?
+        $(;)?
     ) => {
         $crate::diag::SourceDiagnostic::warning(
             $span,
             $crate::diag::eco_format!($fmt, $($arg),*),
         ) $(.with_hint($crate::diag::eco_format!($hint, $($hint_arg),*)))*
+        $(.with_label_message($crate::diag::eco_format!($label_message, $($label_message_arg),*)))*
+        $(.with_note($crate::diag::eco_format!($note, $($note_arg),*)))*
+        $(.with_label($label))*
+        $(.with_code($code))*
     };
 }
 
@@ -290,6 +317,19 @@ impl From<SyntaxError> for SourceDiagnostic {
             notes: error.notes,
             code: error.code,
         }
+    }
+}
+
+pub trait IntoSourceDiagnostic {
+    fn into_source_diagnostic(self, span: Span) -> SourceDiagnostic;
+}
+
+impl<S> IntoSourceDiagnostic for S
+where
+    S: Into<EcoString>,
+{
+    fn into_source_diagnostic(self, span: Span) -> SourceDiagnostic {
+        SourceDiagnostic::error(span, self.into())
     }
 }
 
@@ -458,15 +498,13 @@ pub trait At<T> {
     fn at(self, span: Span) -> SourceResult<T>;
 }
 
-impl<T, S> At<T> for Result<T, S>
+
+impl<T, E> At<T> for Result<T, E>
 where
-    S: Into<EcoString>,
+    E: IntoSourceDiagnostic,
 {
     fn at(self, span: Span) -> SourceResult<T> {
-        self.map_err(|msg| {
-            let err = SourceDiagnostic::error(span, msg);
-            eco_vec!(err)
-        })
+        self.map_err(|err| eco_vec![err.into_source_diagnostic(span)])
     }
 }
 

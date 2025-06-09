@@ -12,7 +12,6 @@ use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::sync::Mutex;
 use tap::pipe::Pipe;
-use tap::Tap;
 
 mod snippets;
 
@@ -117,7 +116,7 @@ fn print_diagnostics(
     errors: &[SourceDiagnostic],
     warnings: &[SourceDiagnostic],
 ) {
-    let mut stdout = StandardStream::stdout(ColorChoice::Always);
+    let stdout = StandardStream::stdout(ColorChoice::Always);
     write_diagnostics(
         world,
         errors,
@@ -236,10 +235,12 @@ impl TestResult {
         self.value.expect("code failed to evaluate")
     }
 
+    #[allow(unused)]
     pub fn get_warnings(&self) -> EcoVec<SourceDiagnostic> {
         self.warnings.clone()
     }
 
+    #[allow(unused)]
     pub fn get_errors(&self) -> EcoVec<SourceDiagnostic> {
         match &self.value {
             Ok(_) => eco_vec!(),

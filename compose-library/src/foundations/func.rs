@@ -9,6 +9,8 @@ use compose_utils::Static;
 use dumpster::{Trace, Visitor};
 use std::fmt;
 use std::sync::LazyLock;
+use ecow::EcoString;
+use compose_library::diag::Spanned;
 
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast)]
@@ -29,6 +31,13 @@ impl Func {
     pub(crate) fn spanned(mut self, span: Span) -> Func {
         if self.span.is_detached() {
             self.span = span;
+        }
+        self
+    }
+
+    pub(crate) fn named(mut self, name: Spanned<EcoString>) -> Func {
+        if let Repr::Closure(closure) = &mut self.repr {
+            closure.name = Some(name);
         }
         self
     }
@@ -156,6 +165,7 @@ pub struct Closure {
     pub node: SyntaxNode,
     pub defaults: Vec<Value>,
     pub num_pos_params: usize,
+    pub name: Option<Spanned<EcoString>>,
 }
 
 unsafe impl Trace for Closure {
