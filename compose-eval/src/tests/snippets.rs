@@ -38,3 +38,39 @@ fn shared_state() {
 
     assert_eval(input);
 }
+
+#[test]
+fn closure_recursion() {
+    let input = r#"
+        // Recursively clamps a value to <= 0;
+        let no_pos = (v) => {
+            if v > 0 {
+                no_pos(v - 1)
+            } else {
+                v
+            }
+        }
+
+        assert::eq(no_pos(5), 0)
+        assert::eq(no_pos(-2), -2)
+    "#;
+    
+    assert_eval(input);
+}
+
+#[test]
+fn closure_recursion_2() {
+    let input = r#"
+        let fact = (n) => {
+            if n == 0 {
+                1
+            } else {
+                n * fact(n - 1)
+            }
+        } 
+        
+        assert::eq(fact(5), 120)
+    "#;
+    
+    assert_eval(input);
+}

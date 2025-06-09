@@ -47,6 +47,19 @@ impl<'a> Param<'a> {
             .find(|n| n.kind() == SyntaxKind::Ref)
             .map(|n| n.span())
     }
+    
+    pub fn is_mut(self) -> bool {
+        self.0
+            .children()
+            .any(|n| n.kind() == SyntaxKind::Mut)
+    }
+    
+    pub fn mut_span(self) -> Option<Span> {
+        self.0
+            .children()
+            .find(|n| n.kind() == SyntaxKind::Mut)
+            .map(|n| n.span())
+    }
 }
 
 #[derive(Debug)]
@@ -87,7 +100,7 @@ pub enum Pattern<'a> {
 }
 
 impl<'a> Pattern<'a> {
-    pub(crate) fn bindings(self) -> Vec<Ident<'a>> {
+    pub fn bindings(self) -> Vec<Ident<'a>> {
         match self {
             Pattern::Single(Expr::Ident(i)) => vec![i],
             Pattern::Destructuring(v) => v.bindings(),

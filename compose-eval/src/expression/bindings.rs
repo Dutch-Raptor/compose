@@ -1,7 +1,7 @@
 use crate::vm::Vm;
 use crate::Eval;
-use compose_library::diag::{At, SourceResult};
-use compose_library::{diag, Binding, Value};
+use compose_library::diag::{At, SourceResult, Spanned};
+use compose_library::{diag, BindingKind, Value};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, Expr, Pattern};
 use ecow::eco_vec;
@@ -28,10 +28,10 @@ impl<'a> Eval for ast::LetBinding<'a> {
         let init = self.initial_value();
 
         let binding_kind = match (self.is_mut(), has_init) {
-            (true, true) => compose_library::BindingKind::Mutable,
-            (false, true) => compose_library::BindingKind::Variable { first_assign: None },
-            (true, false) => compose_library::BindingKind::UninitializedMutable,
-            (false, false) => compose_library::BindingKind::Uninitialized,
+            (true, true) => BindingKind::Mutable,
+            (false, true) => BindingKind::Immutable { first_assign: None },
+            (true, false) => BindingKind::UninitializedMutable,
+            (false, false) => BindingKind::Uninitialized,
         };
 
         let value = match init {
@@ -54,14 +54,15 @@ pub fn destructure_pattern(
     vm: &mut Vm,
     pattern: Pattern,
     value: Value,
-    binding_kind: compose_library::BindingKind,
+    binding_kind: BindingKind,
 ) -> SourceResult<()> {
     destructure_impl(vm, pattern, value, &mut |vm, expr, value| match expr {
         Expr::Ident(ident) => {
-            vm.try_bind(
-                ident,
-                Binding::new(value, ident.span()).with_kind(binding_kind),
-            )?;
+            let name = ident.get().clone();
+            let spanned = value.named(Spanned::new(name, ident.span()));
+
+            vm.define(ident, spanned, binding_kind)?;
+
             Ok(())
         }
         _ => Err(eco_vec![diag::SourceDiagnostic::error(
@@ -106,7 +107,10 @@ mod tests {
         let binding = vm.scopes.top.get("a").unwrap();
 
         assert_eq!(binding.read(), &Value::Int(3));
-        assert_eq!(binding.kind(), BindingKind::Variable { first_assign: None });
+        assert_eq!(
+            binding.kind(),
+            BindingKind::Immutable { first_assign: None }
+        );
     }
 
     #[test]
@@ -237,7 +241,7 @@ mod tests {
 
         // should now be immutable
         let binding = vm.scopes.get("a").unwrap();
-        assert!(matches!(binding.kind(), BindingKind::Variable { .. }));
+        assert!(matches!(binding.kind(), BindingKind::Immutable { .. }));
     }
 
     #[test]
@@ -246,7 +250,10 @@ mod tests {
         let mut vm = Vm::new(&world);
         assert_eval_with_vm(&mut vm, &world, "let a = 3");
         let binding = vm.scopes.get("a").unwrap();
-        assert_eq!(binding.kind(), BindingKind::Variable { first_assign: None });
+        assert_eq!(
+            binding.kind(),
+            BindingKind::Immutable { first_assign: None }
+        );
         assert_eq!(binding.read(), &Value::Int(3));
 
         eval_code_with_vm(&mut vm, &world, "a = 4")

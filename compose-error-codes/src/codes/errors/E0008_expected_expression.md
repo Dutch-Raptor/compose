@@ -1,4 +1,4 @@
-## E0007: An expression was expected but none was found
+## E0008: An expression was expected but none was found
 
 In Compose, many constructs require a valid expression — such as operands in arithmetic, the right-hand side of a `let` binding, or the body of a block. This error occurs when the parser expects the start of an expression but finds an invalid token instead (such as a closing delimiter or a misplaced keyword).
 
@@ -7,7 +7,7 @@ In Compose, many constructs require a valid expression — such as operands in a
 ### Example
 
 ```compose error
-let value = +
+let value = let
 ```
 
 ✅ **Fix:**

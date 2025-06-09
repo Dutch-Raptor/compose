@@ -147,8 +147,9 @@ impl TryFrom<Value> for IterValue {
         let iter = match value {
             Value::Iterator(v) => Ok(v),
             Value::Str(_) => Err(
-                error!(Span::detached(), "cannot iterate over a string directly")
-                    .with_hint("call `.chars()` to iterate over the characters of a string"),
+                error!(Span::detached(), "cannot iterate over a string directly";
+                    hint: "call `.chars()` to iterate over the characters of a string"
+                ),
             ),
             Value::Box(b) => {
                 let val = b.get().map_err(|e| error!(Span::detached(), "{e}"))?;

@@ -1,6 +1,6 @@
-use compose_library::diag::{bail, StrResult};
-use compose_library::gc::GcValue;
 use compose_library::Value;
+use compose_library::diag::{StrResult, bail};
+use compose_library::gc::GcValue;
 use compose_macros::func;
 use compose_macros::{scope, ty};
 use dumpster::Trace;
@@ -50,6 +50,11 @@ impl Boxed {
     #[func]
     pub fn new(value: Value) -> Self {
         Self(GcValue::new(value))
+    }
+
+    #[func]
+    pub fn clone_inner(self) -> StrResult<Value> {
+        self.0.try_clone_inner().ok_or("concurrent access".into())
     }
 }
 
