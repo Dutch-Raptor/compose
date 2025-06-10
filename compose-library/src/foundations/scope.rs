@@ -12,12 +12,15 @@ use indexmap::map::Entry;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::iter;
+use std::sync::LazyLock;
 use strsim::jaro_winkler;
 use tap::Pipe;
 
 pub trait NativeScope {
-    fn scope() -> Scope;
+    fn scope() -> &'static Scope;
 }
+
+pub static EMPTY_SCOPE: LazyLock<Scope> = LazyLock::new(Scope::new);
 
 #[derive(Debug, Default, Clone)]
 pub struct Scopes<'a> {
@@ -235,6 +238,10 @@ impl Scope {
         let data = T::data();
         self.define(data.name, Type::from(data))
     }
+    
+    pub fn bindings(&self) -> &IndexMap<EcoString, Binding> {
+        &self.map
+    }
 }
 
 impl Scope {
@@ -311,6 +318,12 @@ pub enum BindingKind {
     Constant,
     Param,
     ParamMut,
+}
+
+impl BindingKind {
+    pub fn is_mut(&self) -> bool {
+        matches!(self, BindingKind::Mutable | BindingKind::ParamMut | BindingKind::UninitializedMutable)
+    }
 }
 
 impl Binding {

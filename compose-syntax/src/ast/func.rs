@@ -11,8 +11,54 @@ impl<'a> Closure<'a> {
         self.0.cast_first()
     }
 
+    pub fn captures(self) -> CaptureList<'a> {
+        self.0.cast_first()
+    }
+
     pub fn body(self) -> Expr<'a> {
         self.0.cast_last()
+    }
+}
+
+node! {
+    struct CaptureList
+}
+
+impl<'a> CaptureList<'a> {
+    pub fn children(self) -> impl DoubleEndedIterator<Item = Capture<'a>> {
+        self.0.children().filter_map(SyntaxNode::cast)
+    }
+}
+
+node! {
+    struct Capture
+}
+
+impl<'a> Capture<'a> {
+    pub fn binding(self) -> Ident<'a> {
+        self.0.cast_first()
+    }
+
+    pub fn is_ref(self) -> bool {
+        self.0.children().any(|n| n.kind() == SyntaxKind::Ref)
+    }
+
+    pub fn ref_span(self) -> Option<Span> {
+        self.0
+            .children()
+            .find(|n| n.kind() == SyntaxKind::Ref)
+            .map(|n| n.span())
+    }
+
+    pub fn is_mut(self) -> bool {
+        self.0.children().any(|n| n.kind() == SyntaxKind::Mut)
+    }
+
+    pub fn mut_span(self) -> Option<Span> {
+        self.0
+            .children()
+            .find(|n| n.kind() == SyntaxKind::Mut)
+            .map(|n| n.span())
     }
 }
 
@@ -36,9 +82,7 @@ impl<'a> Param<'a> {
     }
 
     pub fn is_ref(self) -> bool {
-        self.0
-            .children()
-            .any(|n| n.kind() == SyntaxKind::Ref)
+        self.0.children().any(|n| n.kind() == SyntaxKind::Ref)
     }
 
     pub fn ref_span(self) -> Option<Span> {
@@ -47,13 +91,11 @@ impl<'a> Param<'a> {
             .find(|n| n.kind() == SyntaxKind::Ref)
             .map(|n| n.span())
     }
-    
+
     pub fn is_mut(self) -> bool {
-        self.0
-            .children()
-            .any(|n| n.kind() == SyntaxKind::Mut)
+        self.0.children().any(|n| n.kind() == SyntaxKind::Mut)
     }
-    
+
     pub fn mut_span(self) -> Option<Span> {
         self.0
             .children()

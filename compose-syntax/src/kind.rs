@@ -15,6 +15,8 @@ pub enum SyntaxKind {
     Binary,
     Bool,
     Break,
+    Capture,
+    CaptureList,
     Closure,
     CodeBlock,
     Colon,
@@ -83,8 +85,8 @@ pub enum SyntaxKind {
     Plus,
     PlusEq,
     Pub,
-    Return,
     Ref,
+    Return,
     RightBrace,
     RightBracket,
     RightParen,
@@ -128,6 +130,8 @@ impl SyntaxKind {
             SyntaxKind::Binary => "binary expression",
             SyntaxKind::Bool => "boolean literal",
             SyntaxKind::Break => "break",
+            SyntaxKind::CaptureList => "capture group",
+            SyntaxKind::Capture => "captured variable",
             SyntaxKind::Closure => "closure",
             SyntaxKind::CodeBlock => "code block",
             SyntaxKind::Colon => ":",
@@ -225,6 +229,7 @@ impl SyntaxKind {
             Self::RightBrace => Some(Self::LeftBrace),
             Self::RightParen => Some(Self::LeftParen),
             Self::RightBracket => Some(Self::LeftBracket),
+            Self::Pipe => Some(Self::Pipe),
             _ => None,
         }
     }
@@ -245,6 +250,7 @@ impl SyntaxKind {
                 | Self::RightBrace
                 | Self::RightParen
                 | Self::RightBracket
+                | Self::Pipe
         )
     }
     pub(crate) fn is_keyword(&self) -> bool {

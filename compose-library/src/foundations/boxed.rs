@@ -53,7 +53,7 @@ impl Boxed {
     }
 
     #[func]
-    pub fn clone_inner(self) -> StrResult<Value> {
+    pub fn get_clone(self) -> StrResult<Value> {
         self.0.try_clone_inner().ok_or("concurrent access".into())
     }
 }

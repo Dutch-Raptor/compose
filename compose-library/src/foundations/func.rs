@@ -1,16 +1,17 @@
 use crate::diag::{SourceResult, StrResult, bail};
 use crate::foundations::args::Args;
 use crate::{Sink, Value};
+use compose_library::diag::{Spanned, error};
 use compose_library::{Engine, Scope};
 use compose_macros::{cast, ty};
 use compose_syntax::ast::AstNode;
-use compose_syntax::{Span, SyntaxNode, ast};
+use compose_syntax::{Label, Span, SyntaxNode, ast};
 use compose_utils::Static;
 use dumpster::{Trace, Visitor};
+use ecow::{EcoString, eco_format, eco_vec};
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::LazyLock;
-use ecow::EcoString;
-use compose_library::diag::Spanned;
 
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast)]
@@ -37,9 +38,17 @@ impl Func {
 
     pub(crate) fn named(mut self, name: Spanned<EcoString>) -> Func {
         if let Repr::Closure(closure) = &mut self.repr {
+            closure.unresolved_captures.remove(&name.value);
             closure.name = Some(name);
         }
         self
+    }
+
+    pub(crate) fn resolve(&self) -> SourceResult<()> {
+        if let Repr::Closure(closure) = &self.repr {
+            closure.resolve()?;
+        }
+        Ok(())
     }
 
     pub(crate) fn span(&self) -> Span {
@@ -144,7 +153,7 @@ pub trait NativeFunc {
 pub struct NativeFuncData {
     pub closure: fn(&mut Engine, &mut Args) -> SourceResult<Value>,
     pub name: &'static str,
-    pub scope: LazyLock<Scope>,
+    pub scope: LazyLock<&'static Scope>,
     pub fn_type: FuncType,
 }
 
@@ -160,12 +169,61 @@ unsafe impl Trace for NativeFuncData {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Closure {
     pub node: SyntaxNode,
     pub defaults: Vec<Value>,
     pub num_pos_params: usize,
     pub name: Option<Spanned<EcoString>>,
+    pub captured: Scope,
+    pub unresolved_captures: HashMap<EcoString, Span>,
+}
+
+impl PartialEq for Closure {
+    fn eq(&self, other: &Self) -> bool {
+        self.node == other.node
+    }
+}
+
+impl Closure {
+    pub fn resolve(&self) -> SourceResult<()> {
+        if !self.unresolved_captures.is_empty() {
+            let mut captures = self.unresolved_captures.iter();
+            
+            let names = self
+                .unresolved_captures
+                .keys()
+                .map(|name| name.trim())
+                .collect::<Vec<_>>()
+                .join(", ");
+            
+            let params = self
+                .node
+                .cast::<ast::Closure>()
+                .expect("Closure contains non closure node")
+                .params()
+                .children()
+                .map(|p| p.to_untyped().to_text())
+                .collect::<Vec<_>>()
+                .join(", ");
+            
+            let (first_name, first_span) = captures.next().unwrap();
+
+            let mut err = error!(*first_span, "outer variables used in closure but not captured";
+                label_message: "outer variable `{first_name}` used here";
+                hint: "explicitly capture them by adding them to a capture group: `|{names}| ({params}) => ...`");
+
+            for (name, span) in captures {
+                err = err.with_label(Label::primary(
+                    *span,
+                    eco_format!("outer variable `{name}` used here"),
+                ));
+            }
+
+            return Err(eco_vec!(err));
+        }
+        Ok(())
+    }
 }
 
 unsafe impl Trace for Closure {

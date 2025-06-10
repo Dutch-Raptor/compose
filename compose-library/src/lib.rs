@@ -2,7 +2,7 @@ pub mod diag;
 mod world;
 mod foundations;
 mod sink;
-mod repr;
+pub mod repr;
 mod engine;
 mod gc;
 

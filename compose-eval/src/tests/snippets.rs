@@ -54,7 +54,7 @@ fn closure_recursion() {
         assert::eq(no_pos(5), 0)
         assert::eq(no_pos(-2), -2)
     "#;
-    
+
     assert_eval(input);
 }
 
@@ -71,6 +71,31 @@ fn closure_recursion_2() {
         
         assert::eq(fact(5), 120)
     "#;
-    
+
+    assert_eval(input);
+}
+
+#[test]
+fn closure_capturing() {
+    let input = r#"
+        let create_counter = (from = 0) => {
+            let mut cur = box::new(from);
+            |ref mut cur| () => {
+                let ret = cur.get_clone()
+                cur += 1
+                ret
+            }
+        }
+
+        let counter = create_counter(from: 3)
+
+        assert::eq(counter(), 3)
+        assert::eq(counter(), 4)
+        assert::eq(counter(), 5)
+        assert::eq(counter(), 6)
+        assert::eq(counter(), 7)
+        assert::eq(counter(), 8)
+    "#;
+
     assert_eval(input);
 }

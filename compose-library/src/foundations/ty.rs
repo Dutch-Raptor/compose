@@ -52,7 +52,7 @@ pub struct NativeTypeData {
     pub name: &'static str,
     pub title: &'static str,
     pub docs: &'static str,
-    pub scope: LazyLock<Scope>,
+    pub scope: LazyLock<&'static Scope>,
 }
 
 impl Display for Type {

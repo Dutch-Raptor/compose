@@ -11,7 +11,9 @@ pub struct Vm<'a> {
     pub scopes: Scopes<'a>,
     pub flow: Option<FlowEvent>,
     pub engine: Engine<'a>,
+    pub context: EvalContext
 }
+
 
 impl<'a> Vm<'a> {
     pub(crate) fn sink_mut(&mut self) -> &mut Sink {
@@ -73,6 +75,7 @@ impl<'a> Vm<'a> {
                 sink: Sink::default(),
                 world,
             },
+            context: Default::default(),
         }
     }
 
@@ -98,5 +101,37 @@ impl<'a> Vm<'a> {
 pub fn routines() -> Routines {
     Routines {
         eval_closure: crate::expression::eval_closure,
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct EvalContext {
+    pub closure_capture: DeferredErrorMode,
+}
+
+/// Whether to defer an error or immediately emit it
+#[derive(Debug, Clone, Copy, Default)]
+pub enum DeferredErrorMode {
+    #[default]
+    Immediate,
+    Deferred,
+}
+
+impl DeferredErrorMode {
+    pub fn should_defer(&self) -> bool {
+        matches!(self, Self::Deferred)
+    }
+}
+
+impl Vm<'_> {
+    /// Run f with closure capture errors deferred.
+    ///
+    /// This makes the caller responsible for either handling or emitting the unresolved errors.
+    pub fn with_deferred_closure_capture_errors<T>(&mut self, f: impl FnOnce(&mut Vm) -> SourceResult<T>) -> SourceResult<T> {
+        let old = self.context.closure_capture;
+        self.context.closure_capture = DeferredErrorMode::Deferred;
+        let result = f(self);
+        self.context.closure_capture = old;
+        result
     }
 }
