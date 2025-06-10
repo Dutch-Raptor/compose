@@ -1,8 +1,8 @@
 use crate::{Eval, Vm};
-use compose_library::diag::{bail, At, SourceResult, Spanned};
-use compose_library::{Arg, Args, Func, Type, UnboundItem, Value};
+use compose_library::diag::{At, SourceResult, Spanned, bail};
+use compose_library::{Arg, Args, Func, NativeScope, Type, UnboundItem, Value};
 use compose_syntax::ast::AstNode;
-use compose_syntax::{ast, Span};
+use compose_syntax::{Span, ast};
 use ecow::EcoVec;
 use extension_traits::extension;
 
@@ -41,12 +41,25 @@ impl ast::FuncCall<'_> {
         let target = target_expr.eval(vm)?;
         let mut args = self.args().eval(vm)?;
 
-        let callee_binding = target
-            .ty()
-            .scope()
-            .try_get(&field)
-            .map_err(|e| e.with_item(UnboundItem::FieldOrMethod(Some(target.ty().name().into()))))
-            .at(field.span())?;
+        let callee_binding = {
+            let res = target.ty().scope().try_get(&field);
+
+            match res {
+                Ok(binding) => binding,
+                Err(err) => {
+                    let value_scope = Value::scope();
+                    match value_scope.try_get(&field) {
+                        Ok(binding) => binding,
+                        Err(mut err2) => {
+                            err2.possible_misspellings.extend(err.possible_misspellings);
+                            return Err(err2.with_item(UnboundItem::FieldOrMethod(Some(
+                                target.ty().name().into(),
+                            )))).at(field.span());
+                        }
+                    }
+                }
+            }
+        };
 
         let target_ty = target.ty();
 

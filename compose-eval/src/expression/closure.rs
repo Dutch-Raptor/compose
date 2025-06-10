@@ -1,10 +1,14 @@
 use crate::vm::FlowEvent;
 use crate::{Eval, Vm};
-use compose_library::diag::{SourceResult, Spanned, bail};
-use compose_library::{Args, Binding, BindingKind, Closure, Func, Scopes, Value, World};
+use compose_library::diag::{bail, error, IntoSourceDiagnostic, SourceResult, Spanned};
+use compose_library::{
+    Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError,
+    World,
+};
 use compose_syntax::ast::{AstNode, Expr, Ident, Param};
-use compose_syntax::{Label, SyntaxNode, ast};
-use std::collections::HashSet;
+use compose_syntax::{ast, Label, Span, SyntaxNode};
+use ecow::{EcoString, EcoVec};
+use std::collections::HashMap;
 
 impl Eval for ast::Closure<'_> {
     type Output = Value;
@@ -17,17 +21,75 @@ impl Eval for ast::Closure<'_> {
             }
         }
 
-        // let captured = {
-        //     let mut visitor = CapturesVisitor::new(&vm.scopes, None);
-        //     visitor.visit(self.body().to_untyped());
-        //
-        //     if !visitor.captures.is_empty() {
-        //         let mut iter = visitor.captures.iter();
-        //         let first = iter.next().expect("at least one capture");
-        //
-        //         // How to deal with recursion and the name of the closure itself?????
-        //     }
-        // };
+        let captured = {
+            let mut errors = EcoVec::new();
+            let mut scope = Scope::new();
+            for capture in self.captures().children() {
+                let span = capture.binding().span();
+                let name = capture.binding().get();
+                let binding = match vm.scopes.get(&capture.binding()).cloned() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let VariableAccessError::Unbound(unbound) = e else {
+                            errors.push(e.into_source_diagnostic(span));
+                            continue;
+                        };
+
+                        let mut err = error!(
+                            span, "unknown variable `{name}` in closure capture list";
+                            label_message: "variable `{name}` is not defined in the outer scope and cannot be captured";
+                        );
+                        unbound.apply_hint(&mut err);
+                        errors.push(err);
+
+                        continue;
+                    }
+                };
+
+                if capture.is_mut() && capture.is_ref() && !binding.kind().is_mut() {
+                    errors.push(error!(
+                        capture.span(), "cannot capture variable `{name}` as `ref mut` because it is not declared as mutable";
+                        label_message: "capture is declared as a mutable reference";
+                        label: Label::secondary(binding.span(), "was defined as immutable here");
+                        note: "captured mutable references must match the mutability of the original declaration";
+                        hint: "declare the variable as mutable: `let mut {name} = ...`";
+                        hint: "or remove `mut` from the capture: `|ref {name}, ...|"
+                    ));
+                    continue;
+                }
+
+                let value = binding.read_checked(span, vm.sink_mut());
+
+                if capture.is_ref() && !value.is_box() {
+                    errors.push(error!(
+                        span, "cannot capture non reference type by reference";
+                        label_message: "this captures by reference";
+                        note: "only boxed values can be captured by reference"
+                    ));
+                }
+
+                scope.bind(
+                    name.clone(),
+                    Binding::new(value.clone(), span).with_kind(match capture.is_mut() {
+                        true => BindingKind::Mutable,
+                        false => BindingKind::Immutable { first_assign: None },
+                    }),
+                );
+            }
+
+            if !errors.is_empty() {
+                return Err(errors);
+            }
+
+            scope
+        };
+
+        let unresolved_captures = {
+            let mut visitor =
+                CapturesVisitor::new(&vm.scopes, Some(vm.engine.world.library()), &captured);
+            visitor.visit(self.body().to_untyped());
+            visitor.finish()
+        };
 
         let closure = Closure {
             name: None,
@@ -38,7 +100,13 @@ impl Eval for ast::Closure<'_> {
                 .children()
                 .filter(|p| matches!(p.kind(), ast::ParamKind::Pos(_)))
                 .count(),
+            captured,
+            unresolved_captures,
         };
+
+        if !vm.context.closure_capture.should_defer() {
+            closure.resolve()?
+        }
 
         let param_span = self.params().span();
         Ok(Value::Func(Func::from(closure)).spanned(param_span))
@@ -78,7 +146,7 @@ fn define(
 }
 
 pub fn eval_closure(
-    _func: &Func,
+    func: &Func,
     closure: &Closure,
     world: &dyn World,
     mut args: Args,
@@ -94,7 +162,11 @@ pub fn eval_closure(
     let mut inner_vm = Vm::new(world);
 
     if let Some(Spanned { value, span }) = &closure.name {
-        inner_vm.try_bind(value.clone(), Binding::new(_func.clone(), *span))?;
+        inner_vm.try_bind(value.clone(), Binding::new(func.clone(), *span))?;
+    }
+
+    for (k, v) in closure.captured.bindings() {
+        inner_vm.scopes.top.bind(k.clone(), v.clone());
     }
 
     let mut defaults = closure.defaults.iter();
@@ -137,20 +209,21 @@ pub struct CapturesVisitor<'a> {
     /// The internal scope of variables defined within the closure.
     internal: Scopes<'a>,
     /// The variables that are captured.
-    captures: HashSet<Ident<'a>>,
+    captures: HashMap<EcoString, Span>,
 }
 
 impl<'a> CapturesVisitor<'a> {
-    pub fn new(external: &'a Scopes<'a>, self_name: Option<Ident<'a>>) -> Self {
+    pub fn new(external: &'a Scopes<'a>, library: Option<&'a Library>, existing: &Scope) -> Self {
         let mut inst = Self {
             external,
-            internal: Scopes::new(None),
-            captures: HashSet::new(),
+            internal: Scopes::new(library),
+            captures: HashMap::new(),
         };
 
-        if let Some(name) = self_name {
-            inst.bind(name);
+        for (k, v) in existing.bindings() {
+            inst.internal.top.bind(k.clone(), v.clone());
         }
+
         inst
     }
 
@@ -254,7 +327,54 @@ impl<'a> CapturesVisitor<'a> {
 
         // If the value does not exist in the external scope, it is not captured.
         if self.external.get(&ident).is_ok() {
-            self.captures.insert(ident);
+            self.captures
+                .entry(ident.get().clone())
+                .or_insert(ident.span());
         }
     }
+
+    fn finish(self) -> HashMap<EcoString, Span> {
+        self.captures
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tests::*;
+
+    #[test]
+    fn capturing() {
+        assert_eval(r#"
+            let a = 10
+            let f = |a| () => a + 1
+            assert::eq(f(), 11)
+        "#);
+
+        assert_eval(r#"
+            let mut a = box::new(5)
+            let f = |ref mut a| () => {
+                a += 1
+                a
+            }
+            assert::eq(f(), 6)
+        "#);
+
+        assert_eval(r#"
+            let a = 2
+            let b = 3
+            let f = |a, b| () => a * b
+            assert::eq(f(), 6)
+        "#);
+        
+        assert_eval(r#"
+            let mut name = box::new("Alice")
+            let age = 30
+            let show = |ref name, age| () => {
+                name + age.repr()
+            }
+            assert::eq(show(), "Name: Alice, Age: 30")
+            name = "bob";
+        "#);
+    }
+
 }

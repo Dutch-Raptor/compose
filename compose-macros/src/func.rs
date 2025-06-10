@@ -82,7 +82,7 @@ fn create_func_data(func: &Func) -> TokenStream {
     let scope = if *scope {
         quote! { <#rust_name as #foundations::NativeScope>::scope() }
     } else {
-        quote! { #foundations::Scope::default() }
+        quote! { &#foundations::EMPTY_SCOPE }
     };
 
     let closure = create_wrapper_closure(func);

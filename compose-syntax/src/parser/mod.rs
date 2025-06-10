@@ -213,6 +213,12 @@ pub enum ExpectResult<'a> {
     SyntaxError(&'a mut SyntaxError),
 }
 
+impl<'a> ExpectResult<'a> {
+    pub(crate) fn is_ok(&self) -> bool {
+        matches!(self, ExpectResult::Ok)
+    }
+}
+
 impl ExpectResult<'_> {
     /// Applies a function to the inner `SyntaxError` if one exists.
     ///

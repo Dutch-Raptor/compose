@@ -1,16 +1,18 @@
-use crate::Reflect;
 use crate::diag::{At, SourceResult, Spanned};
 use crate::foundations::boxed::Boxed;
 use crate::foundations::iterator::IterValue;
 use crate::{CastInfo, Str, UnitValue};
 use crate::{FromValue, Func};
 use crate::{IntoValue, ValueRef};
+use crate::{NativeScope, Reflect};
 use crate::{Sink, Type};
-use compose_library::diag::{StrResult, bail};
+use compose_library::diag::{bail, error, StrResult};
 use compose_library::repr::Repr;
+use compose_macros::func;
+use compose_macros::scope;
 use compose_syntax::Span;
 use dumpster::{Trace, Visitor};
-use ecow::{EcoString, eco_format};
+use ecow::{eco_format, EcoString};
 use std::collections::HashSet;
 use std::fmt;
 use std::ops::Deref;
@@ -25,6 +27,14 @@ pub enum Value {
     Type(Type),
     Iterator(IterValue),
     Box(Boxed),
+}
+
+#[scope]
+impl Value {
+    #[func(name = "repr")]
+    pub fn repr_(self) -> EcoString {
+        self.repr()
+    }
 }
 
 impl Value {
@@ -72,7 +82,6 @@ fn eq_internal(l_ref: ValueRef, r_ref: ValueRef, visited: &mut HashSet<(usize, u
         return eq_internal(l_ref, inner_r, visited);
     }
 
-
     macro_rules! cmp {
             ($($variant:ident),* $(,)?) => {
                 match (l.deref(), r.deref()) {
@@ -92,7 +101,6 @@ fn eq_internal(l_ref: ValueRef, r_ref: ValueRef, visited: &mut HashSet<(usize, u
         }
 
     cmp![Int, Bool, Unit, Str, Func, Type, Iterator]
-
 }
 
 impl PartialEq for Value {
@@ -101,7 +109,7 @@ impl PartialEq for Value {
         // so we need to unbox both values before comparing them
         let Ok(l) = self.as_ref() else { return false };
         let Ok(r) = other.as_ref() else { return false };
-        
+
         let mut visited = HashSet::new();
         eq_internal(l, r, &mut visited)
     }
@@ -160,24 +168,49 @@ impl Value {
         }
     }
 
+    pub fn resolved(self) -> SourceResult<Self> {
+        match self {
+            Value::Func(f) => {
+                f.resolve()?;
+                Ok(Value::Func(f))
+            }
+            _ => Ok(self),
+        }
+    }
+
     /// Access a field on this value (with dot syntax) `a.b`
     pub fn field(&self, field: &str, access_span: Span, sink: &mut Sink) -> StrResult<Value> {
+        dbg!(Value::scope());
         let field_value = match self {
             Self::Func(func) => func.field(field, access_span, sink).cloned(),
             Self::Type(ty) => ty.field(field, access_span, sink).cloned(),
-            _ => bail!("no field or method named `{}` on `{}`", field, self.ty()),
+            _ => Err(error!(
+                "no field or method named `{}` on `{}`",
+                field,
+                self.ty()
+            )),
         };
 
-        field_value.or_else(|e| {
-            // Try to get the field from the type
-            self.ty()
-                .scope()
-                .get(field)
-                .map(|b| b.read_checked(access_span, sink))
-                .cloned()
-                // Return the original error if that failed
-                .ok_or(e)
-        })
+        if let Ok(field_value) = field_value {
+            return Ok(field_value);
+        }
+
+        // Get the field from the type
+        let type_field_value = self.ty().field(field, access_span, sink).cloned();
+        if let Ok(type_field_value) = type_field_value {
+            return Ok(type_field_value);
+        }
+
+        // Try and get the type from Value itself
+        let self_field_value = Value::scope()
+            .get(field)
+            .map(|b| b.read_checked(access_span, sink))
+            .cloned();
+
+        match self_field_value {
+            None => bail!("no field or method named `{}` on `{}`", field, self.ty()),
+            Some(v) => Ok(v),
+        }
     }
 
     /// Access an associated value of this value by path syntax `a::b`
@@ -292,13 +325,13 @@ mod tests {
         let b = Value::Int(5);
         assert_eq!(a, b);
     }
-    
+
     #[test]
     fn test_unbox_partial_eq_cycles() {
         let mut boxed = Value::Box(Boxed::new(Value::Int(5)));
         // now reassign the boxed value to itself
         *boxed.as_mut().unwrap() = boxed.clone();
-        
+
         assert_eq!(boxed, boxed);
     }
 }

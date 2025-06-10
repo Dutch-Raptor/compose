@@ -101,3 +101,7 @@ pub const PATTERN: SyntaxSet = syntax_set![
 ];
 
 pub const PARAM: SyntaxSet = PATTERN.union(syntax_set![Ref, Mut]);
+
+pub const CAPTURE: SyntaxSet = syntax_set![Ident, Ref, Mut];
+
+pub const CAPTURE_RECOVER: SyntaxSet = syntax_set![Comma, Pipe].union(CAPTURE);

@@ -35,7 +35,7 @@ impl<'a> Eval for ast::LetBinding<'a> {
         };
 
         let value = match init {
-            Some(expr) => expr.eval(vm)?,
+            Some(expr) => vm.with_deferred_closure_capture_errors(|vm| expr.eval(vm))?,
             None => Value::unit(),
         };
 
@@ -59,7 +59,9 @@ pub fn destructure_pattern(
     destructure_impl(vm, pattern, value, &mut |vm, expr, value| match expr {
         Expr::Ident(ident) => {
             let name = ident.get().clone();
-            let spanned = value.named(Spanned::new(name, ident.span()));
+            let spanned = value.named(Spanned::new(name, ident.span()))
+                // Now that the names have been added, make sure any deferred errors are resolved
+                .resolved()?;
 
             vm.define(ident, spanned, binding_kind)?;
 

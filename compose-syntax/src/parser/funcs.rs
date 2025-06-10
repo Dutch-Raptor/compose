@@ -1,6 +1,7 @@
 use crate::kind::SyntaxKind;
-use crate::parser::Parser;
 use crate::parser::{expressions, patterns};
+use crate::parser::{ExprContext, Parser};
+use crate::precedence::Precedence;
 use crate::set;
 use crate::set::{syntax_set, ARG_RECOVER};
 use compose_error_codes::E0009_ARGS_MISSING_COMMAS;
@@ -29,7 +30,7 @@ pub fn args(p: &mut Parser) {
 
 fn arg(p: &mut Parser) {
     let m_mods = p.marker();
-    
+
     let mut had_modifiers = false;
     had_modifiers |= p.eat_if(SyntaxKind::Ref);
     had_modifiers |= p.eat_if(SyntaxKind::Mut);
@@ -41,41 +42,95 @@ fn arg(p: &mut Parser) {
         if p[m].kind() != SyntaxKind::Ident {
             p[m].expected("identifier");
         }
-        
+
         if had_modifiers {
             p[m_mods].convert_to_error("argument modifiers like `ref` and `mut` go before the expression in named arguments")
-            .with_label_message("help: move the modifiers to the right of the `=`");       
+            .with_label_message("help: move the modifiers to the right of the `=`");
         }
-        
+
         expressions::code_expression(p);
         p.wrap(m, SyntaxKind::Named)
     }
 }
 
-pub fn closure(p: &mut Parser) {
+pub fn closure(p: &mut Parser) -> bool {
     trace_fn!("parse_closure");
+    let mut okay = true;
     let m = p.marker();
 
-    params(p);
+    if p.at(SyntaxKind::Pipe) {
+        okay &= captures(p);
+    }
 
-    p.expect_or_recover_until(
-        SyntaxKind::Arrow,
-        "expected `=>` after closure parameters",
-        syntax_set!(Arrow, LeftBrace, NewLine),
-    )
+    okay &= params(p);
+
+    okay &= p
+        .expect_or_recover_until(
+            SyntaxKind::Arrow,
+            "expected `=>` after closure parameters",
+            syntax_set!(Arrow, LeftBrace, NewLine),
+        )
         .map(|e| {
             e.with_label_message("help: you probably meant to write `=>` here");
-        });
-    
+        })
+        .is_ok();
 
     expressions::code_expression(p);
 
-    p.wrap(m, SyntaxKind::Closure)
+    p.wrap(m, SyntaxKind::Closure);
+
+    okay
+}
+
+fn captures(p: &mut Parser) -> bool {
+    debug_assert!(p.at(SyntaxKind::Pipe), "Expected `|`");
+    let mut okay = true;
+    let m = p.marker();
+    p.assert(SyntaxKind::Pipe);
+
+    while !p.at_set(syntax_set!(Pipe, End)) {
+        if !p.at_set(set::CAPTURE) {
+            okay = false;
+            p.unexpected("expected a capture declaration", None);
+            continue;
+        }
+
+        capture(p);
+
+        if !p.at_set(syntax_set!(Pipe, End)) {
+            okay &= p.expect(SyntaxKind::Comma)
+        }
+    }
+
+    okay &= p.expect_closing_delimiter(m, SyntaxKind::Pipe);
+
+    p.wrap(m, SyntaxKind::CaptureList);
+
+    okay
+}
+
+fn capture(p: &mut Parser) {
+    let m = p.marker();
+
+    p.eat_if(SyntaxKind::Ref);
+    p.eat_if(SyntaxKind::Mut);
+
+    let ident_m = p.marker();
+    // Parse a full expression, even though we only care about an identifier.
+    // This way the entire expression can be marked as an error if it is not.
+    expressions::code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
+
+    if p[ident_m].kind() != SyntaxKind::Ident {
+        p.expected("an identifier");
+    }
+
+    p.wrap(m, SyntaxKind::Capture)
 }
 
 /// Parse closure parameters.
-pub fn params(p: &mut Parser) {
+pub fn params(p: &mut Parser) -> bool {
     let m = p.marker();
+    let mut okay = true;
     let wrapped_in_parens = p.eat_if(SyntaxKind::LeftParen);
 
     let mut seen = HashSet::new();
@@ -87,39 +142,42 @@ pub fn params(p: &mut Parser) {
         while !p.current().is_terminator() {
             if !p.at_set(set::PARAM) {
                 p.unexpected("expected a param", None);
+                okay = false;
                 continue;
             }
 
             param(p, &mut seen);
 
             if !p.current().is_terminator() {
-                p.expect_or_recover(SyntaxKind::Comma, ARG_RECOVER);
+                okay &= p.expect_or_recover(SyntaxKind::Comma, ARG_RECOVER);
             }
         }
     }
 
     if !wrapped_in_parens && p.at(SyntaxKind::Comma) {
         p.insert_error_here("to have multiple parameters, wrap them in parentheses");
-        p.recover_until(syntax_set!(RightParen, Arrow))
+        p.recover_until(syntax_set!(RightParen, Arrow));
+        okay = false;
     }
 
     if wrapped_in_parens {
-        p.expect_closing_delimiter(m, SyntaxKind::RightParen);
+        okay &= p.expect_closing_delimiter(m, SyntaxKind::RightParen);
     }
-    p.wrap(m, SyntaxKind::Params)
+    p.wrap(m, SyntaxKind::Params);
+
+    okay
 }
 
 fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
     trace_fn!("parse_param");
     let m = p.marker();
 
-
     p.eat_if(SyntaxKind::Ref);
     p.eat_if(SyntaxKind::Mut);
 
     let was_at_pat = p.at_set(set::PATTERN);
     let pat_m = p.marker();
-    
+
     patterns::pattern(p, false, seen, Some("parameter"));
 
     // Parse named params like `a = 1`
@@ -437,5 +495,56 @@ mod tests {
             });
             p.assert_end();
         }
+    }
+
+    #[test]
+    fn test_parse_closure_with_capture_list() {
+        let input = r#"
+            |a, ref b, mut c, ref mut d| (e) => {}
+        "#;
+
+        let mut p = assert_parse(input);
+
+        p.assert_next_children(SyntaxKind::Closure, |p| {
+            p.assert_next_children(SyntaxKind::CaptureList, |p| {
+                p.assert_next(SyntaxKind::Pipe, "|");
+                p.assert_next_children(SyntaxKind::Capture, |p| {
+                    p.assert_next(SyntaxKind::Ident, "a");
+                    p.assert_end();
+                });
+                p.assert_next(SyntaxKind::Comma, ",");
+                p.assert_next_children(SyntaxKind::Capture, |p| {
+                    p.assert_next(SyntaxKind::Ref, "ref");
+                    p.assert_next(SyntaxKind::Ident, "b");
+                    p.assert_end();
+                });
+                p.assert_next(SyntaxKind::Comma, ",");
+                p.assert_next_children(SyntaxKind::Capture, |p| {
+                    p.assert_next(SyntaxKind::Mut, "mut");
+                    p.assert_next(SyntaxKind::Ident, "c");
+                    p.assert_end();
+                });
+                p.assert_next(SyntaxKind::Comma, ",");
+                p.assert_next_children(SyntaxKind::Capture, |p| {
+                    p.assert_next(SyntaxKind::Ref, "ref");
+                    p.assert_next(SyntaxKind::Mut, "mut");
+                    p.assert_next(SyntaxKind::Ident, "d");
+                    p.assert_end();
+                });
+                p.assert_next(SyntaxKind::Pipe, "|");
+                p.assert_end();
+            });
+            p.assert_next_children(SyntaxKind::Params, |p| {
+                p.assert_next(SyntaxKind::LeftParen, "(");
+                p.assert_next_children(SyntaxKind::Param, |p| {
+                    p.assert_next(SyntaxKind::Ident, "e");
+                    p.assert_end();
+                });
+            });
+            p.assert_next(SyntaxKind::Arrow, "=>");
+            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
+            p.assert_end();
+        });
+        p.assert_end();
     }
 }

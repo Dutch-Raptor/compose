@@ -50,10 +50,14 @@ pub fn scope(_: TokenStream, item: syn::Item) -> Result<TokenStream> {
     Ok(quote! {
         #base
         impl #foundations::NativeScope for #self_ty {
-            fn scope() -> #foundations::Scope {
-                let mut scope = #foundations::Scope::new();
-                #(#definitions;)*
-                scope
+            fn scope() -> &'static #foundations::Scope {
+                static SCOPE: ::std::sync::LazyLock<#foundations::Scope> = ::std::sync::LazyLock::new(|| {
+                    let mut scope = #foundations::Scope::new();
+                    #(#definitions;)*
+                    scope
+                });
+                
+                &SCOPE
             }
         }
     })

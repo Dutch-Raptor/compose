@@ -2,11 +2,11 @@ use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
 use crate::parser::funcs::closure;
-use crate::parser::{ExprContext, funcs, statements};
+use crate::parser::{funcs, statements, ExprContext};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{SyntaxSet, UNARY_OP, syntax_set};
-use crate::{Label, ast, set};
+use crate::set::{syntax_set, SyntaxSet, UNARY_OP};
+use crate::{ast, set, Label};
 use compose_error_codes::{
     E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT, E0008_EXPECTED_EXPRESSION,
 };
@@ -73,6 +73,21 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
         }
 
         let bin_op = BinOp::from_kind(p.current());
+
+        // Handle ambiguity between binary `|` op and closure with capture list
+        if p.at(SyntaxKind::Pipe) {
+            // tentatively check if this is a valid closure
+            let checkpoint = p.checkpoint();
+            if closure(p) {
+                // If it was, this was not a binary op.
+                // Restore and keep this expression atomic
+                p.restore(checkpoint);
+                break;
+            } else {
+                // if it wasn't a closure, restore and continue parsing as binary
+                p.restore(checkpoint)
+            }
+        }
 
         if let Some(op) = bin_op {
             let prec = op.precedence();
@@ -165,8 +180,12 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
         SyntaxKind::LeftParen => expr_with_parens(p, ctx),
         // Already fully handled in the lexer
         SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str => p.eat(),
-        SyntaxKind::Ref | SyntaxKind::Mut | SyntaxKind::Ident | SyntaxKind::Underscore => {
-            closure(p)
+        SyntaxKind::Ref
+        | SyntaxKind::Mut
+        | SyntaxKind::Ident
+        | SyntaxKind::Underscore
+        | SyntaxKind::Pipe => {
+            closure(p);
         }
         _ => err_expected_expression(
             p,
@@ -312,6 +331,7 @@ pub(in crate::parser) fn err_unclosed_delim(
 mod tests {
     use super::*;
     use crate::test_utils::*;
+    use compose_error_codes::E0006_UNTERMINATED_STATEMENT;
 
     #[test]
     fn test_parse_parenthesized() {
@@ -679,5 +699,63 @@ mod tests {
                 p.assert_end();
             });
         });
+    }
+
+    #[test]
+    fn test_disambiguate_closure_and_pipe() {
+        let input = r#"
+            a | a | a | a
+        "#;
+
+        let mut p = assert_parse(input);
+
+        p.assert_next_children(SyntaxKind::Binary, |p| {
+            p.assert_next(SyntaxKind::Ident, "a");
+            p.assert_next(SyntaxKind::Pipe, "|");
+            p.assert_next_children(SyntaxKind::Binary, |p| {
+                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next(SyntaxKind::Pipe, "|");
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Ident, "a");
+                    p.assert_next(SyntaxKind::Pipe, "|");
+                    p.assert_next(SyntaxKind::Ident, "a");
+                    p.assert_end();
+                });
+                p.assert_end();
+            });
+            p.assert_end();
+        });
+        p.assert_end();
+
+        let input = r#"
+            a | a | () => {}
+        "#;
+
+        let mut p = assert_parse_with_errors(input, &[E0006_UNTERMINATED_STATEMENT]);
+
+        p.assert_next(SyntaxKind::Ident, "a");
+        // Should be an error as the end of the statement would be expected here
+        // `a` and `| a | () => {}` are separate expression statements
+        p.assert_next_error(E0006_UNTERMINATED_STATEMENT);
+        p.assert_next_children(SyntaxKind::Closure, |p| {
+            p.assert_next_children(SyntaxKind::CaptureList, |p| {
+                p.assert_next(SyntaxKind::Pipe, "|");
+                p.assert_next_children(SyntaxKind::Capture, |p| {
+                    p.assert_next(SyntaxKind::Ident, "a");
+                    p.assert_end()
+                });
+                p.assert_next(SyntaxKind::Pipe, "|");
+                p.assert_end();
+            });
+            p.assert_next_children(SyntaxKind::Params, |p| {
+                p.assert_next(SyntaxKind::LeftParen, "(");
+                p.assert_next(SyntaxKind::RightParen, ")");
+                p.assert_end();
+            });
+            p.assert_next(SyntaxKind::Arrow, "=>");
+            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
+            p.assert_end();
+        });
+        p.assert_end();
     }
 }
