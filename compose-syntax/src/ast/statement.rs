@@ -11,7 +11,7 @@ pub enum Statement<'a> {
 impl<'a> AstNode<'a> for Statement<'a> {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self> {
         match node.kind() {
-            SyntaxKind::Let => Some(Statement::Let(LetBinding::from_untyped(node)?)),
+            SyntaxKind::LetBinding => Some(Statement::Let(LetBinding::from_untyped(node)?)),
             SyntaxKind::Assignment => {
                 Some(Statement::Assign(Assignment::from_untyped(node)?))
             }

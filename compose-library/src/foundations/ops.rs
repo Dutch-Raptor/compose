@@ -11,6 +11,7 @@ macro_rules! type_error {
 pub fn add(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     match (lhs, rhs) {
         (Value::Int(left), Value::Int(right)) => Ok(Value::Int(left + right)),
+        (Value::Str(left), Value::Str(right)) => Ok(Value::Str(left + right)),
         (left, right) => type_error!("cannot add {} to {}", left, right),
     }
 }

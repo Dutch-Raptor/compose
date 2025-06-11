@@ -1,9 +1,9 @@
-        let fact = (n) => {
-            if n == 0 {
-                1
-            } else {
-                n * fact(n - 1)
-            }
-        }
+let fact = (n) => {
+    if n == 0 {
+        1
+    } else {
+        n * fact(n - 1)
+    }
+}
 
-        assert::eq(fact(5), 120)
+assert::eq(fact(5), 120)
