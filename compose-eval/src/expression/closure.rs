@@ -1,6 +1,8 @@
 use crate::vm::FlowEvent;
 use crate::{Eval, Vm};
-use compose_library::diag::{bail, error, IntoSourceDiagnostic, SourceResult, Spanned};
+use compose_library::diag::{
+    bail, error, IntoSourceDiagnostic, SourceResult, Spanned,
+};
 use compose_library::{
     Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError,
     World,
@@ -46,27 +48,13 @@ impl Eval for ast::Closure<'_> {
                     }
                 };
 
-                if capture.is_mut() && capture.is_ref() && !binding.kind().is_mut() {
-                    errors.push(error!(
-                        capture.span(), "cannot capture variable `{name}` as `ref mut` because it is not declared as mutable";
-                        label_message: "capture is declared as a mutable reference";
-                        label: Label::secondary(binding.span(), "was defined as immutable here");
-                        note: "captured mutable references must match the mutability of the original declaration";
-                        hint: "declare the variable as mutable: `let mut {name} = ...`";
-                        hint: "or remove `mut` from the capture: `|ref {name}, ...|"
-                    ));
-                    continue;
-                }
-
-                let value = binding.read_checked(span, vm.sink_mut());
-
-                if capture.is_ref() && !value.is_box() {
-                    errors.push(error!(
-                        span, "cannot capture non reference type by reference";
-                        label_message: "this captures by reference";
-                        note: "only boxed values can be captured by reference"
-                    ));
-                }
+                let value = match validate_capture(capture, &binding, vm) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        errors.extend(e.into_iter());
+                        continue;
+                    }
+                };
 
                 scope.bind(
                     name.clone(),
@@ -113,9 +101,40 @@ impl Eval for ast::Closure<'_> {
     }
 }
 
+fn validate_capture<'a>(
+    capture: ast::Capture,
+    binding: &'a Binding,
+    vm: &mut Vm,
+) -> SourceResult<&'a Value> {
+    let span = capture.binding().span();
+    let name = capture.binding().get();
+    if capture.is_mut() && capture.is_ref() && !binding.kind().is_mut() {
+        bail!(
+            capture.span(), "cannot capture variable `{name}` as `ref mut` because it is not declared as mutable";
+            label_message: "capture is declared as a mutable reference";
+            label: Label::secondary(binding.span(), "was defined as immutable here");
+            note: "captured mutable references must match the mutability of the original declaration";
+            hint: "declare the variable as mutable: `let mut {name} = ...`";
+            hint: "or remove `mut` from the capture: `|ref {name}, ...|"
+        );
+    }
+
+    let value = binding.read_checked(span, vm.sink_mut());
+
+    if capture.is_ref() && !value.is_box() {
+        bail!(
+            span, "cannot capture non reference type by reference";
+            label_message: "this captures by reference";
+            note: "only boxed values can be captured by reference"
+        );
+    }
+
+    Ok(value)
+}
+
 fn define(
     vm: &mut Vm,
-    ident: ast::Ident,
+    ident: Ident,
     Spanned { value, span }: Spanned<Value>,
     param: Param,
 ) -> SourceResult<()> {
@@ -228,12 +247,12 @@ impl<'a> CapturesVisitor<'a> {
     }
 
     pub fn visit(&mut self, node: &'a SyntaxNode) {
-        if let Some(ast::Statement::Let(expr)) = node.cast() {
-            if let Some(init) = expr.initial_value() {
+        if let Some(ast::Statement::Let(let_binding)) = node.cast() {
+            if let Some(init) = let_binding.initial_value() {
                 self.visit(init.to_untyped())
             }
 
-            for ident in expr.pattern().bindings() {
+            for ident in let_binding.pattern().bindings() {
                 self.bind(ident);
             }
             return;
@@ -271,22 +290,14 @@ impl<'a> CapturesVisitor<'a> {
                     }
                 }
 
-                self.internal.enter();
-                for param in closure.params().children() {
-                    match param.kind() {
-                        ast::ParamKind::Named(named) => {
-                            self.bind(named.name());
-                        }
-                        ast::ParamKind::Pos(pat) => {
-                            for ident in pat.bindings() {
-                                self.bind(ident);
-                            }
-                        }
-                    }
+                for capture in closure.captures().children() {
+                    self.visit(capture.to_untyped());
                 }
 
-                self.visit(closure.body().to_untyped());
-                self.internal.exit();
+                // NOTE: For now we do not try to analyse the body of the closure.
+                // This is because the closure might try to recursively call itself
+                // and in simple ast walking, that is really hard to resolve correctly.
+                // Any errors in the body will be caught when the outer body is evaluated.
             }
 
             Expr::ForLoop(for_loop) => {
@@ -303,13 +314,14 @@ impl<'a> CapturesVisitor<'a> {
                 self.internal.exit();
             }
 
-            _ => {}
+            _ => {
+                // If not an expression or named, just go over all the children
+                for child in node.children() {
+                    self.visit(child);
+                }
+            }
         }
 
-        // If not an expression or named, just go over all the children
-        for child in node.children() {
-            self.visit(child);
-        }
     }
 
     fn bind(&mut self, ident: Ident) {
@@ -340,41 +352,121 @@ impl<'a> CapturesVisitor<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::expression::closure::CapturesVisitor;
     use crate::tests::*;
+    use compose_library::{Scope, Scopes};
+    use compose_syntax::{parse, FileId};
 
     #[test]
     fn capturing() {
-        assert_eval(r#"
+        assert_eval(
+            r#"
             let a = 10
             let f = |a| () => a + 1
             assert::eq(f(), 11)
-        "#);
+        "#,
+        );
 
-        assert_eval(r#"
+        assert_eval(
+            r#"
             let mut a = box::new(5)
             let f = |ref mut a| () => {
                 a += 1
                 a
             }
             assert::eq(f(), 6)
-        "#);
+        "#,
+        );
 
-        assert_eval(r#"
+        assert_eval(
+            r#"
             let a = 2
             let b = 3
             let f = |a, b| () => a * b
             assert::eq(f(), 6)
-        "#);
-        
-        assert_eval(r#"
+        "#,
+        );
+
+        assert_eval(
+            r#"
             let mut name = box::new("Alice")
             let age = 30
             let show = |ref name, age| () => {
-                name + age.repr()
+                "Name: " + name + ", Age: " + age.repr()
             }
             assert::eq(show(), "Name: Alice, Age: 30")
             name = "bob";
-        "#);
+        "#,
+        );
     }
 
+    #[track_caller]
+    fn test(scopes: &Scopes, existing_scope: &Scope, text: &str, result: &[&str]) {
+        let mut visitor = CapturesVisitor::new(scopes, None, existing_scope);
+        let nodes = parse(text, FileId::new("test.comp"));
+        for node in &nodes {
+            visitor.visit(node);
+        }
+
+        let captures = visitor.finish();
+        let mut names: Vec<_> = captures.iter().map(|(k, ..)| k).collect();
+        names.sort();
+
+        assert_eq!(names, result);
+    }
+
+    #[test]
+    fn test_captures_visitor() {
+        let mut scopes = Scopes::new(None);
+        scopes.top.define("f", 0i64);
+        scopes.top.define("x", 0i64);
+        scopes.top.define("y", 0i64);
+        scopes.top.define("z", 0i64);
+        let s = &scopes;
+
+        let mut existing = Scope::new();
+        existing.define("a", 0i64);
+        existing.define("b", 0i64);
+        existing.define("c", 0i64);
+        let e = &existing;
+
+        // let binding
+        test(s, e, "let t = x;", &["x"]);
+        test(s, e, "let x = x;", &["x"]);
+        test(s, e, "let x;", &[]);
+        test(s, e, "let x = 2; x + y", &["y"]);
+        test(s, e, "x + y", &["x", "y"]);
+        
+        // assignment
+        test(s, e, "x += y", &["x", "y"]);
+        test(s, e, "x = y", &["x", "y"]);
+        
+
+        // closure definition
+        // Closure bodies are ignored
+        test(s, e, "let f = () => x + y;", &[]);
+        // with capture
+        test(s, e, "let f = |x| () => x + y;", &["x"]);
+        test(s, e, "let f = |x| () => f();", &["x"]);
+        // with params
+        test(s, e, "let f = (x, y, z) => f();", &[]);
+        // named params
+        test(s, e, "let f = (x = x, y = y, z = z) => f();", &["x", "y", "z"]);
+
+        // for loop
+        test(s, e, "for x in y { x + z }", &["y", "z"]);
+        test(s, e, "for x in y { x }; x", &["x", "y"]);
+
+        // block
+        test(s, e, "{ x }", &["x"]);
+        test(s, e, "{ let x; x }", &[]);
+        test(s, e, "{ let x; x }; x", &["x"]);
+        
+        // field access
+        test(s, e, "x.y.f(z)", &["x", "z"]);
+        
+        // parenthesized
+        test(s, e, "(x + z)", &["x", "z"]);
+        test(s, e, "(((x) => x + y) + y)", &["y"]);
+    }
 }

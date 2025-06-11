@@ -1,5 +1,6 @@
 use compose_macros::func;
 use std::fmt;
+use std::ops::Add;
 use compose_library::{StringIterator, Value};
 use compose_macros::{cast, scope, ty};
 use ecow::EcoString;
@@ -8,6 +9,16 @@ use compose_library::repr::Repr;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[ty(scope, cast, name = "string")]
 pub struct Str(pub EcoString);
+
+impl Add for &Str {
+    type Output = Str;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut l = self.0.clone();
+        l.push_str(&rhs.0);
+        Str(l)
+    }
+}
 
 #[scope]
 impl Str {
