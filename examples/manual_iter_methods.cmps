@@ -1,0 +1,13 @@
+let create_take = (n) => {
+    let mut n = box::new(n);
+    |ref mut n| (a) => {
+        *n -= 1;
+        *n >= 0;
+    };
+};
+
+
+let mut iter = "abcdefghijklmnop".chars().take_while(create_take(2));
+assert::eq(iter.next(), "a");
+assert::eq(iter.next(), "b");
+assert::eq(iter.next(), ());

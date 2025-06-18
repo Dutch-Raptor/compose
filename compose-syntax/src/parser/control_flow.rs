@@ -1,11 +1,11 @@
 use crate::kind::SyntaxKind;
 use crate::node::SyntaxErrorSeverity;
-use crate::parser::Parser;
 use crate::parser::expressions::code_expression;
 use crate::parser::patterns::pattern;
 use crate::parser::statements::code;
+use crate::parser::Parser;
 use crate::set::syntax_set;
-use crate::{Label, Span, SyntaxError, SyntaxNode, set};
+use crate::{set, Label, Span, SyntaxError, SyntaxNode};
 use compose_error_codes::{
     E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES, W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION,
     W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION,
@@ -210,8 +210,8 @@ mod tests {
         let mut p = assert_parse(
             r#"
         while true {
-            do_thing()
-        }
+            do_thing();
+        };
         "#,
         );
 
@@ -230,6 +230,7 @@ mod tests {
                         p.assert_next(SyntaxKind::RightParen, ")");
                         p.assert_end();
                     });
+                    p.assert_end();
                 });
                 p.assert_next(SyntaxKind::RightBrace, "}");
                 p.assert_end();
@@ -244,8 +245,8 @@ mod tests {
         let mut p = assert_parse_with_warnings(
             r#"
         while (true) {
-            do_thing()
-        }
+            do_thing();
+        };
         "#,
             &[W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION],
         );
@@ -268,8 +269,8 @@ mod tests {
         let mut p = assert_parse(
             r#"
         if true {
-            do_thing()
-        }
+            do_thing();
+        };
         "#,
         );
 
@@ -290,7 +291,7 @@ mod tests {
         let mut p = assert_parse_with_errors(
             r#"
         if true
-            do_thing()
+            do_thing();
         "#,
             &[E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES],
         );
@@ -311,12 +312,12 @@ mod tests {
         let mut p = assert_parse(
             r#"
         if cond1 {
-            do_one()
+            do_one();
         } else if cond2 {
-            do_two()
+            do_two();
         } else {
-            do_fallback()
-        }
+            do_fallback();
+        };
         "#,
         );
 
@@ -352,8 +353,8 @@ mod tests {
         let mut p = assert_parse_with_warnings(
             r#"
         for (x in items) {
-            do_thing()
-        }
+            do_thing();
+        };
         "#,
             &[W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION],
         );

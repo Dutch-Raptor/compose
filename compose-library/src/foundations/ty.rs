@@ -1,6 +1,6 @@
-use crate::{Scope, Sink, UnBoundError, Value};
-use compose_library::UnboundItem;
+use crate::{Scope, Sink, Trace, UnBoundError, Value};
 use compose_library::diag::StrResult;
+use compose_library::{UnboundItem, UntypedRef};
 use compose_macros::{cast, ty};
 use compose_syntax::Span;
 use compose_utils::Static;
@@ -44,6 +44,12 @@ impl Type {
 
     pub fn name(&self) -> &'static str {
         self.0.name
+    }
+}
+
+impl Trace for Type {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        self.scope().visit_refs(f);
     }
 }
 

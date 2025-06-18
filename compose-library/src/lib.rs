@@ -1,3 +1,5 @@
+// Workaround to refer to self as compose_library instead of crate. Needed for some macros
+extern crate self as compose_library;
 pub mod diag;
 mod world;
 mod foundations;
@@ -5,24 +7,35 @@ mod sink;
 pub mod repr;
 mod engine;
 mod gc;
+mod vm;
 
-use compose_library::diag::SourceResult;
-pub use foundations::*;
-pub use sink::*;
-pub use world::*;
 pub use engine::*;
+pub use foundations::*;
+pub use gc::*;
+pub use sink::*;
+use std::fmt::Debug;
+pub use vm::*;
+pub use world::*;
 
-// Workaround to refer to self as compose_library instead of crate. Needed for some macros
-extern crate self as compose_library;
-
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Library {
     /// The module containing global functions, types and values.
     pub global: Module,
 }
 
+impl Debug for Library {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Library")
+    }
+}
+
+impl Trace for Library {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        self.global.visit_refs(f);
+    }
+}
+
 pub struct Routines {
-    pub eval_closure: fn(&Func, &Closure, &dyn World, Args) -> SourceResult<Value>
 }
 
 

@@ -1,15 +1,15 @@
 use crate::expression::bindings::destructure_pattern;
 use crate::vm::FlowEvent;
-use crate::{Eval, Vm};
+use crate::{Eval, Machine};
 use compose_library::diag::{At, SourceResult};
-use compose_library::{BindingKind, Value, IterValue, ValueIterator};
+use compose_library::{BindingKind, IterValue, Value, ValueIterator};
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 
 impl Eval for ast::Conditional<'_> {
     type Output = Value;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         if eval_condition(self.condition(), vm)? {
             return self.consequent().eval(vm);
         }
@@ -31,7 +31,7 @@ impl Eval for ast::Conditional<'_> {
 impl Eval for ast::WhileLoop<'_> {
     type Output = Value;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         let mut value = Value::unit();
         while eval_condition(self.condition(), vm)? {
             value = self.body().eval(vm)?;
@@ -43,19 +43,20 @@ impl Eval for ast::WhileLoop<'_> {
 impl Eval for ast::ForLoop<'_> {
     type Output = Value;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    //noinspection RsUnnecessaryQualifications - False positive
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         let mut output = Value::unit();
         let pattern = self.binding();
         let iterable_expr = self.iterable();
-        let mut iterator = {
+        let iterator = {
             let value = iterable_expr.eval(vm)?;
-            IterValue::try_from(value).at(iterable_expr.span())?
+            IterValue::try_from_value(value, &mut vm.heap).at(iterable_expr.span())?
         };
         let body = self.body();
 
         let flow = vm.flow.take();
 
-        while let Some(v) = iterator.next(&mut vm.engine)? {
+        while let Some(v) = iterator.next(vm)? {
             vm.in_scope(|vm| {
                 destructure_pattern(
                     vm,
@@ -65,7 +66,7 @@ impl Eval for ast::ForLoop<'_> {
                 )?;
 
                 output = body.eval(vm)?;
-                
+
                 SourceResult::Ok(())
             })?;
             
@@ -90,7 +91,7 @@ impl Eval for ast::ForLoop<'_> {
 
 /// Evaluates the condition expression and ensures it's a boolean.
 #[inline]
-fn eval_condition(cond: ast::Condition<'_>, vm: &mut Vm) -> SourceResult<bool> {
+fn eval_condition(cond: ast::Condition<'_>, vm: &mut Machine) -> SourceResult<bool> {
     let cond_expr = cond.expr();
     let cond_value = cond_expr.eval(vm)?;
     cond_value.cast::<bool>().at(cond_expr.span())

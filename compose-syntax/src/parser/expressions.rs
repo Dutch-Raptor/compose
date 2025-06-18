@@ -649,7 +649,7 @@ mod tests {
             {
                 println("hello");
                 do_other_stuff();
-            )
+            );
             let a = 4;
         "#;
 

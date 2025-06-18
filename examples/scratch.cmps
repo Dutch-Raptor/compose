@@ -1,9 +1,13 @@
-let fact = (n) => {
-    if n == 0 {
-        1
-    } else {
-        n * fact(n - 1)
-    }
-}
+let create_counter = (from = 0) => {
+    let mut cur = box::new(from);
+    |ref mut cur| () => {
+        let ret = *cur;
+        *cur += 1;
+        ret;
+    };
+};
 
-assert::eq(fact(5), 120)
+let counter = create_counter(from: 3);
+
+assert::eq(counter(), 3);
+assert::eq(counter(), 4);

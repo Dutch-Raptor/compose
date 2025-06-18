@@ -1,14 +1,13 @@
-use crate::IntoValue;
-use crate::diag::{At, SourceDiagnostic, SourceResult, error, warning, IntoSourceDiagnostic};
+use crate::diag::{error, warning, At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult};
+use crate::{IntoValue, Trace};
 use crate::{Library, NativeFuncData, NativeType, Sink, Type, Value};
 use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
-use compose_library::diag::{StrResult, bail};
-use compose_library::{Func, NativeFunc};
+use compose_library::diag::{bail, StrResult};
+use compose_library::{Func, NativeFunc, UntypedRef};
 use compose_syntax::{Label, Span};
-use dumpster::{Trace, Visitor};
-use ecow::{EcoString, eco_format, eco_vec};
-use indexmap::IndexMap;
+use ecow::{eco_format, eco_vec, EcoString};
 use indexmap::map::Entry;
+use indexmap::IndexMap;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::iter;
@@ -183,15 +182,20 @@ pub struct Scope {
     map: IndexMap<EcoString, Binding>,
 }
 
-// Safety: Each binding can contain a Gc<T> Value, so each needs to be traced.
-// An EcoString cannot contain a Gc<T> Value, so it does not need to be traced.
-unsafe impl Trace for Scope {
-    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
-        for (_k, v) in &self.map {
-            v.accept(visitor)?;
+impl Trace for Scopes<'_> {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        self.top.visit_refs(f);
+        for scope in self.stack.iter() {
+            scope.visit_refs(f);
         }
+    }
+}
 
-        Ok(())
+impl Trace for Scope {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        for v in self.map.values() {
+            v.value.visit_refs(f);
+        }
     }
 }
 
@@ -300,13 +304,6 @@ pub struct Binding {
     value: Value,
     span: Span,
     kind: BindingKind,
-}
-
-unsafe impl Trace for Binding {
-    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
-        self.value.accept(visitor)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

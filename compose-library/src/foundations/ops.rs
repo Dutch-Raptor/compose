@@ -44,6 +44,13 @@ pub fn gt(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     }
 }
 
+pub fn gte(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    match (lhs, rhs) {
+        (Value::Int(left), Value::Int(right)) => Ok(Value::Bool(left >= right)),
+        (left, right) => type_error!("cannot compare {} to {}", left, right),
+    }
+}
+
 pub fn neq(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     Ok(Value::Bool(lhs != rhs))
 }

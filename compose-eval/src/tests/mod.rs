@@ -1,12 +1,12 @@
-use crate::{EvalConfig, Vm};
+use crate::{EvalConfig, Machine};
 use compose_error_codes::ErrorCode;
 use compose_library::diag::codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use compose_library::diag::{
-    FileError, FileResult, SourceDiagnostic, SourceResult, Warned, write_diagnostics,
+    write_diagnostics, FileError, FileResult, SourceDiagnostic, SourceResult, Warned,
 };
-use compose_library::{Library, Value, World, library};
+use compose_library::{library, Library, Value, World};
 use compose_syntax::{FileId, Source};
-use ecow::{EcoVec, eco_format, eco_vec};
+use ecow::{eco_format, eco_vec, EcoVec};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{Read, Write};
@@ -128,7 +128,7 @@ fn print_diagnostics(
 }
 
 #[must_use]
-pub fn eval_code_with_vm(vm: &mut Vm, world: &TestWorld, input: &str) -> TestResult {
+pub fn eval_code_with_vm(vm: &mut Machine, world: &TestWorld, input: &str) -> TestResult {
     if input.is_empty() {
         return TestResult {
             value: Ok(Value::unit()),
@@ -252,7 +252,7 @@ impl TestResult {
 #[must_use]
 pub fn eval_code(code: &str) -> TestResult {
     let world = TestWorld::from_str("");
-    let mut vm = Vm::new(&world);
+    let mut vm = Machine::new(&world);
     eval_code_with_vm(&mut vm, &world, code)
 }
 
@@ -265,7 +265,7 @@ pub fn assert_eval(code: &str) -> Value {
 }
 
 #[track_caller]
-pub fn assert_eval_with_vm(vm: &mut Vm, world: &TestWorld, code: &str) -> Value {
+pub fn assert_eval_with_vm(vm: &mut Machine, world: &TestWorld, code: &str) -> Value {
     eval_code_with_vm(vm, world, code)
         .assert_no_warnings()
         .assert_no_errors()

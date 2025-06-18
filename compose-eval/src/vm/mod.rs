@@ -1,0 +1,236 @@
+mod stack;
+
+//noinspection RsUnusedImport - false positive, actually used
+use crate::expression::eval_closure;
+use crate::vm::stack::{StackFrames, TrackMarker};
+use compose_library::diag::{error, At, SourceDiagnostic, SourceResult};
+use compose_library::{Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink, Trace, UntypedRef, Value, VariableAccessError, Vm, World};
+use compose_syntax::ast::AstNode;
+use compose_syntax::{ast, Span};
+use ecow::EcoString;
+use std::fmt::Debug;
+
+pub use stack::Tracked;
+pub use stack::TrackedContainer;
+
+pub struct Machine<'a> {
+    pub frames: StackFrames<'a>,
+    pub flow: Option<FlowEvent>,
+    pub engine: Engine<'a>,
+    pub context: EvalContext,
+    pub heap: Heap,
+}
+
+impl<'a> Vm<'a> for Machine<'a> {
+    fn heap(&self) -> &Heap {
+        &self.heap
+    }
+
+    fn heap_mut(&mut self) -> &mut Heap {
+        &mut self.heap
+    }
+
+    fn engine(&self) -> &Engine<'a> {
+        &self.engine
+    }
+
+    fn engine_mut(&mut self) -> &mut Engine<'a> {
+        &mut self.engine
+    }
+
+    fn call_func(&mut self, func: &Func, args: Args) -> SourceResult<Value> {
+        match &func.kind {
+            FuncKind::Native(native) => {
+                native.call(self, args)
+            }
+            FuncKind::Closure(closure) => {
+                eval_closure(closure, self, args)
+            }
+        }
+    }
+}
+
+
+impl<'a> Machine<'a> {
+    pub(crate) fn sink_mut(&mut self) -> &mut Sink {
+        &mut self.engine.sink
+    }
+
+    pub(crate) fn in_scope<T>(&mut self, f: impl FnOnce(&mut Machine<'a>) -> T) -> T {
+        self.frames.top.scopes.enter();
+        let result = f(self);
+        self.frames.top.scopes.exit();
+        result
+    }
+
+    pub fn world(&self) -> &dyn World {
+        self.engine.world
+    }
+}
+
+impl Debug for Machine<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Vm")
+            .field("frames", &self.frames)
+            .field("flow", &self.flow)
+            .field("sink", &self.engine)
+            .field("heap", &self.heap)
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FlowEvent {
+    Continue(Span),
+    Break(Span),
+    Return(Span, Option<Value>),
+}
+
+impl FlowEvent {
+    pub(crate) fn forbidden(&self) -> SourceDiagnostic {
+        match *self {
+            Self::Break(span) => {
+                error!(span, "cannot break outside of a loop")
+            }
+            Self::Return(span, _) => {
+                error!(span, "cannot return outside of a function")
+            }
+            Self::Continue(span) => {
+                error!(span, "cannot continue outside of a loop")
+            }
+        }
+    }
+}
+
+impl<'a> Machine<'a> {
+    pub fn new(world: &'a dyn World) -> Self {
+        Self {
+            frames: StackFrames::new(Some(world.library())),
+            flow: None,
+            engine: Engine {
+                routines: routines(),
+                sink: Sink::default(),
+                world,
+            },
+            context: Default::default(),
+            heap: Heap::new(),
+        }
+    }
+
+    /// Enter a new stack frame to evaluate `f`. This frame does not have access
+    /// to any defined variables in other frames, but does share the same heap.
+    /// This means references passed into this frame can share data.
+    pub fn with_frame<T>(&mut self, f: impl FnOnce(&mut Machine) -> T) -> T {
+        self.frames.enter();
+        let result = f(self);
+        self.frames.exit();
+        result
+    }
+
+    pub fn maybe_gc(&mut self) {
+        let roots = VmRoots {
+            frames: &self.frames,
+            flow: &self.flow,
+        };
+        self.heap.clean(&roots);
+    }
+}
+
+pub struct VmRoots<'a> {
+    pub frames: &'a StackFrames<'a>,
+    pub flow: &'a Option<FlowEvent>,
+}
+
+impl Trace for VmRoots<'_> {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        self.frames.visit_refs(f);
+    }
+}
+
+impl<'a> Machine<'a> {
+    pub fn track(&mut self, value: &impl Trace) {
+        self.frames.top.track(value);
+    }
+
+    pub fn track_marker(&mut self) -> TrackMarker {
+        self.frames.top.marker()
+    }
+
+    pub fn track_forget(&mut self, marker: TrackMarker) {
+        self.frames.top.forget(marker);   
+    }
+
+    pub fn define(
+        &mut self,
+        var: ast::Ident,
+        value: impl IntoValue,
+        binding_kind: BindingKind,
+    ) -> SourceResult<()> {
+        self.try_bind(
+            var.get().clone(),
+            Binding::new(value, var.span()).with_kind(binding_kind),
+        )?;
+        Ok(())
+    }
+
+    pub fn try_bind(&mut self, name: EcoString, binding: Binding) -> SourceResult<&mut Binding> {
+        let span = binding.span();
+        self.frames.top.scopes.top.try_bind(name, binding).at(span)
+    }
+
+    pub fn bind(&mut self, name: EcoString, binding: Binding) -> &mut Binding {
+        self.frames.top.scopes.top.bind(name, binding)
+    }
+
+    fn scopes(&self) -> &Scopes<'a> {
+        &self.frames.top.scopes
+    }
+    fn scopes_mut(&mut self) -> &mut Scopes<'a> {
+        &mut self.frames.top.scopes
+    }
+
+    pub fn get(&self, name: &str) -> Result<&Binding, VariableAccessError> {
+        self.scopes().get(name)
+    }
+
+    pub fn get_mut(&mut self, name: &str) -> Result<&mut Binding, VariableAccessError> {
+        self.scopes_mut().get_mut(name)
+    }
+}
+
+pub fn routines() -> Routines {
+    Routines {
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct EvalContext {
+    pub closure_capture: ErrorMode,
+}
+
+/// Whether to defer an error or immediately emit it
+#[derive(Debug, Clone, Copy, Default)]
+pub enum ErrorMode {
+    #[default]
+    Immediate,
+    Deferred,
+}
+
+impl ErrorMode {
+    pub fn should_defer(&self) -> bool {
+        matches!(self, Self::Deferred)
+    }
+}
+
+impl Machine<'_> {
+    /// Run f with closure capture errors deferred.
+    ///
+    /// This makes the caller responsible for either handling or emitting the unresolved errors.
+    pub fn with_closure_capture_errors_mode<T>(&mut self, mode: ErrorMode, f: impl FnOnce(&mut Machine) -> SourceResult<T>) -> SourceResult<T> {
+        let old = self.context.closure_capture;
+        self.context.closure_capture = mode;
+        let result = f(self);
+        self.context.closure_capture = old;
+        result
+    }
+}

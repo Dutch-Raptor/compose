@@ -1,10 +1,12 @@
+use crate::Iter;
+use compose_library::repr::Repr;
+use compose_library::vm::Vm;
+use compose_library::{IterValue, StringIterator, Value};
 use compose_macros::func;
-use std::fmt;
-use std::ops::Add;
-use compose_library::{StringIterator, Value};
 use compose_macros::{cast, scope, ty};
 use ecow::EcoString;
-use compose_library::repr::Repr;
+use std::fmt;
+use std::ops::Add;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[ty(scope, cast, name = "string")]
@@ -23,8 +25,18 @@ impl Add for &Str {
 #[scope]
 impl Str {
     #[func]
-    pub fn chars(self) -> StringIterator {
-        StringIterator::new(self.0)
+    pub fn chars(self, vm: &mut dyn Vm) -> IterValue {
+        IterValue::new(Iter::String(StringIterator::new(self.0)), vm)
+    }
+
+    #[func]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    #[func]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -51,7 +63,6 @@ impl From<String> for Str {
         Str(value.into())
     }
 }
-
 
 impl From<&str> for Str {
     fn from(s: &str) -> Self {

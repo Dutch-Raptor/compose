@@ -1,8 +1,6 @@
-use crate::vm::FlowEvent;
-use crate::{Eval, Vm};
-use compose_library::diag::{
-    bail, error, IntoSourceDiagnostic, SourceResult, Spanned,
-};
+use crate::vm::{FlowEvent, Tracked, TrackedContainer};
+use crate::{Eval, Machine};
+use compose_library::diag::{bail, error, IntoSourceDiagnostic, SourceResult, Spanned};
 use compose_library::{
     Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError,
     World,
@@ -15,7 +13,7 @@ use std::collections::HashMap;
 impl Eval for ast::Closure<'_> {
     type Output = Value;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         let mut defaults = Vec::new();
         for param in self.params().children() {
             if let ast::ParamKind::Named(named) = param.kind() {
@@ -29,7 +27,7 @@ impl Eval for ast::Closure<'_> {
             for capture in self.captures().children() {
                 let span = capture.binding().span();
                 let name = capture.binding().get();
-                let binding = match vm.scopes.get(&capture.binding()).cloned() {
+                let binding = match vm.get(&capture.binding()).cloned() {
                     Ok(v) => v,
                     Err(e) => {
                         let VariableAccessError::Unbound(unbound) = e else {
@@ -73,8 +71,11 @@ impl Eval for ast::Closure<'_> {
         };
 
         let unresolved_captures = {
-            let mut visitor =
-                CapturesVisitor::new(&vm.scopes, Some(vm.engine.world.library()), &captured);
+            let mut visitor = CapturesVisitor::new(
+                &vm.frames.top.scopes,
+                Some(vm.engine.world.library()),
+                &captured,
+            );
             visitor.visit(self.body().to_untyped());
             visitor.finish()
         };
@@ -104,7 +105,7 @@ impl Eval for ast::Closure<'_> {
 fn validate_capture<'a>(
     capture: ast::Capture,
     binding: &'a Binding,
-    vm: &mut Vm,
+    vm: &mut Machine,
 ) -> SourceResult<&'a Value> {
     let span = capture.binding().span();
     let name = capture.binding().get();
@@ -133,7 +134,7 @@ fn validate_capture<'a>(
 }
 
 fn define(
-    vm: &mut Vm,
+    vm: &mut Machine,
     ident: Ident,
     Spanned { value, span }: Spanned<Value>,
     param: Param,
@@ -164,12 +165,7 @@ fn define(
     Ok(())
 }
 
-pub fn eval_closure(
-    func: &Func,
-    closure: &Closure,
-    world: &dyn World,
-    mut args: Args,
-) -> SourceResult<Value> {
+pub fn eval_closure(closure: &Closure, vm: &mut Machine, mut args: Args) -> SourceResult<Value> {
     let ast_closure = closure
         .node
         .cast::<ast::Closure>()
@@ -177,51 +173,66 @@ pub fn eval_closure(
     let params = ast_closure.params();
     let body = ast_closure.body();
 
-    // Don't use the scope from the call site
-    let mut inner_vm = Vm::new(world);
+    let track_marker = vm.track_marker();
 
-    if let Some(Spanned { value, span }) = &closure.name {
-        inner_vm.try_bind(value.clone(), Binding::new(func.clone(), *span))?;
-    }
-
-    for (k, v) in closure.captured.bindings() {
-        inner_vm.scopes.top.bind(k.clone(), v.clone());
-    }
-
-    let mut defaults = closure.defaults.iter();
-    for p in params.children() {
-        match p.kind() {
-            ast::ParamKind::Pos(pattern) => match pattern {
-                ast::Pattern::Single(ast::Expr::Ident(ident)) => {
-                    define(&mut inner_vm, ident, args.expect(&ident)?, p)?;
-                }
-                pattern => bail!(pattern.span(), "Patterns not supported in closures yet"),
-            },
-            ast::ParamKind::Named(named) => {
-                let name = named.name();
-                let default = defaults.next().unwrap();
-                let value = args
-                    .named(&name)?
-                    .unwrap_or_else(|| Spanned::new(default.clone(), named.expr().span()));
-                define(&mut inner_vm, name, value, p)?;
+    // We do need access to the same heap, so we give this vm access to the heap, while evaluating the
+    // closure
+    let result = vm
+        .with_frame(move |vm| {
+            if let Some(Spanned { value, span }) = &closure.name {
+                vm.try_bind(
+                    value.clone(),
+                    Binding::new(Func::from(closure.clone()), *span),
+                )?;
             }
-        }
-    }
 
-    // Ensure all args have been used
-    args.finish()?;
+            for (k, v) in closure.captured.bindings() {
+                vm.bind(k.clone(), v.clone());
+            }
 
-    let output = body.eval(&mut inner_vm)?;
-    match inner_vm.flow {
-        None => {}
-        Some(FlowEvent::Return(_, Some(explicit))) => return Ok(explicit),
-        Some(FlowEvent::Return(_, None)) => {}
-        Some(other) => bail!(other.forbidden()),
-    }
-    Ok(output)
+            let mut defaults = closure.defaults.iter();
+            for p in params.children() {
+                match p.kind() {
+                    ast::ParamKind::Pos(pattern) => match pattern {
+                        ast::Pattern::Single(ast::Expr::Ident(ident)) => {
+                            define(vm, ident, args.expect(&ident)?, p)?;
+                        }
+                        pattern => bail!(pattern.span(), "Patterns not supported in closures yet"),
+                    },
+                    ast::ParamKind::Named(named) => {
+                        let name = named.name();
+                        let default = defaults.next().unwrap();
+                        let value = args
+                            .named(&name)?
+                            .unwrap_or_else(|| Spanned::new(default.clone(), named.expr().span()));
+                        define(vm, name, value, p)?;
+                    }
+                }
+            }
+
+            // Ensure all args have been used
+            args.finish()?;
+
+            let output = body.eval(vm)?.tracked(vm);
+            match &vm.flow {
+                None => {}
+                Some(FlowEvent::Return(_, Some(explicit))) => return Ok(explicit.clone()),
+                Some(FlowEvent::Return(_, None)) => {}
+                Some(other) => bail!(other.forbidden()),
+            }
+            SourceResult::Ok(output)
+        })
+        .tracked(vm);
+
+    vm.maybe_gc();
+
+    vm.track_forget(track_marker);
+
+    result
 }
 
 /// Visits a closure and determines which variables are captured implicitly.
+#[derive(Debug)]
 pub struct CapturesVisitor<'a> {
     /// The external scope that variables might be captured from.
     external: &'a Scopes<'a>,
@@ -321,7 +332,6 @@ impl<'a> CapturesVisitor<'a> {
                 }
             }
         }
-
     }
 
     fn bind(&mut self, ident: Ident) {
@@ -361,41 +371,42 @@ mod tests {
     fn capturing() {
         assert_eval(
             r#"
-            let a = 10
-            let f = |a| () => a + 1
-            assert::eq(f(), 11)
+            let a = 10;
+            let f = |a| () => a + 1;
+            assert::eq(f(), 11);
         "#,
         );
 
         assert_eval(
             r#"
-            let mut a = box::new(5)
+            let mut a = box::new(5);
             let f = |ref mut a| () => {
-                a += 1
-                a
-            }
-            assert::eq(f(), 6)
+                *a += 1;
+                *a;
+            };
+            assert::eq(f(), 6);
         "#,
         );
 
         assert_eval(
             r#"
-            let a = 2
-            let b = 3
-            let f = |a, b| () => a * b
-            assert::eq(f(), 6)
+            let a = 2;
+            let b = 3;
+            let f = |a, b| () => a * b;
+            assert::eq(f(), 6);
         "#,
         );
 
         assert_eval(
             r#"
-            let mut name = box::new("Alice")
-            let age = 30
+            let mut name = box::new("Alice");
+            let age = 30;
             let show = |ref name, age| () => {
-                "Name: " + name + ", Age: " + age.repr()
-            }
-            assert::eq(show(), "Name: Alice, Age: 30")
-            name = "bob";
+                "Name: " + *name + ", Age: " + age.repr();
+            };
+            assert::eq(show(), "Name: Alice, Age: 30");
+            *name = "Bob";
+            assert::eq(show(), "Name: Bob, Age: 30");
         "#,
         );
     }
@@ -434,13 +445,12 @@ mod tests {
         test(s, e, "let t = x;", &["x"]);
         test(s, e, "let x = x;", &["x"]);
         test(s, e, "let x;", &[]);
-        test(s, e, "let x = 2; x + y", &["y"]);
+        test(s, e, "let x = 2; x + y;", &["y"]);
         test(s, e, "x + y", &["x", "y"]);
-        
+
         // assignment
-        test(s, e, "x += y", &["x", "y"]);
-        test(s, e, "x = y", &["x", "y"]);
-        
+        test(s, e, "x += y;", &["x", "y"]);
+        test(s, e, "x = y;", &["x", "y"]);
 
         // closure definition
         // Closure bodies are ignored
@@ -451,22 +461,27 @@ mod tests {
         // with params
         test(s, e, "let f = (x, y, z) => f();", &[]);
         // named params
-        test(s, e, "let f = (x = x, y = y, z = z) => f();", &["x", "y", "z"]);
+        test(
+            s,
+            e,
+            "let f = (x = x, y = y, z = z) => f();",
+            &["x", "y", "z"],
+        );
 
         // for loop
-        test(s, e, "for x in y { x + z }", &["y", "z"]);
-        test(s, e, "for x in y { x }; x", &["x", "y"]);
+        test(s, e, "for x in y { x + z; };", &["y", "z"]);
+        test(s, e, "for x in y { x; }; x", &["x", "y"]);
 
         // block
-        test(s, e, "{ x }", &["x"]);
-        test(s, e, "{ let x; x }", &[]);
-        test(s, e, "{ let x; x }; x", &["x"]);
-        
+        test(s, e, "{ x; };", &["x"]);
+        test(s, e, "{ let x; x; };", &[]);
+        test(s, e, "{ let x; x; }; x;", &["x"]);
+
         // field access
-        test(s, e, "x.y.f(z)", &["x", "z"]);
-        
+        test(s, e, "x.y.f(z);", &["x", "z"]);
+
         // parenthesized
-        test(s, e, "(x + z)", &["x", "z"]);
-        test(s, e, "(((x) => x + y) + y)", &["y"]);
+        test(s, e, "(x + z);", &["x", "z"]);
+        test(s, e, "(((x) => x + y) + y);", &["y"]);
     }
 }

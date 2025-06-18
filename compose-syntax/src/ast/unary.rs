@@ -15,6 +15,7 @@ impl<'a> Unary<'a> {
             .unwrap_or(UnOp::Plus)
     }
 
+
     pub fn expr(self) -> Expr<'a> { self.0.cast_last() }
 }
 
@@ -24,6 +25,7 @@ pub enum UnOp {
     Minus,
     Bang,
     Tilde,
+    Star,
 }
 
 impl UnOp {
@@ -33,6 +35,7 @@ impl UnOp {
             SyntaxKind::Minus => Self::Minus,
             SyntaxKind::Bang => Self::Bang,
             SyntaxKind::Tilde => Self::Tilde,
+            SyntaxKind::Star => Self::Star,
             _ => return None,
         })
     }
@@ -43,6 +46,7 @@ impl UnOp {
             Self::Minus => "-",
             Self::Bang => "!",
             Self::Tilde => "~",
+            Self::Star => "*",
         }
     }
 }
@@ -52,6 +56,7 @@ impl PrecedenceTrait for UnOp {
         match self {
             Self::Plus | Self::Minus => Precedence::Sum,
             Self::Bang | Self::Tilde => Precedence::Prefix,
+            Self::Star => Precedence::Prefix,
         }
     }
 }

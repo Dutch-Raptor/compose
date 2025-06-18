@@ -1,42 +1,213 @@
-use dumpster::sync::Gc;
-use dumpster::Trace;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+mod clean;
+mod trigger;
 
-#[derive(Debug, Clone, Trace)]
-pub struct GcValue<T>(Gc<RwLock<T>>)
-where
-    T: Trace + Send + Sync + 'static;
+use crate::gc::trigger::GcTriggerPolicy;
+use crate::Value;
+use compose_library::gc::trigger::GcData;
+use compose_library::Iter;
+use slotmap::{new_key_type, SlotMap};
+use std::fmt::Debug;
+use std::ops::Deref;
 
-impl<T> GcValue<T>
-where
-    T: Trace + Send + Sync + 'static,
-{
-    pub fn new(value: T) -> Self {
-        GcValue(Gc::new(RwLock::new(value)))
+#[derive(Debug)]
+pub struct Heap {
+    map: SlotMap<UntypedRef, HeapItem>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct HeapRef<T: HeapObject> {
+    key: UntypedRef,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T: HeapObject> Clone for HeapRef<T> {
+    fn clone(&self) -> Self {
+        HeapRef {
+            key: self.key,
+            _marker: Default::default(),
+        }
     }
+}
+impl<T: HeapObject> Copy for HeapRef<T> {}
 
-    pub fn get_mut(&self) -> RwLockWriteGuard<T> {
-        self.0.write().unwrap()
-    }
-
-    pub fn try_get(&self) -> Option<RwLockReadGuard<T>> {
-        self.0.try_read().ok()
-    }
-
-    pub fn try_get_mut(&self) -> Option<RwLockWriteGuard<T>> {
-        self.0.try_write().ok()
-    }
-
-    pub fn as_ptr(&self) -> *const RwLock<T> {
-        Gc::<RwLock<T>>::as_ptr(&self.0)
+impl<T: HeapObject> HeapRef<T> {
+    pub fn key(&self) -> UntypedRef {
+        self.key
     }
 }
 
-impl<T> GcValue<T>
+impl<T> Deref for HeapRef<T>
 where
-    T: Trace + Send + Sync + Clone + 'static,
+    T: HeapObject,
 {
-    pub fn try_clone_inner(&self) -> Option<T> {
-        self.0.try_read().map(|v| v.clone()).ok()
+    type Target = UntypedRef;
+
+    fn deref(&self) -> &Self::Target {
+        &self.key
+    }
+}
+
+impl<T> From<UntypedRef> for HeapRef<T>
+where
+    T: HeapObject,
+{
+    fn from(key: UntypedRef) -> Self {
+        Self {
+            key,
+            _marker: Default::default(),
+        }
+    }
+}
+
+new_key_type! {
+    pub struct UntypedRef;
+}
+
+impl<T> HeapRef<T>
+where
+    T: HeapObject,
+{
+    pub fn get(self, heap: &Heap) -> Option<&T> {
+        heap.get(self)
+    }
+
+    pub fn get_mut(self, heap: &mut Heap) -> Option<&mut T> {
+        heap.get_mut(self)
+    }
+}
+
+impl Heap {
+    pub fn new() -> Self {
+        Self {
+            map: SlotMap::with_key(),
+        }
+    }
+
+    pub fn get_mut<T: HeapObject>(&mut self, key: HeapRef<T>) -> Option<&mut T> {
+        self.map.get_mut(*key)?.as_type_mut()
+    }
+    pub fn alloc<T: HeapObject>(&mut self, value: T) -> HeapRef<T> {
+        self.map.insert(value.to_untyped()).into()
+    }
+
+    pub fn data(&self) -> GcData {
+        GcData {
+            heap_size: self.map.len(),
+        }
+    }
+
+    pub fn get<T: HeapObject>(&self, key: HeapRef<T>) -> Option<&T> {
+        self.map.get(*key)?.as_type()
+    }
+
+    pub fn remove<T: HeapObject>(&mut self, key: HeapRef<T>) -> Option<HeapItem> {
+        self.map.remove(*key)
+    }
+}
+
+/// A type that can keep references to heap values
+pub trait Trace {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef));
+}
+
+impl Trace for &[UntypedRef] {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        for key in *self {
+            f(*key)
+        }
+    }
+}
+
+pub trait HeapObject: Trace + Debug {
+    fn from_untyped(untyped: &HeapItem) -> Option<&Self>;
+    fn from_untyped_mut(untyped: &mut HeapItem) -> Option<&mut Self>;
+    fn to_untyped(self) -> HeapItem;
+}
+
+macro_rules! heap_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $enum_name:ident {
+            $(
+                $variant:ident($ty:ty)
+            ),* $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        pub enum $enum_name {
+            $(
+                $variant($ty),
+            )*
+        }
+
+        impl Trace for $enum_name {
+            fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+                match self {
+                    $(
+                        $enum_name::$variant(inner) => inner.visit_refs(f),
+                    )*
+                }
+            }
+        }
+    };
+}
+
+impl Trace for Value {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        match self {
+            Value::Int(_) => {}
+            Value::Bool(_) => {}
+            Value::Unit(_) => {}
+            Value::Str(_) => {}
+            Value::Func(func) => func.visit_refs(f),
+            Value::Type(ty) => ty.visit_refs(f),
+            Value::Iterator(i) => i.visit_refs(f),
+            Value::Box(b) => f(b.key()),
+        }
+    }
+}
+
+macro_rules! impl_heap_obj {
+    ($ident:ident, $ty:ty) => {
+        impl HeapObject for $ty {
+            fn from_untyped(untyped: &HeapItem) -> Option<&Self> {
+                match untyped {
+                    HeapItem::$ident(v) => Some(v),
+                    _ => None,
+                }
+            }
+
+            fn from_untyped_mut(untyped: &mut HeapItem) -> Option<&mut Self> {
+                match untyped {
+                    HeapItem::$ident(v) => Some(v),
+                    _ => None,
+                }
+            }
+
+            fn to_untyped(self) -> HeapItem {
+                HeapItem::$ident(self)
+            }
+        }
+    };
+}
+
+impl_heap_obj!(Value, Value);
+impl_heap_obj!(Iter, Iter);
+
+heap_enum! {
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum HeapItem {
+        Value(Value),
+        Iter(Iter)
+    }
+}
+
+impl HeapItem {
+    fn as_type<T: HeapObject>(&self) -> Option<&T> {
+        T::from_untyped(self)
+    }
+
+    fn as_type_mut<T: HeapObject>(&mut self) -> Option<&mut T> {
+        T::from_untyped_mut(self)
     }
 }

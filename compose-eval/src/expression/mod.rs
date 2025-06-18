@@ -1,6 +1,6 @@
+use crate::vm::Machine;
 use crate::Eval;
-use crate::vm::Vm;
-use compose_library::diag::SourceResult;
+use compose_library::diag::{At, SourceResult};
 use compose_library::{UnitValue, Value};
 use compose_syntax::ast::{AstNode, Expr};
 
@@ -22,7 +22,7 @@ pub use closure::eval_closure;
 impl Eval for Expr<'_> {
     type Output = Value;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         let span = self.span();
         let v = match self {
             Expr::Int(i) => i.eval(vm),

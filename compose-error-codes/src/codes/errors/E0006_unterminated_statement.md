@@ -1,6 +1,7 @@
-## E0006: A semicolon or newline is required after each statement.
+## E0006: A semicolon is required after each statement.
 
-In Compose, each statement must be followed by either a semicolon (`;`) or a newline. This makes statement boundaries unambiguous and consistent.
+In Compose, each statement must be followed by a semicolon (`;`). This makes statement boundaries unambiguous and
+consistent.
 
 ---
 
@@ -16,13 +17,7 @@ let x = 1 let y = 2
 let x = 1; let y = 2;
 ```
 
-or
-
-```compose
-let x = 1
-let y = 2
-```
-
 ---
 
-This rule applies to all statements, including variable declarations, expressions in blocks, and control-flow constructs. Use semicolons to write multiple statements on one line, or place each on a new line.
+This rule applies to all statements, including variable declarations, expressions in blocks, and control-flow
+constructs.

@@ -1,13 +1,13 @@
-use crate::ReplArgs;
 use crate::error::CliError;
-use crate::repl::editor::{EditorFooter, EditorGutter, EditorHistory, EditorReader, print_input};
+use crate::repl::editor::{print_input, EditorFooter, EditorGutter, EditorHistory, EditorReader};
 use crate::world::SystemWorld;
+use crate::ReplArgs;
 use compose::error_codes::lookup;
 use compose_editor::editor::Editor;
 use compose_editor::renderer::full::CrosstermRenderer;
-use compose_eval::{EvalConfig, Vm};
+use compose_eval::{EvalConfig, Machine};
 use compose_explain::Explain;
-use compose_library::diag::{Warned, eco_format};
+use compose_library::diag::{eco_format, Warned};
 use compose_library::{Value, World};
 use compose_syntax::Source;
 use std::fs;
@@ -21,7 +21,7 @@ pub fn repl(args: ReplArgs) -> Result<(), CliError> {
     };
 
     let world = SystemWorld::from_str(&start_text);
-    let mut vm = Vm::new(&world);
+    let mut vm = Machine::new(&world);
 
     if !start_text.is_empty() {
         // Show the initial source
@@ -104,7 +104,7 @@ fn print_help() {
     "}
 }
 
-fn handle_repl_commands(vm: &mut Vm, world: &SystemWorld, input: &str) -> Option<ReplCommand> {
+fn handle_repl_commands(vm: &mut Machine, world: &SystemWorld, input: &str) -> Option<ReplCommand> {
     match input.trim() {
         ":q" | ":quit" => return Some(ReplCommand::Quit),
         ":vmstate" => {
@@ -170,7 +170,7 @@ enum ReplCommand {
     Handled,
 }
 
-fn eval_initial_pass(vm: &mut Vm, world: &SystemWorld) {
+fn eval_initial_pass(vm: &mut Machine, world: &SystemWorld) {
     let source = entrypoint(world);
 
     let warnings: Vec<_> = source.warnings().into_iter().map(|w| w.into()).collect();
@@ -190,7 +190,7 @@ fn eval_initial_pass(vm: &mut Vm, world: &SystemWorld) {
     }
 }
 
-pub fn eval_repl_input(vm: &mut Vm, world: &SystemWorld, input: &str, args: &ReplArgs) {
+pub fn eval_repl_input(vm: &mut Machine, world: &SystemWorld, input: &str, args: &ReplArgs) {
     if input.is_empty() {
         return;
     }

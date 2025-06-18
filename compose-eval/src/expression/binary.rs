@@ -1,7 +1,7 @@
+use crate::vm::Machine;
 use crate::Eval;
-use crate::vm::Vm;
-use compose_library::diag::{At, SourceResult, StrResult, bail};
-use compose_library::{Value, ops};
+use compose_library::diag::{bail, At, SourceResult, StrResult};
+use compose_library::{ops, Value};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
 use std::ops::Deref;
@@ -9,13 +9,14 @@ use std::ops::Deref;
 impl Eval for ast::Binary<'_> {
     type Output = Value;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         match self.op() {
             BinOp::Add => apply_binary(self, vm, ops::add),
             BinOp::Sub => apply_binary(self, vm, ops::sub),
             BinOp::Mul => apply_binary(self, vm, ops::mul),
             BinOp::Lt => apply_binary(self, vm, ops::lt),
             BinOp::Gt => apply_binary(self, vm, ops::gt),
+            BinOp::Gte => apply_binary(self, vm, ops::gte),
             BinOp::Eq => apply_binary(self, vm, ops::eq),
             BinOp::Neq => apply_binary(self, vm, ops::neq),
             other => bail!(
@@ -29,7 +30,7 @@ impl Eval for ast::Binary<'_> {
 
 fn apply_binary(
     binary: ast::Binary,
-    vm: &mut Vm,
+    vm: &mut Machine,
     op: fn(&Value, &Value) -> StrResult<Value>,
 ) -> SourceResult<Value> {
     let l = binary.lhs();
@@ -43,9 +44,7 @@ fn apply_binary(
     let r = binary.rhs();
     let rhs = r.eval(vm)?;
 
-    let rhs = rhs.as_ref().at(r.span())?;
-    let lhs = lhs.as_ref().at(l.span())?;
-    op(lhs.deref(), rhs.deref()).at(binary.span())
+    op(&lhs, &rhs).at(binary.span())
 }
 
 trait ShortCircuits {
