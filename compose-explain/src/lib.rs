@@ -1,13 +1,13 @@
-use std::fmt::Write;
 use crate::world::ExplainWorld;
-use codespan_reporting::term::Config;
 use codespan_reporting::term::termcolor::Ansi;
+use codespan_reporting::term::Config;
 use compose_error_codes::ErrorCode;
-use compose_eval::{EvalConfig, Vm};
+use compose_eval::{EvalConfig, Machine};
+use compose_library::diag::{write_diagnostics, Warned};
 use compose_library::Value;
-use compose_library::diag::{Warned, write_diagnostics};
 use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
 use regex::Regex;
+use std::fmt::Write;
 
 mod world;
 
@@ -117,7 +117,7 @@ fn process_markdown(input: &str) -> String {
 
 fn execute_with_diagnostics(code: &str) -> String {
     let world = ExplainWorld::from_str(code);
-    let mut vm = Vm::new(&world);
+    let mut vm = Machine::new(&world);
 
     let mut diags_buffer = vec![];
     let mut wtr = Ansi::new(&mut diags_buffer);

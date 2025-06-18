@@ -46,7 +46,7 @@ pub const ARG_RECOVER: SyntaxSet = syntax_set![
     NewLine,
 ];
 
-pub const UNARY_OP: SyntaxSet = syntax_set![Plus, Minus, Bang, Tilde];
+pub const UNARY_OP: SyntaxSet = syntax_set![Plus, Minus, Bang, Tilde, Star];
 
 pub const BINARY_OP: SyntaxSet = syntax_set![
     // Basic arithmetic

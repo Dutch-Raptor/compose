@@ -5,19 +5,19 @@ mod vm;
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub use crate::vm::Vm;
+pub use crate::vm::Machine;
+use compose_library::diag::{error, SourceDiagnostic, SourceResult, Warned};
 use compose_library::Value;
-use compose_library::diag::{SourceDiagnostic, SourceResult, Warned, error};
-use compose_syntax::Source;
 use compose_syntax::ast::Statement;
-use ecow::{EcoVec, eco_vec};
+use compose_syntax::Source;
+use ecow::{eco_vec, EcoVec};
 use std::cmp::min;
 use std::ops::Range;
 
 pub trait Eval {
     type Output;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output>;
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output>;
 }
 
 #[derive(Default)]
@@ -27,7 +27,7 @@ pub struct EvalConfig {
 }
 
 
-pub fn eval(source: &Source, vm: &mut Vm, eval_config: &EvalConfig) -> Warned<SourceResult<Value>> {
+pub fn eval(source: &Source, vm: &mut Machine, eval_config: &EvalConfig) -> Warned<SourceResult<Value>> {
     eval_range(source, 0..usize::MAX, vm, eval_config)
 }
 
@@ -37,7 +37,7 @@ pub fn eval(source: &Source, vm: &mut Vm, eval_config: &EvalConfig) -> Warned<So
 pub fn eval_range(
     source: &Source,
     eval_range: Range<usize>,
-    vm: &mut Vm,
+    vm: &mut Machine,
     config: &EvalConfig,
 ) -> Warned<SourceResult<Value>> {
     let mut result = Value::unit();
@@ -87,7 +87,7 @@ pub fn eval_range(
 
 pub fn build_err(
     syntax_warnings: &[SourceDiagnostic],
-    vm: &mut Vm,
+    vm: &mut Machine,
     errs: EcoVec<SourceDiagnostic>,
     config: &EvalConfig,
 ) -> Warned<SourceResult<Value>> {

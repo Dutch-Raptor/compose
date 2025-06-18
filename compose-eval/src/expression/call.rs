@@ -1,28 +1,29 @@
-use crate::{Eval, Vm};
-use compose_library::diag::{At, SourceResult, Spanned, bail};
+use crate::vm::ErrorMode;
+use crate::{Eval, Machine};
+use compose_library::diag::{bail, At, SourceResult, Spanned};
 use compose_library::{Arg, Args, Func, NativeScope, Type, UnboundItem, Value};
 use compose_syntax::ast::AstNode;
-use compose_syntax::{Span, ast};
+use compose_syntax::{ast, Span};
 use ecow::EcoVec;
 use extension_traits::extension;
 
 impl Eval for ast::FuncCall<'_> {
     type Output = Value;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         let callee_span = self.callee().span();
 
         let (callee, args) = self.eval_callee_and_args(vm)?;
 
         let func = callee.cast::<Func>().at(callee_span)?;
 
-        func.call(&mut vm.engine, args)
+        func.call(vm, args)
     }
 }
 
 #[extension(trait FuncCallExt)]
 impl ast::FuncCall<'_> {
-    fn eval_callee_and_args(&self, vm: &mut Vm) -> SourceResult<(Value, Args)> {
+    fn eval_callee_and_args(&self, vm: &mut Machine) -> SourceResult<(Value, Args)> {
         if let ast::Expr::FieldAccess(field_access) = self.callee() {
             self.eval_method_call(&field_access, vm)
         } else {
@@ -33,7 +34,7 @@ impl ast::FuncCall<'_> {
     fn eval_method_call(
         &self,
         field_access: &ast::FieldAccess,
-        vm: &mut Vm,
+        vm: &mut Machine,
     ) -> SourceResult<(Value, Args)> {
         let target_expr = field_access.target();
         let field = field_access.field();
@@ -54,7 +55,8 @@ impl ast::FuncCall<'_> {
                             err2.possible_misspellings.extend(err.possible_misspellings);
                             return Err(err2.with_item(UnboundItem::FieldOrMethod(Some(
                                 target.ty().name().into(),
-                            )))).at(field.span());
+                            ))))
+                                .at(field.span());
                         }
                     }
                 }
@@ -82,7 +84,7 @@ impl ast::FuncCall<'_> {
         Ok((callee, args))
     }
 
-    fn eval_regular_call(&self, vm: &mut Vm) -> SourceResult<(Value, Args)> {
+    fn eval_regular_call(&self, vm: &mut Machine) -> SourceResult<(Value, Args)> {
         let callee = self.callee().eval(vm)?;
         let args = self.args().eval(vm)?.spanned(self.span());
         Ok((callee, args))
@@ -106,24 +108,30 @@ fn err_call_associated_function_as_method<T>(
 impl Eval for ast::Args<'_> {
     type Output = Args;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         let mut items = EcoVec::with_capacity(self.items().count());
 
-        for arg in self.items() {
-            let span = arg.span();
-            match arg {
-                ast::Arg::Pos(expr) => items.push(Arg {
-                    span,
-                    name: None,
-                    value: Spanned::new(expr.eval(vm)?, expr.span()),
-                }),
-                ast::Arg::Named(named) => items.push(Arg {
-                    span,
-                    name: Some(named.name().get().into()),
-                    value: Spanned::new(named.expr().eval(vm)?, named.expr().span()),
-                }),
+        // If we are within a let binding, function args cannot refer to the let binding,
+        // So there is no need to defer these errors
+        vm.with_closure_capture_errors_mode(ErrorMode::Immediate, |vm| {
+            for arg in self.items() {
+                let span = arg.span();
+                match arg {
+                    ast::Arg::Pos(expr) => items.push(Arg {
+                        span,
+                        name: None,
+                        value: Spanned::new(expr.eval(vm)?, expr.span()),
+                    }),
+                    ast::Arg::Named(named) => items.push(Arg {
+                        span,
+                        name: Some(named.name().get().into()),
+                        value: Spanned::new(named.expr().eval(vm)?, named.expr().span()),
+                    }),
+                }
             }
-        }
+
+            Ok(())
+        })?;
 
         // Do not assign a span here, we want to assign the span at the callsite (the whole call)
         Ok(Args {

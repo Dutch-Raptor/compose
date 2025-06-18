@@ -1,9 +1,10 @@
-use crate::Value;
-use crate::diag::{At, SourceDiagnostic, SourceResult, Spanned, bail, error};
-use crate::foundations::IntoValue;
+use crate::diag::{bail, error, At, SourceDiagnostic, SourceResult, Spanned};
 use crate::foundations::cast::FromValue;
+use crate::foundations::IntoValue;
+use crate::{Trace, Value};
+use compose_library::UntypedRef;
 use compose_syntax::Span;
-use ecow::{EcoVec, eco_vec};
+use ecow::{eco_vec, EcoVec};
 
 pub struct Args {
     pub span: Span,
@@ -156,4 +157,12 @@ pub struct Arg {
     pub span: Span,
     pub name: Option<String>,
     pub value: Spanned<Value>,
+}
+
+impl Trace for Args {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        for arg in &self.items {
+            arg.value.value.visit_refs(f);
+        }
+    }
 }

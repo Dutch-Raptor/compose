@@ -1,13 +1,13 @@
-use crate::FileArgs;
 use crate::error::CliError;
 use crate::world::SystemWorld;
-use compose_eval::{EvalConfig, Vm};
+use crate::FileArgs;
+use compose_eval::{EvalConfig, Machine};
 use compose_library::diag::Warned;
 
 pub fn file(args: FileArgs) -> Result<(), CliError> {
     let file = args.file;
     let world = SystemWorld::from_file(file)?;
-    let mut vm = Vm::new(&world);
+    let mut vm = Machine::new(&world);
     let source = world.entry_point_source()?;
 
     if args.print_ast {

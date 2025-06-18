@@ -1,14 +1,14 @@
-use crate::diag::{SourceResult, StrResult, bail};
+use crate::diag::{bail, SourceResult, StrResult};
 use crate::foundations::args::Args;
-use crate::{Sink, Value};
-use compose_library::diag::{Spanned, error};
-use compose_library::{Engine, Scope};
+use crate::vm::Vm;
+use crate::{Sink, Trace, Value};
+use compose_library::diag::{error, Spanned};
+use compose_library::{Scope, UntypedRef};
 use compose_macros::{cast, ty};
 use compose_syntax::ast::AstNode;
-use compose_syntax::{Label, Span, SyntaxNode, ast};
+use compose_syntax::{ast, Label, Span, SyntaxNode};
 use compose_utils::Static;
-use dumpster::{Trace, Visitor};
-use ecow::{EcoString, eco_format, eco_vec};
+use ecow::{eco_format, eco_vec, EcoString};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::LazyLock;
@@ -16,16 +16,8 @@ use std::sync::LazyLock;
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast)]
 pub struct Func {
-    repr: Repr,
-    span: Span,
-}
-
-unsafe impl Trace for Func {
-    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
-        self.repr.accept(visitor)?;
-
-        Ok(())
-    }
+    pub kind: FuncKind,
+    pub span: Span,
 }
 
 impl Func {
@@ -37,7 +29,7 @@ impl Func {
     }
 
     pub(crate) fn named(mut self, name: Spanned<EcoString>) -> Func {
-        if let Repr::Closure(closure) = &mut self.repr {
+        if let FuncKind::Closure(closure) = &mut self.kind {
             closure.unresolved_captures.remove(&name.value);
             closure.name = Some(name);
         }
@@ -45,7 +37,7 @@ impl Func {
     }
 
     pub(crate) fn resolve(&self) -> SourceResult<()> {
-        if let Repr::Closure(closure) = &self.repr {
+        if let FuncKind::Closure(closure) = &self.kind {
             closure.resolve()?;
         }
         Ok(())
@@ -58,53 +50,49 @@ impl Func {
 
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.repr {
-            Repr::Native(native) => write!(f, "{}", native.0.name),
-            Repr::Closure(closure) => closure.fmt(f),
+        match &self.kind {
+            FuncKind::Native(native) => write!(f, "{}", native.0.name),
+            FuncKind::Closure(closure) => closure.fmt(f),
+        }
+    }
+}
+
+impl Trace for Func {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        match &self.kind {
+            FuncKind::Native(native) => {
+                native.scope.visit_refs(f);
+            }
+            FuncKind::Closure(closure) => {
+                closure.captured.visit_refs(f);
+                closure.defaults.iter().for_each(|v| v.visit_refs(f));
+            }
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum Repr {
+pub enum FuncKind {
     Native(Static<NativeFuncData>),
-    Closure(Closure),
-}
-
-unsafe impl Trace for Repr {
-    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
-        match self {
-            Repr::Native(native) => native.0.accept(visitor),
-            Repr::Closure(closure) => closure.accept(visitor),
-        }
-    }
+    Closure(Box<Closure>),
 }
 
 impl Func {
-    pub fn call(&self, engine: &mut Engine, mut args: Args) -> SourceResult<Value> {
-        match &self.repr {
-            Repr::Native(native) => {
-                let value = (native.closure)(engine, &mut args)?;
-                args.finish()?;
-                Ok(value)
-            }
-            Repr::Closure(closure) => {
-                (engine.routines.eval_closure)(self, closure, engine.world, args)
-            }
-        }
+    pub fn call(&self, vm: &mut dyn Vm, args: Args) -> SourceResult<Value> {
+        vm.call_func(self, args)
     }
 
     pub fn scope(&self) -> Option<&'static Scope> {
-        match &self.repr {
-            Repr::Native(native) => Some(&native.0.scope),
-            Repr::Closure(_) => None,
+        match &self.kind {
+            FuncKind::Native(native) => Some(&native.0.scope),
+            FuncKind::Closure(_) => None,
         }
     }
 
     pub fn name(&self) -> Option<&str> {
-        match &self.repr {
-            Repr::Native(native) => Some(native.0.name),
-            Repr::Closure(_) => None,
+        match &self.kind {
+            FuncKind::Native(native) => Some(native.0.name),
+            FuncKind::Closure(_) => None,
         }
     }
 
@@ -135,12 +123,12 @@ impl Func {
     }
 
     pub fn is_associated_function(&self) -> bool {
-        match self.repr {
-            Repr::Native(n) => match n.fn_type {
+        match self.kind {
+            FuncKind::Native(n) => match n.fn_type {
                 FuncType::Method => false,
                 FuncType::Associated => true,
             },
-            Repr::Closure(_) => false,
+            FuncKind::Closure(_) => false,
         }
     }
 }
@@ -151,23 +139,18 @@ pub trait NativeFunc {
 
 #[derive(Debug)]
 pub struct NativeFuncData {
-    pub closure: fn(&mut Engine, &mut Args) -> SourceResult<Value>,
+    pub closure: fn(&mut dyn Vm, &mut Args) -> SourceResult<Value>,
     pub name: &'static str,
     pub scope: LazyLock<&'static Scope>,
     pub fn_type: FuncType,
 }
 
-unsafe impl Trace for NativeFuncData {
-    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
-        // Safety:
-        // - `fn` type is just a pointer, does not contain any Gc<T>
-        // - `&'static str`, same as above
-        // - We delegate to the `Scope` `trace` impl
-        // - `FnType` is a simple enum, does not contain any Gc<T>
-        self.scope.accept(visitor)?;
-        Ok(())
+impl NativeFuncData {
+    pub fn call(&self, vm: &mut dyn Vm, mut args: Args) -> SourceResult<Value> {
+        (self.closure)(vm, &mut args)
     }
 }
+
 
 #[derive(Debug, Clone)]
 pub struct Closure {
@@ -226,15 +209,6 @@ impl Closure {
     }
 }
 
-unsafe impl Trace for Closure {
-    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
-        // Safety: Only defaults may contain Gc<T>
-        self.defaults.accept(visitor)?;
-
-        Ok(())
-    }
-}
-
 impl fmt::Display for Closure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let closure: ast::Closure = self.node.cast().expect("closure");
@@ -244,30 +218,30 @@ impl fmt::Display for Closure {
     }
 }
 
-#[derive(Debug, Trace)]
+#[derive(Debug)]
 pub enum FuncType {
     Method,
     Associated,
 }
 
-impl From<Repr> for Func {
-    fn from(value: Repr) -> Self {
+impl From<FuncKind> for Func {
+    fn from(value: FuncKind) -> Self {
         Self {
             span: Span::detached(),
-            repr: value,
+            kind: value,
         }
     }
 }
 
 impl From<&'static NativeFuncData> for Func {
     fn from(data: &'static NativeFuncData) -> Self {
-        Repr::Native(Static(data)).into()
+        FuncKind::Native(Static(data)).into()
     }
 }
 
 impl From<Closure> for Func {
     fn from(closure: Closure) -> Self {
-        Repr::Closure(closure).into()
+        FuncKind::Closure(Box::new(closure)).into()
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::vm::Vm;
+use crate::vm::{ErrorMode, Machine};
 use crate::Eval;
 use compose_library::diag::{At, SourceResult, Spanned};
 use compose_library::{diag, BindingKind, Value};
@@ -9,9 +9,11 @@ use ecow::eco_vec;
 impl<'a> Eval for ast::Ident<'a> {
     type Output = Value;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         let span = self.span();
         Ok(vm
+            .frames
+            .top
             .scopes
             .get(&self)
             .at(span)?
@@ -23,7 +25,7 @@ impl<'a> Eval for ast::Ident<'a> {
 impl<'a> Eval for ast::LetBinding<'a> {
     type Output = Value;
 
-    fn eval(self, vm: &mut Vm) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
         let has_init = self.has_initial_value();
         let init = self.initial_value();
 
@@ -35,7 +37,9 @@ impl<'a> Eval for ast::LetBinding<'a> {
         };
 
         let value = match init {
-            Some(expr) => vm.with_deferred_closure_capture_errors(|vm| expr.eval(vm))?,
+            Some(expr) => {
+                vm.with_closure_capture_errors_mode(ErrorMode::Deferred, |vm| expr.eval(vm))?
+            }
             None => Value::unit(),
         };
 
@@ -51,7 +55,7 @@ impl<'a> Eval for ast::LetBinding<'a> {
 }
 
 pub fn destructure_pattern(
-    vm: &mut Vm,
+    vm: &mut Machine,
     pattern: Pattern,
     value: Value,
     binding_kind: BindingKind,
@@ -59,7 +63,8 @@ pub fn destructure_pattern(
     destructure_impl(vm, pattern, value, &mut |vm, expr, value| match expr {
         Expr::Ident(ident) => {
             let name = ident.get().clone();
-            let spanned = value.named(Spanned::new(name, ident.span()))
+            let spanned = value
+                .named(Spanned::new(name, ident.span()))
                 // Now that the names have been added, make sure any deferred errors are resolved
                 .resolved()?;
 
@@ -75,10 +80,10 @@ pub fn destructure_pattern(
 }
 
 fn destructure_impl(
-    vm: &mut Vm,
+    vm: &mut Machine,
     pattern: Pattern,
     value: Value,
-    bind: &mut impl Fn(&mut Vm, Expr, Value) -> SourceResult<()>,
+    bind: &mut impl Fn(&mut Machine, Expr, Value) -> SourceResult<()>,
 ) -> SourceResult<()> {
     match pattern {
         Pattern::Single(expr) => bind(vm, expr, value)?,
@@ -101,12 +106,12 @@ mod tests {
     #[test]
     fn test_let_binding() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         eval_code_with_vm(&mut vm, &world, "let a = 3")
             .value
             .expect("failed to evaluate");
 
-        let binding = vm.scopes.top.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
 
         assert_eq!(binding.read(), &Value::Int(3));
         assert_eq!(
@@ -118,10 +123,10 @@ mod tests {
     #[test]
     fn test_let_mut_binding() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         assert_eval_with_vm(&mut vm, &world, "let mut a = 3");
 
-        let binding = vm.scopes.top.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
 
         assert_eq!(binding.read(), &Value::Int(3));
         assert_eq!(binding.kind(), BindingKind::Mutable);
@@ -130,10 +135,10 @@ mod tests {
     #[test]
     fn test_let_binding_without_value() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         assert_eval_with_vm(&mut vm, &world, "let a");
 
-        let binding = vm.scopes.top.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
 
         assert_eq!(binding.read(), &Value::unit());
         assert_eq!(binding.kind(), BindingKind::Uninitialized);
@@ -142,10 +147,10 @@ mod tests {
     #[test]
     fn test_let_mut_binding_without_value() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         assert_eval_with_vm(&mut vm, &world, "let mut a");
 
-        let binding = vm.scopes.top.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
         assert_eq!(binding.read(), &Value::unit());
         assert_eq!(binding.kind(), BindingKind::UninitializedMutable);
     }
@@ -153,7 +158,7 @@ mod tests {
     #[test]
     fn test_read_ident() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         // define the variable
         assert_eval_with_vm(&mut vm, &world, "let a = 3");
         // read the variable
@@ -164,7 +169,7 @@ mod tests {
     #[test]
     fn test_read_uninitialised_variable() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         // set up the variable
         assert_eval_with_vm(&mut vm, &world, "let a");
         // reading emits warning
@@ -180,10 +185,10 @@ mod tests {
     fn integration() {
         let result = assert_eval(
             r#"
-            let a = 3
-            let b = 4
-            let c = a + b
-            c * 2
+            let a = 3;
+            let b = 4;
+            let c = a + b;
+            c * 2;
         "#,
         );
 
@@ -193,10 +198,10 @@ mod tests {
     #[test]
     fn assign_mut() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         assert_eval_with_vm(&mut vm, &world, "let mut a = 3");
 
-        let binding = vm.scopes.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::Mutable);
 
         assert_eval_with_vm(&mut vm, &world, "a = 4");
@@ -204,17 +209,17 @@ mod tests {
         assert_eq!(result, Value::Int(4));
 
         // should still be mutable
-        let binding = vm.scopes.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::Mutable);
     }
 
     #[test]
     fn assign_mut_uninitialised() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         assert_eval_with_vm(&mut vm, &world, "let mut a");
 
-        let binding = vm.scopes.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::UninitializedMutable);
         assert_eq!(binding.read(), &Value::Unit(UnitValue));
 
@@ -223,17 +228,17 @@ mod tests {
         assert_eq!(result, Value::Int(4));
 
         // should now be mutable
-        let binding = vm.scopes.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::Mutable);
     }
 
     #[test]
     fn assign_uninitialised() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         assert_eval_with_vm(&mut vm, &world, "let a");
 
-        let binding = vm.scopes.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
         assert_eq!(binding.kind(), BindingKind::Uninitialized);
         assert_eq!(binding.read(), &Value::unit());
 
@@ -242,16 +247,16 @@ mod tests {
         assert_eq!(result, Value::Int(4));
 
         // should now be immutable
-        let binding = vm.scopes.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
         assert!(matches!(binding.kind(), BindingKind::Immutable { .. }));
     }
 
     #[test]
     fn assign_immut_error() {
         let world = TestWorld::new();
-        let mut vm = Vm::new(&world);
+        let mut vm = Machine::new(&world);
         assert_eval_with_vm(&mut vm, &world, "let a = 3");
-        let binding = vm.scopes.get("a").unwrap();
+        let binding = vm.get("a").unwrap();
         assert_eq!(
             binding.kind(),
             BindingKind::Immutable { first_assign: None }

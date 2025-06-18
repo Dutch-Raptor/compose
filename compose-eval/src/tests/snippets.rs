@@ -12,9 +12,9 @@ fn fibonacci() {
             a += b;
             b = a - b;
             i += 1;
-        }
+        };
 
-        a
+        a;
     "#;
 
     assert_eq!(assert_eval(input), Value::Int(7540113804746346429));
@@ -25,15 +25,15 @@ fn shared_state() {
     let input = r#"
         let mut i = box::new(0);
         
-        let inc = (ref mut v) => { v += 1; };
+        let inc = (ref mut v) => { *v += 1; };
         
         inc(i);
         
-        assert::eq(i, 1);
+        assert::eq(*i, 1);
         
         inc(i);
         
-        assert::eq(i, 2);
+        assert::eq(*i, 2);
     "#;
 
     assert_eval(input);
@@ -45,14 +45,14 @@ fn closure_recursion() {
         // Recursively clamps a value to <= 0;
         let no_pos = (v) => {
             if v > 0 {
-                no_pos(v - 1)
+                no_pos(v - 1);
             } else {
-                v
-            }
-        }
+                v;
+            };
+        };
 
-        assert::eq(no_pos(5), 0)
-        assert::eq(no_pos(-2), -2)
+        assert::eq(no_pos(5), 0);
+        assert::eq(no_pos(-2), -2);
     "#;
 
     assert_eval(input);
@@ -63,13 +63,13 @@ fn closure_recursion_2() {
     let input = r#"
         let fact = (n) => {
             if n == 0 {
-                1
+                1;
             } else {
-                n * fact(n - 1)
-            }
-        } 
+                n * fact(n - 1);
+            };
+        } ;
         
-        assert::eq(fact(5), 120)
+        assert::eq(fact(5), 120);
     "#;
 
     assert_eval(input);
@@ -81,20 +81,20 @@ fn closure_capturing() {
         let create_counter = (from = 0) => {
             let mut cur = box::new(from);
             |ref mut cur| () => {
-                let ret = cur.get_clone()
-                cur += 1
-                ret
-            }
-        }
+                let ret = *cur;
+                *cur += 1;
+                ret;
+            };
+        };
 
-        let counter = create_counter(from: 3)
+        let counter = create_counter(from: 3);
 
-        assert::eq(counter(), 3)
-        assert::eq(counter(), 4)
-        assert::eq(counter(), 5)
-        assert::eq(counter(), 6)
-        assert::eq(counter(), 7)
-        assert::eq(counter(), 8)
+        assert::eq(counter(), 3);
+        assert::eq(counter(), 4);
+        assert::eq(counter(), 5);
+        assert::eq(counter(), 6);
+        assert::eq(counter(), 7);
+        assert::eq(counter(), 8);
     "#;
 
     assert_eval(input);

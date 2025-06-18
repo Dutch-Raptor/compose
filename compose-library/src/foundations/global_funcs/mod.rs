@@ -1,5 +1,5 @@
-use crate::diag::{StrResult, bail};
-use crate::{Engine, Value};
+use crate::diag::{bail, StrResult};
+use crate::Value;
 use compose_macros::func;
 use ecow::EcoString;
 use std::io::Write;
@@ -7,6 +7,7 @@ use std::io::Write;
 mod assertions;
 
 pub use assertions::*;
+use compose_library::vm::Vm;
 
 #[func]
 pub fn panic(msg: Value) -> StrResult<()> {
@@ -14,15 +15,15 @@ pub fn panic(msg: Value) -> StrResult<()> {
 }
 
 #[func]
-pub fn print(engine: &mut Engine, #[variadic] print_args: Vec<Value>) -> StrResult<()> {
-    engine
+pub fn print(vm: &mut dyn Vm, #[variadic] print_args: Vec<Value>) -> StrResult<()> {
+    vm.engine()
         .world
         .write(&|wtr: &mut dyn Write| write!(wtr, "{}", join_args(&print_args)))
         .map_err(|e| e.to_string().into())
 }
 #[func]
-pub fn println(engine: &mut Engine, #[variadic] print_args: Vec<Value>) -> StrResult<()> {
-    engine
+pub fn println(vm: &mut dyn Vm, #[variadic] print_args: Vec<Value>) -> StrResult<()> {
+    vm.engine()
         .world
         .write(&|wtr: &mut dyn Write| writeln!(wtr, "{}", join_args(&print_args)))
         .map_err(|e| e.to_string().into())

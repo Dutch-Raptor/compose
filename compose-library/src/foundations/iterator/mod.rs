@@ -1,13 +1,13 @@
-use crate::Value;
-use compose_library::diag::{SourceResult, error};
-use compose_library::gc::GcValue;
-use compose_library::{Engine, Func, IntoValue};
-use compose_macros::func;
-use compose_macros::{scope, ty};
+use crate::{HeapRef, Trace};
+use crate::{UntypedRef, Value};
+use compose_library::diag::{error, SourceResult};
+use compose_library::vm::Vm;
+use compose_library::{Func, Heap};
+use compose_macros::{func, scope, ty};
 use compose_syntax::Span;
-use dumpster::Trace;
 use dyn_clone::DynClone;
 use std::fmt::Debug;
+use std::sync::{Arc, Mutex};
 
 mod iter_combinators;
 mod string_iter;
@@ -17,21 +17,54 @@ pub use iter_combinators::*;
 pub use string_iter::*;
 
 #[ty(scope, cast, name = "Iterator")]
-#[derive(Debug, Clone, Trace)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub struct IterValue {
-    iter: GcValue<Iter>,
+    iter: HeapRef<Iter>,
 }
 
-impl From<Iter> for IterValue {
-    fn from(iter: Iter) -> Self {
+impl Trace for IterValue {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        f(self.iter.key())
+    }
+}
+
+impl IterValue {
+    pub(crate) fn new(iter: Iter, vm: &mut dyn Vm) -> Self {
         Self {
-            iter: GcValue::new(iter),
+            iter: vm.heap_mut().alloc(iter),
+        }
+    }
+
+    pub fn try_from_value(
+        value: Value,
+        _heap: &mut Heap,
+    ) -> Result<IterValue, UnSpanned<SourceDiagnostic>> {
+        match value {
+            Value::Iterator(i) => Ok(i),
+
+            Value::Str(_) => Err(error!(
+                Span::detached(), "cannot iterate over a string directly";
+                hint: "try calling `.chars()` to iterate over the characters of the string"
+            )
+                .into()),
+            Value::Box(_) => Err(error!(
+                Span::detached(), "cannot iterate over a boxed value directly";
+                hint: "try dereferencing the box first with `*`"
+            )
+                .into()),
+            other @ (Value::Int(_)
+            | Value::Func(_)
+            | Value::Type(_)
+            | Value::Bool(_)
+            | Value::Unit(_)) => {
+                Err(error!(Span::detached(), "cannot iterate over type {}", other.ty()).into())
+            }
         }
     }
 }
 
-#[derive(Clone, Debug, Trace)]
-enum Iter {
+#[derive(Clone, Debug, PartialEq)]
+pub enum Iter {
     String(StringIterator),
     Take(TakeIter),
     TakeWhile(TakeWhileIter),
@@ -39,140 +72,99 @@ enum Iter {
     Skip(SkipIter),
 }
 
-macro_rules! iter_from_impl {
-    ($($t:ty => $variant:ident),* $(,)?) => {
-        $(
-            impl From<$t> for IterValue {
-                fn from(value: $t) -> Self {
-                    IterValue::from(Iter::$variant(value))
-                }
-            }
-
-            impl IntoValue for $t {
-                fn into_value(self) -> Value {
-                    Value::Iterator(self.into())
-                }
-            }
-        )*
+impl Trace for Iter {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        match self {
+            Iter::String(_) => {}
+            Iter::TakeWhile(iter) => iter.visit_refs(f),
+            Iter::Take(iter) => iter.visit_refs(f),
+            Iter::Skip(iter) => iter.visit_refs(f),
+            Iter::Map(iter) => iter.visit_refs(f),
+        }
     }
 }
 
-iter_from_impl!(
-    StringIterator => String,
-    TakeIter => Take,
-    TakeWhileIter => TakeWhile,
-    MapIter => Map,
-    SkipIter => Skip,
-);
-
 impl Iter {
-    pub fn next(&mut self, engine: &mut Engine) -> SourceResult<Option<Value>> {
+    pub fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
         match self {
-            Iter::String(s) => ValueIterator::next(s, engine),
-            Iter::Take(t) => t.next(engine),
-            Iter::TakeWhile(t) => t.next(engine),
-            Iter::Map(m) => m.next(engine),
-            Iter::Skip(s) => s.next(engine),
+            Iter::String(s) => ValueIterator::next(s, vm),
+            Iter::Take(t) => t.next(vm),
+            Iter::TakeWhile(t) => t.next(vm),
+            Iter::Map(m) => m.next(vm),
+            Iter::Skip(s) => s.next(vm),
         }
     }
 }
 
 impl ValueIterator for IterValue {
-    fn next(&mut self, engine: &mut Engine) -> SourceResult<Option<Value>> {
-        self.iter.get_mut().next(engine)
+    fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
+        let iter = self
+            .iter
+            .get(vm.heap())
+            .cloned()
+            .expect("expected to point to an iter value");
+        iter.next(vm)
     }
 }
 
 #[scope]
 impl IterValue {
     #[func(name = "next")]
-    fn next_(&self, engine: &mut Engine) -> SourceResult<Option<Value>> {
-        self.iter.get_mut().next(engine)
+    fn next_(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
+        let iter = self
+            .iter
+            .get(vm.heap())
+            .cloned()
+            .expect("expected to point to an iter value");
+
+        iter.next(vm)
     }
 
     #[func]
-    fn take(self, n: usize) -> Self {
-        TakeIter {
-            inner: self,
-            take: n,
-        }
-        .into()
+    fn take(self, vm: &mut dyn Vm, n: usize) -> Self {
+        IterValue::new(
+            Iter::Take(TakeIter {
+                inner: self,
+                take: Arc::new(Mutex::new(n)),
+            }),
+            vm,
+        )
     }
 
     #[func]
-    fn take_while(self, predicate: Func) -> Self {
-        TakeWhileIter {
-            inner: self,
-            predicate,
-        }
-        .into()
+    fn take_while(self, vm: &mut dyn Vm, predicate: Func) -> Self {
+        IterValue::new(
+            Iter::TakeWhile(TakeWhileIter {
+                inner: self,
+                predicate: Arc::new(predicate),
+            }),
+            vm,
+        )
     }
 
     #[func]
-    fn map(self, map: Func) -> Self {
-        MapIter { inner: self, map }.into()
+    fn map(self, vm: &mut dyn Vm, map: Func) -> Self {
+        IterValue::new(
+            Iter::Map(MapIter {
+                inner: self,
+                map: Arc::new(map),
+            }),
+            vm,
+        )
     }
 
     #[func]
-    fn skip(self, n: usize) -> Self {
-        SkipIter {
-            inner: self,
-            skip: n,
-        }
-        .into()
+    fn skip(self, vm: &mut dyn Vm, n: usize) -> Self {
+        IterValue::new(
+            Iter::Skip(SkipIter {
+                inner: self,
+                skip: Arc::new(Mutex::new(n)),
+            }),
+            vm,
+        )
     }
 }
 
 pub trait ValueIterator: DynClone + Debug + Send + Sync {
-    fn next(&mut self, engine: &mut Engine) -> SourceResult<Option<Value>>;
-}
-
-dyn_clone::clone_trait_object!(ValueIterator);
-
-impl<T, V> ValueIterator for T
-where
-    T: Iterator<Item = V> + DynClone,
-    T: Debug + Send + Sync,
-    V: IntoValue,
-{
-    fn next(&mut self, _engine: &mut Engine) -> SourceResult<Option<Value>> {
-        Ok(self.next().map(IntoValue::into_value))
-    }
-}
-
-impl TryFrom<Value> for IterValue {
-    type Error = UnSpanned<SourceDiagnostic>;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        let iter = match value {
-            Value::Iterator(v) => Ok(v),
-            Value::Str(_) => Err(
-                error!(Span::detached(), "cannot iterate over a string directly";
-                    hint: "call `.chars()` to iterate over the characters of a string"
-                ),
-            ),
-            Value::Box(b) => {
-                let val = b.get().map_err(|e| error!(Span::detached(), "{e}"))?;
-
-                Ok(IterValue::try_from(val.clone())?)
-            }
-            v @ (Value::Int(_)
-            | Value::Bool(_)
-            | Value::Unit(_)
-            | Value::Func(_)
-            | Value::Type(_)) => Err(error!(
-                Span::detached(),
-                "cannot construct an iterator from an {}",
-                v.ty().name()
-            )),
-        }?;
-
-        Ok(iter)
-    }
-}
-
-impl PartialEq for IterValue {
-    fn eq(&self, _other: &Self) -> bool {
-        false
-    }
+    fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>>;
 }

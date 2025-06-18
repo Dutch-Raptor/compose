@@ -1,23 +1,20 @@
 use crate::diag::{At, SourceResult, Spanned};
 use crate::foundations::boxed::Boxed;
-use crate::foundations::iterator::IterValue;
+use crate::IntoValue;
 use crate::{CastInfo, Str, UnitValue};
 use crate::{FromValue, Func};
-use crate::{IntoValue, ValueRef};
 use crate::{NativeScope, Reflect};
 use crate::{Sink, Type};
 use compose_library::diag::{bail, error, StrResult};
 use compose_library::repr::Repr;
+use compose_library::IterValue;
 use compose_macros::func;
 use compose_macros::scope;
 use compose_syntax::Span;
-use dumpster::{Trace, Visitor};
 use ecow::{eco_format, EcoString};
-use std::collections::HashSet;
 use std::fmt;
-use std::ops::Deref;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Int(i64),
     Bool(bool),
@@ -40,95 +37,6 @@ impl Value {
 impl Value {
     pub fn is_box(&self) -> bool {
         matches!(self, Value::Box(_))
-    }
-}
-
-fn eq_internal(l_ref: ValueRef, r_ref: ValueRef, visited: &mut HashSet<(usize, usize)>) -> bool {
-    use Value::*;
-
-    let l = l_ref.deref();
-    let r = r_ref.deref();
-
-    // If both are boxes, compare the inner pointers
-    if let (Box(boxed_l), Box(boxed_r)) = (l, r) {
-        let ptr_l = boxed_l.as_ptr() as usize;
-        let ptr_r = boxed_r.as_ptr() as usize;
-
-        if !visited.insert((ptr_l, ptr_r)) {
-            return true; // we've seen this pair already
-        }
-
-        let Ok(inner_l) = boxed_l.as_ref() else {
-            return false;
-        };
-        let Ok(inner_r) = boxed_r.as_ref() else {
-            return false;
-        };
-        return eq_internal(inner_l, inner_r, visited);
-    }
-
-    // If one is a box and the other isn't, unwrap and compare
-    if let Box(boxed_l) = l {
-        let Ok(inner_l) = boxed_l.as_ref() else {
-            return false;
-        };
-        return eq_internal(inner_l, r_ref, visited);
-    }
-
-    if let Box(boxed_r) = r {
-        let Ok(inner_r) = boxed_r.as_ref() else {
-            return false;
-        };
-        return eq_internal(l_ref, inner_r, visited);
-    }
-
-    macro_rules! cmp {
-            ($($variant:ident),* $(,)?) => {
-                match (l.deref(), r.deref()) {
-                    // If the unboxed value is still a boxed value, unbox it
-                    (Value::Box(_), _) |
-                    (_, Value::Box(_)) => unreachable!("Boxes should have been unboxed before comparing"),
-
-                    $(
-                        (Value::$variant(l), Value::$variant(r)) => l == r,
-                    )*
-
-                    // Write out $variant, _ to keep the match exhaustive so that
-                    // new variants will cause a compile error here.
-                    $((Value::$variant(_), _) => false),*,
-                }
-            }
-        }
-
-    cmp![Int, Bool, Unit, Str, Func, Type, Iterator]
-}
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        // A boxed value can be the same as another unboxed value
-        // so we need to unbox both values before comparing them
-        let Ok(l) = self.as_ref() else { return false };
-        let Ok(r) = other.as_ref() else { return false };
-
-        let mut visited = HashSet::new();
-        eq_internal(l, r, &mut visited)
-    }
-}
-
-unsafe impl Trace for Value {
-    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
-        match self {
-            Value::Int(_) => {}
-            Value::Bool(_) => {}
-            Value::Unit(_) => {}
-            Value::Str(_) => {}
-            Value::Func(_) => {}
-            Value::Type(_) => {}
-            Value::Iterator(i) => i.accept(visitor)?,
-            Value::Box(b) => b.accept(visitor)?,
-        }
-
-        Ok(())
     }
 }
 
@@ -180,7 +88,6 @@ impl Value {
 
     /// Access a field on this value (with dot syntax) `a.b`
     pub fn field(&self, field: &str, access_span: Span, sink: &mut Sink) -> StrResult<Value> {
-        dbg!(Value::scope());
         let field_value = match self {
             Self::Func(func) => func.field(field, access_span, sink).cloned(),
             Self::Type(ty) => ty.field(field, access_span, sink).cloned(),
@@ -314,24 +221,3 @@ primitive!(Type: "type", Type);
 primitive!(UnitValue: "unit", Unit);
 primitive!(IterValue: "iterator", Iterator);
 primitive!(Boxed: "box", Box);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_unbox_partial_eq() {
-        let a = Value::Box(Boxed::new(Value::Box(Boxed::new(Value::Int(5)))));
-        let b = Value::Int(5);
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn test_unbox_partial_eq_cycles() {
-        let mut boxed = Value::Box(Boxed::new(Value::Int(5)));
-        // now reassign the boxed value to itself
-        *boxed.as_mut().unwrap() = boxed.clone();
-
-        assert_eq!(boxed, boxed);
-    }
-}

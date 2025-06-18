@@ -6,7 +6,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{FnArg, ItemFn, Result, ReturnType, Type, parse_quote};
+use syn::{parse_quote, FnArg, ItemFn, Result, ReturnType, Type};
 
 pub fn func(stream: TokenStream, item: &ItemFn) -> Result<TokenStream> {
     let func = parse(stream, item)?;
@@ -126,18 +126,18 @@ fn create_wrapper_closure(func: &Func) -> TokenStream {
             .as_ref()
             .map(bind)
             .map(|tokens| quote! { #tokens, });
-        let engine = func.special.engine.then(|| quote! { engine, });
+        let vm = func.special.vm.then(|| quote! { vm, });
         let forwarded = func.params.iter().map(bind);
 
         quote! {
-            __func(#self_ #engine #(#forwarded,)*)
+            __func(#self_ #vm #(#forwarded,)*)
         }
     };
 
     let parent = func.parent.as_ref().map(|ty| quote! { #ty:: });
     let ident = &func.rust_name;
     quote! {
-        |engine, args| {
+        |vm, args| {
             let __func = #parent #ident;
             #arg_handlers
             #finish
@@ -280,7 +280,7 @@ impl Parse for Meta {
 #[derive(Default)]
 struct SpecialParams {
     self_: Option<Param>,
-    engine: bool,
+    vm: bool,
 }
 
 fn parse_param(
@@ -326,7 +326,7 @@ fn parse_param(
     };
 
     match ident.to_string().as_str() {
-        "engine" => special_params.engine = true,
+        "vm" => special_params.vm = true,
         _ => {
             let mut attrs = typed.attrs.clone();
 

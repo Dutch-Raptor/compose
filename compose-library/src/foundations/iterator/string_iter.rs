@@ -1,34 +1,53 @@
+use compose_library::diag::SourceResult;
+use compose_library::vm::Vm;
+use compose_library::{IntoValue, Value, ValueIterator};
 use ecow::EcoString;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct StringIterator {
     s: EcoString,
-    byte_pos: usize,
+    byte_pos: Arc<Mutex<usize>>,
 }
 
-// Safety: StringIterator contains no Gc<T> values, and therefore its trace can be empty.
-unsafe impl dumpster::Trace for StringIterator {
-    fn accept<V: dumpster::Visitor>(&self, _visitor: &mut V) -> Result<(), ()> {
-        Ok(())
+impl PartialEq for StringIterator {
+    fn eq(&self, other: &Self) -> bool {
+        if self.s != other.s {
+            return false;
+        }
+
+        // Load the positions of each iterator. 
+        let pos_a = self.byte_pos.lock().expect("Poisoned");
+        let pos_b = self.byte_pos.lock().expect("Poisoned");
+
+        if *pos_a != *pos_b {
+            return false;
+        }
+
+        true
     }
 }
 
 impl StringIterator {
     pub fn new(s: EcoString) -> Self {
-        Self { s, byte_pos: 0 }
+        Self { s, byte_pos: Arc::new(Mutex::new(0)) }
     }
 }
 
-impl Iterator for StringIterator {
-    type Item = char;
+impl ValueIterator for StringIterator {
+    fn next(&self, _: &mut dyn Vm) -> SourceResult<Option<Value>> {
+        let mut idx = self.byte_pos.lock().expect("Poisoned");
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.byte_pos >= self.s.len() {
-            return None;
+        if *idx >= self.s.len() {
+            return Ok(None);
         }
 
-        let c = self.s[self.byte_pos..].chars().next()?;
-        self.byte_pos += c.len_utf8();
-        Some(c)
+        let Some(c) = self.s[*idx..].chars().next() else {
+            return Ok(None)
+        };
+
+        *idx += c.len_utf8();
+
+        Ok(Some(c.into_value()))
     }
 }

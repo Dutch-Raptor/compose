@@ -1,8 +1,7 @@
-use ecow::EcoString;
+use crate::{Scope, Trace};
+use compose_library::UntypedRef;
 use compose_syntax::FileId;
-use crate::Scope;
-
-
+use ecow::EcoString;
 
 
 #[derive(Debug, Clone)]
@@ -65,5 +64,11 @@ impl Module {
     
     pub fn file_id(&self) -> Option<FileId> {
         self.file_id
+    }
+}
+
+impl Trace for Module {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        self.scope.visit_refs(f);
     }
 }
