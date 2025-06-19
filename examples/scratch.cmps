@@ -1,13 +1,2 @@
-let create_counter = (from = 0) => {
-    let mut cur = box::new(from);
-    |ref mut cur| () => {
-        let ret = *cur;
-        *cur += 1;
-        ret;
-    };
-};
-
-let counter = create_counter(from: 3);
-
-assert::eq(counter(), 3);
-assert::eq(counter(), 4);
+let a = *(box::new(4)) == *(() => box::new(4))();
+println(a)

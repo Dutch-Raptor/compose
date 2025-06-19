@@ -173,7 +173,7 @@ pub fn eval_closure(closure: &Closure, vm: &mut Machine, mut args: Args) -> Sour
     let params = ast_closure.params();
     let body = ast_closure.body();
 
-    let track_marker = vm.track_marker();
+    let track_marker = vm.temp_root_marker();
 
     // We do need access to the same heap, so we give this vm access to the heap, while evaluating the
     // closure
@@ -213,7 +213,7 @@ pub fn eval_closure(closure: &Closure, vm: &mut Machine, mut args: Args) -> Sour
             // Ensure all args have been used
             args.finish()?;
 
-            let output = body.eval(vm)?.tracked(vm);
+            let output = body.eval(vm)?.track_tmp_root(vm);
             match &vm.flow {
                 None => {}
                 Some(FlowEvent::Return(_, Some(explicit))) => return Ok(explicit.clone()),
@@ -226,7 +226,7 @@ pub fn eval_closure(closure: &Closure, vm: &mut Machine, mut args: Args) -> Sour
 
     vm.maybe_gc();
 
-    vm.track_forget(track_marker);
+    vm.pop_temp_roots(track_marker);
 
     result
 }

@@ -92,15 +92,17 @@ impl Trace for StackFrame<'_> {
 }
 
 pub trait Tracked {
-    fn tracked(self, vm: &mut Machine) -> Self;
+    /// Temporarily track this value as a GC Root
+    fn track_tmp_root(self, vm: &mut Machine) -> Self;
 }
 
 impl<T> Tracked for T
 where
     T: Trace,
 {
-    fn tracked(self, vm: &mut Machine) -> Self {
-        vm.track(&self);
+    
+    fn track_tmp_root(self, vm: &mut Machine) -> Self {
+        vm.push_temp_root(&self);
         self
     }
 }
@@ -114,7 +116,7 @@ where
     T: Tracked,
 {
     fn tracked(self, vm: &mut Machine) -> Self {
-        self.map(|x| x.tracked(vm))
+        self.map(|x| x.track_tmp_root(vm))
     }
 }
 
@@ -123,6 +125,6 @@ where
     T: Tracked,
 {
     fn tracked(self, vm: &mut Machine) -> Self {
-        self.map(|x| x.tracked(vm))
+        self.map(|x| x.track_tmp_root(vm))
     }
 }
