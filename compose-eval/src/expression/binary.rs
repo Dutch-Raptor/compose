@@ -1,7 +1,7 @@
-use crate::vm::Machine;
 use crate::Eval;
-use compose_library::diag::{bail, At, SourceResult, StrResult};
-use compose_library::{ops, Value};
+use crate::vm::{Machine, Tracked};
+use compose_library::diag::{At, SourceResult, StrResult, bail};
+use compose_library::{Value, ops};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
 use std::ops::Deref;
@@ -33,8 +33,9 @@ fn apply_binary(
     vm: &mut Machine,
     op: fn(&Value, &Value) -> StrResult<Value>,
 ) -> SourceResult<Value> {
+    let guard = vm.temp_root_guard();
     let l = binary.lhs();
-    let lhs = l.eval(vm)?;
+    let lhs = l.eval(guard.vm)?.track_tmp_root(guard.vm);
 
     // make sure we dont evaluate rhs when short-circuiting
     if binary.op().short_circuits(&lhs) {
@@ -42,7 +43,7 @@ fn apply_binary(
     }
 
     let r = binary.rhs();
-    let rhs = r.eval(vm)?;
+    let rhs = r.eval(guard.vm)?.track_tmp_root(guard.vm);
 
     op(&lhs, &rhs).at(binary.span())
 }

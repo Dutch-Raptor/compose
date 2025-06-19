@@ -9,7 +9,7 @@ use compose_syntax::ast::AstNode;
 use compose_syntax::{ast, Span};
 use ecow::EcoString;
 use std::fmt::Debug;
-
+use std::ops::{Deref, DerefMut};
 pub use stack::Tracked;
 pub use stack::TrackedContainer;
 
@@ -148,16 +148,24 @@ impl Trace for VmRoots<'_> {
 }
 
 impl<'a> Machine<'a> {
-    pub fn track(&mut self, value: &impl Trace) {
+    pub fn push_temp_root(&mut self, value: &impl Trace) {
         self.frames.top.track(value);
     }
 
-    pub fn track_marker(&mut self) -> TrackMarker {
+    pub fn temp_root_marker(&mut self) -> TrackMarker {
         self.frames.top.marker()
     }
 
-    pub fn track_forget(&mut self, marker: TrackMarker) {
+    pub fn pop_temp_roots(&mut self, marker: TrackMarker) {
         self.frames.top.forget(marker);   
+    }
+    
+    /// Automatically forgets any tracked values during `f` after f is finished
+    pub fn temp_root_scope(&mut self, f: impl FnOnce(&mut Machine<'a>) -> SourceResult<Value>) -> SourceResult<Value> {
+        let marker = self.temp_root_marker();
+        let result = f(self);
+        self.pop_temp_roots(marker);
+        result
     }
 
     pub fn define(
@@ -195,6 +203,41 @@ impl<'a> Machine<'a> {
 
     pub fn get_mut(&mut self, name: &str) -> Result<&mut Binding, VariableAccessError> {
         self.scopes_mut().get_mut(name)
+    }
+}
+
+pub struct TempRootGuard<'a, 'b> {
+    pub marker: TrackMarker,
+    pub vm: &'b mut Machine<'a>,
+}
+
+impl<'a, 'b> Drop for TempRootGuard<'a, 'b> {
+    fn drop(&mut self) {
+        self.vm.pop_temp_roots(self.marker);
+    }
+}
+
+impl<'a> Machine<'a> {
+    pub fn temp_root_guard<'b>(&'b mut self) -> TempRootGuard<'a, 'b> {
+        let marker = self.temp_root_marker();
+        TempRootGuard {
+            marker,
+            vm: self,
+        }
+    }
+}
+
+impl<'a, 'b> Deref for TempRootGuard<'a, 'b> {
+    type Target = Machine<'a>;
+    
+    fn deref(&self) -> &Self::Target {
+        self.vm
+    }
+}
+
+impl<'a, 'b> DerefMut for TempRootGuard<'a, 'b> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.vm
     }
 }
 
