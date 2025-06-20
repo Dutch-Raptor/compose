@@ -194,6 +194,9 @@ impl TestResult {
         match &self.value {
             Ok(_) => panic!("expected errors, but got none"),
             Err(errors) => {
+                if expected_errors.is_empty() {
+                    panic!("expected no errors, but got: {:?}", errors)   
+                }
                 if errors
                     .iter()
                     .map(|e| e.code)

@@ -102,20 +102,20 @@ where
 {
     
     fn track_tmp_root(self, vm: &mut Machine) -> Self {
-        vm.push_temp_root(&self);
+        vm.track_tmp_root(&self);
         self
     }
 }
 
 pub trait TrackedContainer {
-    fn tracked(self, vm: &mut Machine) -> Self;
+    fn track_tmp_root(self, vm: &mut Machine) -> Self;
 }
 
 impl<T, E> TrackedContainer for Result<T, E>
 where
     T: Tracked,
 {
-    fn tracked(self, vm: &mut Machine) -> Self {
+    fn track_tmp_root(self, vm: &mut Machine) -> Self {
         self.map(|x| x.track_tmp_root(vm))
     }
 }
@@ -124,7 +124,7 @@ impl<T> TrackedContainer for Option<T>
 where
     T: Tracked,
 {
-    fn tracked(self, vm: &mut Machine) -> Self {
+    fn track_tmp_root(self, vm: &mut Machine) -> Self {
         self.map(|x| x.track_tmp_root(vm))
     }
 }

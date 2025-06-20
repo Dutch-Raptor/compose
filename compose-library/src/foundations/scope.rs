@@ -1,7 +1,7 @@
 use crate::diag::{error, warning, At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult};
 use crate::{IntoValue, Trace};
 use crate::{Library, NativeFuncData, NativeType, Sink, Type, Value};
-use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
+use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, E0011_UNBOUND_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
 use compose_library::diag::{bail, StrResult};
 use compose_library::{Func, NativeFunc, UntypedRef};
 use compose_syntax::{Label, Span};
@@ -137,19 +137,20 @@ impl UnBoundError {
         let mut diag = match &self.item {
             UnboundItem::Variable => error!(
                 span, "Unbound variable: `{}`", self.name;
-                label_message: "this variable is unbound here"
+                label_message: "this variable is unbound here";
+                code: &E0011_UNBOUND_VARIABLE
             ),
             UnboundItem::FieldOrMethod(Some(ty)) => error!(
                 span, "type `{ty}` has no field or method named `{}`", self.name;
-                label_message: "this field or method does not exist on type `{ty}`"
+                label_message: "this field or method does not exist on type `{ty}`";
             ),
             UnboundItem::FieldOrMethod(_) => error!(
                 span, "Unbound field or method: `{}`", self.name;
-                label_message: "this field or method is unbound here"
+                label_message: "this field or method is unbound here";
             ),
             UnboundItem::AssociatedFieldOrFunction(assoc) => error!(
                 span, "no associated function or field named `{}` found for type `{}`", self.name, assoc;
-                label_message: "this field or method is unbound here"
+                label_message: "this field or method is unbound here";
             ),
         };
 

@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 compose-eval = { workspace = true}
 compose-error-codes = {workspace = true}
+compose-doc-macros = {workspace = true}
 
 [lints]
 workspace = true

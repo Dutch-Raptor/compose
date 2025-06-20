@@ -1,18 +1,17 @@
+use std::io::{Read, Write};
+use std::sync::Mutex;
 use compose_library::diag::FileResult;
 use compose_library::{library, Library, World};
 use compose_syntax::{FileId, Source};
-use std::fmt::Debug;
-use std::io::{Read, Write};
-use std::sync::Mutex;
 
 #[derive(Debug)]
-pub(crate) struct ExplainWorld {
+pub(crate) struct DocWorld {
     pub source: Source,
     library: Library,
     pub stdout: Mutex<String>
 }
 
-impl ExplainWorld {
+impl DocWorld {
     pub(crate) fn from_str(text: &str) -> Self {
         let entrypoint = FileId::new("main.comp");
         let source = Source::new(entrypoint, text.to_string());
@@ -25,7 +24,7 @@ impl ExplainWorld {
     }
 }
 
-impl World for ExplainWorld {
+impl World for DocWorld {
     fn entry_point(&self) -> FileId {
         self.source.id()
     }

@@ -96,7 +96,7 @@ pub fn code(p: &mut Parser, end_set: SyntaxSet) {
         if !p.end() && !p.skip_if(SyntaxKind::Semicolon) {
             p.insert_error_before("expected a semicolon after a statement")
                 .with_code(&E0006_UNTERMINATED_STATEMENT)
-                .with_label_message("help: insert a semicolon or newline here");
+                .with_label_message("help: insert a semicolon here");
         }
 
         // If the parser is not progressing, then we have an error
