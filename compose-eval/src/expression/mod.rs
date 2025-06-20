@@ -1,5 +1,5 @@
-use crate::vm::Machine;
 use crate::Eval;
+use crate::vm::{Machine, Tracked};
 use compose_library::diag::{At, SourceResult};
 use compose_library::{UnitValue, Value};
 use compose_syntax::ast::{AstNode, Expr};
@@ -43,7 +43,8 @@ impl Eval for Expr<'_> {
             Expr::WhileLoop(w) => w.eval(vm),
             Expr::ForLoop(f) => f.eval(vm),
         }?
-        .spanned(span);
+        .spanned(span)
+        .track_tmp_root(vm);
 
         Ok(v)
     }

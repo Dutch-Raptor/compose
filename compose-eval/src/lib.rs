@@ -2,8 +2,7 @@ mod access;
 mod expression;
 mod statement;
 mod vm;
-#[cfg(test)]
-pub(crate) mod tests;
+pub mod test;
 
 pub use crate::vm::Machine;
 use compose_library::diag::{error, SourceDiagnostic, SourceResult, Warned};
@@ -23,7 +22,7 @@ pub trait Eval {
 #[derive(Default)]
 pub struct EvalConfig {
     /// Whether to include syntax warnings in the returned result.
-    include_syntax_warnings: bool,
+    pub include_syntax_warnings: bool,
 }
 
 

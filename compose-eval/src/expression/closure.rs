@@ -1,12 +1,12 @@
 use crate::vm::{FlowEvent, Tracked, TrackedContainer};
 use crate::{Eval, Machine};
-use compose_library::diag::{bail, error, IntoSourceDiagnostic, SourceResult, Spanned};
+use compose_library::diag::{IntoSourceDiagnostic, SourceResult, Spanned, bail, error};
 use compose_library::{
     Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError,
     World,
 };
 use compose_syntax::ast::{AstNode, Expr, Ident, Param};
-use compose_syntax::{ast, Label, Span, SyntaxNode};
+use compose_syntax::{Label, Span, SyntaxNode, ast};
 use ecow::{EcoString, EcoVec};
 use std::collections::HashMap;
 
@@ -14,10 +14,12 @@ impl Eval for ast::Closure<'_> {
     type Output = Value;
 
     fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+        let guard = vm.temp_root_guard();
+
         let mut defaults = Vec::new();
         for param in self.params().children() {
             if let ast::ParamKind::Named(named) = param.kind() {
-                defaults.push(named.expr().eval(vm)?);
+                defaults.push(named.expr().eval(guard.vm)?);
             }
         }
 
@@ -27,7 +29,7 @@ impl Eval for ast::Closure<'_> {
             for capture in self.captures().children() {
                 let span = capture.binding().span();
                 let name = capture.binding().get();
-                let binding = match vm.get(&capture.binding()).cloned() {
+                let binding = match guard.vm.get(&capture.binding()).cloned() {
                     Ok(v) => v,
                     Err(e) => {
                         let VariableAccessError::Unbound(unbound) = e else {
@@ -46,7 +48,7 @@ impl Eval for ast::Closure<'_> {
                     }
                 };
 
-                let value = match validate_capture(capture, &binding, vm) {
+                let value = match validate_capture(capture, &binding, guard.vm) {
                     Ok(v) => v,
                     Err(e) => {
                         errors.extend(e.into_iter());
@@ -72,8 +74,8 @@ impl Eval for ast::Closure<'_> {
 
         let unresolved_captures = {
             let mut visitor = CapturesVisitor::new(
-                &vm.frames.top.scopes,
-                Some(vm.engine.world.library()),
+                &guard.vm.frames.top.scopes,
+                Some(guard.vm.engine.world.library()),
                 &captured,
             );
             visitor.visit(self.body().to_untyped());
@@ -93,7 +95,7 @@ impl Eval for ast::Closure<'_> {
             unresolved_captures,
         };
 
-        if !vm.context.closure_capture.should_defer() {
+        if !guard.vm.context.closure_capture.should_defer() {
             closure.resolve()?
         }
 
@@ -165,7 +167,8 @@ fn define(
     Ok(())
 }
 
-pub fn eval_closure(closure: &Closure, vm: &mut Machine, mut args: Args) -> SourceResult<Value> {
+pub fn eval_closure(closure: &Closure, vm: &mut Machine, args: Args) -> SourceResult<Value> {
+    let guard = vm.temp_root_guard();
     let ast_closure = closure
         .node
         .cast::<ast::Closure>()
@@ -173,12 +176,13 @@ pub fn eval_closure(closure: &Closure, vm: &mut Machine, mut args: Args) -> Sour
     let params = ast_closure.params();
     let body = ast_closure.body();
 
-    let track_marker = vm.temp_root_marker();
+    // Make sure a gc round is aware that the args are reachable
+    guard.vm.track_tmp_root(&args);
 
-    // We do need access to the same heap, so we give this vm access to the heap, while evaluating the
-    // closure
-    let result = vm
+    let result = guard
+        .vm
         .with_frame(move |vm| {
+            let mut args = args;
             if let Some(Spanned { value, span }) = &closure.name {
                 vm.try_bind(
                     value.clone(),
@@ -213,7 +217,7 @@ pub fn eval_closure(closure: &Closure, vm: &mut Machine, mut args: Args) -> Sour
             // Ensure all args have been used
             args.finish()?;
 
-            let output = body.eval(vm)?.track_tmp_root(vm);
+            let output = body.eval(vm)?;
             match &vm.flow {
                 None => {}
                 Some(FlowEvent::Return(_, Some(explicit))) => return Ok(explicit.clone()),
@@ -222,11 +226,9 @@ pub fn eval_closure(closure: &Closure, vm: &mut Machine, mut args: Args) -> Sour
             }
             SourceResult::Ok(output)
         })
-        .tracked(vm);
+        .track_tmp_root(guard.vm);
 
-    vm.maybe_gc();
-
-    vm.pop_temp_roots(track_marker);
+    guard.vm.maybe_gc();
 
     result
 }
@@ -363,9 +365,9 @@ impl<'a> CapturesVisitor<'a> {
 #[cfg(test)]
 mod tests {
     use crate::expression::closure::CapturesVisitor;
-    use crate::tests::*;
+    use crate::test::*;
     use compose_library::{Scope, Scopes};
-    use compose_syntax::{parse, FileId};
+    use compose_syntax::{FileId, parse};
 
     #[test]
     fn capturing() {

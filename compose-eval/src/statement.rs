@@ -7,10 +7,13 @@ impl Eval for ast::Statement<'_> {
     type Output = Value;
 
     fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
-        match self {
-            ast::Statement::Expr(e) => e.eval(vm),
-            ast::Statement::Let(l) => l.eval(vm),
-            ast::Statement::Assign(a) => a.eval(vm),
-        }
+        let guard = vm.temp_root_guard();
+        let result = match self {
+            ast::Statement::Expr(e) => e.eval(guard.vm),
+            ast::Statement::Let(l) => l.eval(guard.vm),
+            ast::Statement::Assign(a) => a.eval(guard.vm),
+        };
+        guard.vm.maybe_gc();
+        result
     }
 }

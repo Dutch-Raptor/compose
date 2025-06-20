@@ -99,7 +99,7 @@ fn destructure_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{assert_eval, assert_eval_with_vm, eval_code_with_vm, TestWorld};
+    use crate::test::{assert_eval, assert_eval_with_vm, eval_code_with_vm, TestWorld};
     use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
     use compose_library::{BindingKind, UnitValue};
 

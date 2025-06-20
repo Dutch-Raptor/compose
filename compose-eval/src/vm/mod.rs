@@ -132,7 +132,7 @@ impl<'a> Machine<'a> {
             frames: &self.frames,
             flow: &self.flow,
         };
-        self.heap.clean(&roots);
+        self.heap.maybe_gc(&roots);
     }
 }
 
@@ -148,7 +148,7 @@ impl Trace for VmRoots<'_> {
 }
 
 impl<'a> Machine<'a> {
-    pub fn push_temp_root(&mut self, value: &impl Trace) {
+    pub fn track_tmp_root(&mut self, value: &impl Trace) {
         self.frames.top.track(value);
     }
 

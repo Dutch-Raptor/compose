@@ -19,6 +19,7 @@ impl Eval for ast::Binary<'_> {
             BinOp::Gte => apply_binary(self, vm, ops::gte),
             BinOp::Eq => apply_binary(self, vm, ops::eq),
             BinOp::Neq => apply_binary(self, vm, ops::neq),
+            BinOp::And => apply_binary(self, vm, ops::logical_and),
             other => bail!(
                 self.span(),
                 "unsupported binary operator `{}`",
@@ -33,9 +34,8 @@ fn apply_binary(
     vm: &mut Machine,
     op: fn(&Value, &Value) -> StrResult<Value>,
 ) -> SourceResult<Value> {
-    let guard = vm.temp_root_guard();
     let l = binary.lhs();
-    let lhs = l.eval(guard.vm)?.track_tmp_root(guard.vm);
+    let lhs = l.eval(vm)?;
 
     // make sure we dont evaluate rhs when short-circuiting
     if binary.op().short_circuits(&lhs) {
@@ -43,7 +43,7 @@ fn apply_binary(
     }
 
     let r = binary.rhs();
-    let rhs = r.eval(guard.vm)?.track_tmp_root(guard.vm);
+    let rhs = r.eval(vm)?;
 
     op(&lhs, &rhs).at(binary.span())
 }
@@ -65,7 +65,7 @@ impl ShortCircuits for BinOp {
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::assert_eval;
+    use crate::test::assert_eval;
     use compose_library::Value;
 
     #[test]

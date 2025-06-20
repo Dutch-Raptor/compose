@@ -1,7 +1,7 @@
 mod clean;
 mod trigger;
 
-use crate::gc::trigger::GcTriggerPolicy;
+use crate::gc::trigger::{GcTriggerPolicy, SimplePolicy};
 use crate::Value;
 use compose_library::gc::trigger::GcData;
 use compose_library::Iter;
@@ -12,6 +12,7 @@ use std::ops::Deref;
 #[derive(Debug)]
 pub struct Heap {
     map: SlotMap<UntypedRef, HeapItem>,
+    policy: Box<dyn GcTriggerPolicy>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -80,6 +81,9 @@ impl Heap {
     pub fn new() -> Self {
         Self {
             map: SlotMap::with_key(),
+            policy: Box::new(SimplePolicy {
+                heap_size_threshold: 50,
+            })
         }
     }
 

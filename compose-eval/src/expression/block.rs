@@ -33,7 +33,7 @@ impl Eval for CodeBlock<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::assert_eval;
+    use crate::test::assert_eval;
 
     #[test]
     fn test_block() {

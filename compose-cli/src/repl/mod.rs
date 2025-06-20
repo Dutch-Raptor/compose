@@ -1,12 +1,10 @@
 use crate::error::CliError;
 use crate::repl::editor::{print_input, EditorFooter, EditorGutter, EditorHistory, EditorReader};
 use crate::world::SystemWorld;
-use crate::ReplArgs;
-use compose::error_codes::lookup;
+use crate::{explain, ReplArgs};
 use compose_editor::editor::Editor;
 use compose_editor::renderer::full::CrosstermRenderer;
 use compose_eval::{EvalConfig, Machine};
-use compose_explain::Explain;
 use compose_library::diag::{eco_format, Warned};
 use compose_library::{Value, World};
 use compose_syntax::Source;
@@ -149,15 +147,7 @@ fn handle_repl_commands(vm: &mut Machine, world: &SystemWorld, input: &str) -> O
         }
         _ if input.starts_with(":explain ") => {
             let code = input.trim_start_matches(":explain ");
-            match lookup(code) {
-                Some(code) => {
-                    println!("-----------------");
-                    println!("{}", code.explain())
-                }
-                None => {
-                    println!("No explanation found for {code}");
-                }
-            }
+            _ = explain::explain(code);
         }
         _ => return None,
     }

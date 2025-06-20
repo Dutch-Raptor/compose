@@ -1,3 +1,9 @@
+/*!
+# Welcome to the Compose CLI!
+
+This is the documentation for the Compose CLI.
+For the documentation of the Compose language, see [the language docs](compose).)
+*/
 use crate::error::CliError;
 use clap::Parser;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
@@ -5,6 +11,8 @@ use codespan_reporting::term;
 use compose_library::diag::{write_diagnostics, SourceDiagnostic};
 use compose_library::World;
 use std::path::PathBuf;
+
+pub use compose;
 
 mod error;
 mod explain;
@@ -65,7 +73,7 @@ fn main() -> Result<(), CliError> {
     match args.command {
         Command::Repl(args) => repl::repl(args)?,
         Command::File(args) => file::file(args)?,
-        Command::Explain(args) => explain::explain(args)?,
+        Command::Explain(args) => explain::explain_command(args)?,
     }
 
     Ok(())

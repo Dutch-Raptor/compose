@@ -1,4 +1,4 @@
-use crate::tests::assert_eval;
+use crate::test::assert_eval;
 use compose_library::Value;
 
 #[test]

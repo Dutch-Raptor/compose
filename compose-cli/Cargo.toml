@@ -6,6 +6,7 @@ edition = "2024"
 [[bin]]
 name = "compose"
 path = "src/main.rs"
+doc = false
 
 [dependencies]
 compose-library = { workspace = true }
@@ -14,7 +15,7 @@ compose-syntax = { workspace = true }
 compose-editor = { workspace = true }
 compose-utils = { workspace = true }
 compose = { workspace = true }
-compose-explain = {workspace = true}
+compose-doc = {workspace = true}
 codespan-reporting = { workspace = true}
 clap = { version = "4.5.37", features = ["derive"] }
 indoc = "2.0.6"

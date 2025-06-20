@@ -1,9 +1,17 @@
+use compose_library::gc::trigger::GcEvent;
 use compose_library::{Heap, Trace};
 use slotmap::SecondaryMap;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 impl Heap {
+    pub fn maybe_gc(&mut self, root: &impl Trace) -> Option<CleanResult> {
+        if !self.policy.on_event(&GcEvent::MaybeGc, &self.data()) {
+            return None;
+        }
+        Some(self.clean(root))
+    }
+
     pub fn clean(&mut self, root: &impl Trace) -> CleanResult {
         let start = Instant::now();
         let mut worklist = VecDeque::new();
@@ -39,7 +47,6 @@ impl Heap {
         });
 
         let gc_duration = start.elapsed();
-
 
         CleanResult {
             sweeped,

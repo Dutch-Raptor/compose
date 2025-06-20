@@ -1,2 +1,10 @@
-let a = *(box::new(4)) == *(() => box::new(4))();
-println(a)
+let result = {
+    let mut i = 0;
+    while true {
+        if i == 5 {
+            break i * 2; // returns 10
+        };
+        i = i + 1;
+    };
+};
+assert::eq(result, 10);

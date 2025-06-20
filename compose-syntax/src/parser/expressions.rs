@@ -207,7 +207,10 @@ fn block(p: &mut Parser) {
 
     statements::code(p, syntax_set!(End, RightBrace, RightParen, RightBracket));
 
-    p.expect_closing_delimiter(m, SyntaxKind::RightBrace);
+    if !p.expect_closing_delimiter(m, SyntaxKind::RightBrace) {
+        p.eat();
+    }
+    
     p.wrap(m, SyntaxKind::CodeBlock)
 }
 
@@ -655,17 +658,16 @@ mod tests {
 
         let mut p = assert_parse_with_errors(
             input,
-            &[E0001_UNCLOSED_DELIMITER, E0008_EXPECTED_EXPRESSION],
+            &[E0001_UNCLOSED_DELIMITER],
         );
         p.assert_next_children(SyntaxKind::CodeBlock, |p| {
             p.assert_next_error(E0001_UNCLOSED_DELIMITER); // unclosed `{`
             p.assert_next_children(SyntaxKind::FuncCall, |_| {});
             p.assert_next_children(SyntaxKind::FuncCall, |_| {});
-            // `}` is missing
+            p.assert_next(SyntaxKind::RightParen, ")");
             p.assert_end();
         });
 
-        p.assert_next_error(E0008_EXPECTED_EXPRESSION);
         p.assert_next_children(SyntaxKind::LetBinding, |_| {});
         p.assert_end();
     }
