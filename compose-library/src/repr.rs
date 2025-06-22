@@ -1,4 +1,5 @@
 use ecow::EcoString;
+use compose_library::Vm;
 
 pub fn separated_list(pieces: &[impl AsRef<str>], last: &str) -> String {
     let mut buf = String::new();
@@ -23,5 +24,5 @@ pub fn separated_list(pieces: &[impl AsRef<str>], last: &str) -> String {
 }
 
 pub trait Repr {
-    fn repr(&self) -> EcoString;
+    fn repr(&self, vm: &dyn Vm) -> EcoString;
 }

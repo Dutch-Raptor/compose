@@ -103,6 +103,7 @@ pub enum SyntaxKind {
     Unit,
     While,
     WhileLoop,
+    Array,
 }
 
 impl SyntaxKind {
@@ -120,6 +121,7 @@ impl SyntaxKind {
             SyntaxKind::AmpersandEq => "&=",
             SyntaxKind::Apostrophe => "'",
             SyntaxKind::Args => "argument list",
+            SyntaxKind::Array => "array",
             SyntaxKind::Arrow => "=>",
             SyntaxKind::As => "as",
             SyntaxKind::Assignment => "assignment",

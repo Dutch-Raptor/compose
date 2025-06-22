@@ -2,7 +2,7 @@ mod clean;
 mod trigger;
 
 use crate::gc::trigger::{GcTriggerPolicy, SimplePolicy};
-use crate::Value;
+use crate::{Array, Value};
 use compose_library::gc::trigger::GcData;
 use compose_library::Iter;
 use slotmap::{new_key_type, SlotMap};
@@ -71,9 +71,17 @@ where
     pub fn get(self, heap: &Heap) -> Option<&T> {
         heap.get(self)
     }
+    
+    pub fn try_get(self, heap: &Heap) -> StrResult<&T> {
+        heap.get(self).ok_or_else(|| "Use after free. This is a bug.".into())
+    }
 
     pub fn get_mut(self, heap: &mut Heap) -> Option<&mut T> {
         heap.get_mut(self)
+    }
+    
+    pub fn try_get_mut(self, heap: &mut Heap) -> StrResult<&mut T> {
+        heap.get_mut(self).ok_or_else(|| "Use after free. This is a bug.".into())
     }
 }
 
@@ -167,6 +175,7 @@ impl Trace for Value {
             Value::Type(ty) => ty.visit_refs(f),
             Value::Iterator(i) => i.visit_refs(f),
             Value::Box(b) => f(b.key()),
+            Value::Array(a) => a.visit_refs(f),
         }
     }
 }
@@ -195,14 +204,19 @@ macro_rules! impl_heap_obj {
     };
 }
 
+pub(crate) use impl_heap_obj;
+use crate::diag::StrResult;
+
 impl_heap_obj!(Value, Value);
 impl_heap_obj!(Iter, Iter);
+impl_heap_obj!(Array, Array);
 
 heap_enum! {
     #[derive(Debug, Clone, PartialEq)]
     pub enum HeapItem {
         Value(Value),
-        Iter(Iter)
+        Iter(Iter),
+        Array(Array),
     }
 }
 

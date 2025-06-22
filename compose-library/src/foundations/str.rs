@@ -41,7 +41,7 @@ impl Str {
 }
 
 impl Repr for Str {
-    fn repr(&self) -> EcoString {
+    fn repr(&self, _vm: &dyn Vm) -> EcoString {
         self.0.clone()
     }
 }

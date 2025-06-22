@@ -126,6 +126,7 @@ impl Func {
         match self.kind {
             FuncKind::Native(n) => match n.fn_type {
                 FuncType::Method => false,
+                FuncType::MethodMut => false,
                 FuncType::Associated => true,
             },
             FuncKind::Closure(_) => false,
@@ -221,6 +222,7 @@ impl fmt::Display for Closure {
 #[derive(Debug)]
 pub enum FuncType {
     Method,
+    MethodMut,
     Associated,
 }
 
