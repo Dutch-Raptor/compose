@@ -1,7 +1,7 @@
 use crate::SyntaxNode;
 use crate::ast::atomics::Unit;
 use crate::ast::unary::Unary;
-use crate::ast::{AstNode, Binary, ForLoop, Ident, Int, Parenthesized, WhileLoop};
+use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, Int, Parenthesized, WhileLoop};
 use crate::ast::{Bool, Closure, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
 use crate::ast::control_flow::Conditional;
 use crate::kind::SyntaxKind;
@@ -35,6 +35,7 @@ pub enum Expr<'a> {
     Conditional(Conditional<'a>),
     WhileLoop(WhileLoop<'a>),
     ForLoop(ForLoop<'a>),
+    Array(Array<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -57,6 +58,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::Conditional => Some(Self::Conditional(Conditional::from_untyped(node)?)),
             SyntaxKind::WhileLoop => Some(Self::WhileLoop(WhileLoop::from_untyped(node)?)),       
             SyntaxKind::ForLoop => Some(Self::ForLoop(ForLoop::from_untyped(node)?)),       
+            SyntaxKind::Array => Some(Self::Array(Array::from_untyped(node)?)),       
             _ => None,
         }
     }
@@ -80,6 +82,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::Conditional(conditional) => conditional.to_untyped(),       
             Self::WhileLoop(while_loop) => while_loop.to_untyped(),       
             Self::ForLoop(for_loop) => for_loop.to_untyped(),       
+            Self::Array(array) => array.to_untyped(),       
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::{HeapRef, Trace};
 use crate::{UntypedRef, Value};
-use compose_library::diag::{error, SourceResult};
+use compose_library::diag::{SourceResult, error};
 use compose_library::vm::Vm;
 use compose_library::{Func, Heap};
 use compose_macros::{func, scope, ty};
@@ -46,12 +46,15 @@ impl IterValue {
                 Span::detached(), "cannot iterate over a string directly";
                 hint: "try calling `.chars()` to iterate over the characters of the string"
             )
-                .into()),
+            .into()),
             Value::Box(_) => Err(error!(
                 Span::detached(), "cannot iterate over a boxed value directly";
                 hint: "try dereferencing the box first with `*`"
             )
-                .into()),
+            .into()),
+            Value::Array(_) => {
+                Err(error!(Span::detached(), "Not yet supported, stay tuned!").into())
+            }
             other @ (Value::Int(_)
             | Value::Func(_)
             | Value::Type(_)

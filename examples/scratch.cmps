@@ -1,10 +1,10 @@
-let result = {
-    let mut i = 0;
-    while true {
-        if i == 5 {
-            break i * 2; // returns 10
-        };
-        i = i + 1;
-    };
-};
-assert::eq(result, 10);
+let a = [1, 2, 3];
+println(a);
+a.push(4);
+println(a);
+
+println(a.pop(), a);
+println(a.pop(), a);
+println(a.pop(), a);
+println(a.pop(), a);
+println(a.pop(), a);

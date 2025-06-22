@@ -1,17 +1,17 @@
+use crate::{IntoValue, Vm};
 use crate::diag::{At, SourceResult, Spanned};
 use crate::foundations::boxed::Boxed;
-use crate::IntoValue;
 use crate::{CastInfo, Str, UnitValue};
 use crate::{FromValue, Func};
 use crate::{NativeScope, Reflect};
 use crate::{Sink, Type};
-use compose_library::diag::{bail, error, StrResult};
+use compose_library::diag::{StrResult, bail, error};
 use compose_library::repr::Repr;
-use compose_library::IterValue;
+use compose_library::{ArrayValue, IterValue};
 use compose_macros::func;
 use compose_macros::scope;
 use compose_syntax::Span;
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -24,13 +24,14 @@ pub enum Value {
     Type(Type),
     Iterator(IterValue),
     Box(Boxed),
+    Array(ArrayValue),
 }
 
 #[scope]
 impl Value {
     #[func(name = "repr")]
-    pub fn repr_(self) -> EcoString {
-        self.repr()
+    pub fn repr_(self, vm: &dyn Vm) -> EcoString {
+        self.repr(vm)
     }
 }
 
@@ -51,6 +52,7 @@ impl Value {
             Value::Type(_) => Type::of::<Type>(),
             Value::Iterator(_) => Type::of::<IterValue>(),
             Value::Box(_) => Type::of::<Boxed>(),
+            Value::Array(_) => Type::of::<ArrayValue>(),
         }
     }
 
@@ -146,21 +148,23 @@ impl fmt::Display for Value {
             Value::Type(v) => write!(f, "{}", v),
             Value::Iterator(v) => write!(f, "{:?}", v),
             Value::Box(v) => write!(f, "{}", v),
+            Value::Array(v) => write!(f, "{:?}", v),
         }
     }
 }
 
 impl Repr for Value {
-    fn repr(&self) -> EcoString {
+    fn repr(&self, vm: &dyn Vm) -> EcoString {
         match self {
             Value::Int(v) => eco_format!("{v}"),
             Value::Bool(v) => eco_format!("{v}"),
             Value::Unit(_) => eco_format!("()"),
-            Value::Str(v) => v.repr(),
+            Value::Str(v) => v.repr(vm),
             Value::Func(v) => eco_format!("{v}"),
             Value::Type(v) => eco_format!("{v}"),
             Value::Iterator(v) => eco_format!("iterator({v:?})"),
             Value::Box(v) => eco_format!("{v}"),
+            Value::Array(v) => v.repr(vm),
         }
     }
 }
@@ -221,3 +225,4 @@ primitive!(Type: "type", Type);
 primitive!(UnitValue: "unit", Unit);
 primitive!(IterValue: "iterator", Iterator);
 primitive!(Boxed: "box", Box);
+primitive!(ArrayValue: "array", Array);

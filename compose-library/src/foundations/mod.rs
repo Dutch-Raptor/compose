@@ -13,6 +13,7 @@ mod bool;
 mod unit;
 mod iterator;
 mod boxed;
+mod array;
 
 pub use args::*;
 pub use boxed::*;
@@ -26,3 +27,4 @@ pub use str::*;
 pub use ty::*;
 pub use unit::*;
 pub use value::*;
+pub use array::*;

@@ -25,7 +25,7 @@ fn create(func: &Func, item: &ItemFn) -> TokenStream {
         quote! {
             impl ::compose_library::foundations::NativeFunc for #rust_name {
                 fn data() -> &'static ::compose_library::foundations::NativeFuncData {
-                    static DATA: ::compose_library::foundations::NativeFuncData = #data;
+                    static DATA: #foundations::NativeFuncData = #data;
                     &DATA
                 }
             }
@@ -87,10 +87,10 @@ fn create_func_data(func: &Func) -> TokenStream {
 
     let closure = create_wrapper_closure(func);
 
-    let fn_type = if special.self_.is_some() {
-        quote! { #foundations::FuncType::Method }
-    } else {
-        quote! { #foundations::FuncType::Associated }
+    let fn_type = match special.self_ {
+        Some(Param { binding: Binding::RefMut, ..}) => quote! { #foundations::FuncType::MethodMut },
+        Some(_) => quote! { #foundations::FuncType::Method },
+        None => quote! { #foundations::FuncType::Associated },   
     };
 
     let name = quote! { #name };

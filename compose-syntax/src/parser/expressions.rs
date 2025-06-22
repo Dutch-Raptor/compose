@@ -174,6 +174,7 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             p.assert(SyntaxKind::RightParen);
             p.wrap(m, SyntaxKind::Unit)
         }
+        SyntaxKind::LeftBracket => array(p),
         SyntaxKind::If => conditional(p),
         SyntaxKind::While => while_loop(p),
         SyntaxKind::For => for_loop(p),
@@ -198,6 +199,29 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             )),
         ),
     }
+}
+
+fn array(p: &mut Parser) {
+    let m = p.marker();
+
+    p.assert(SyntaxKind::LeftBracket);
+
+    while !p.current().is_terminator() {
+        if !p.at_set(set::EXPR) {
+            p.unexpected("expected an expression in array list", None);
+            continue;
+        }
+
+        code_expression(p);
+
+        if !p.current().is_terminator() {
+            p.expect_or_recover(SyntaxKind::Comma, syntax_set!(RightBracket));
+        }
+    }
+
+    p.expect_closing_delimiter(m, SyntaxKind::RightBracket);
+
+    p.wrap(m, SyntaxKind::Array)
 }
 
 fn block(p: &mut Parser) {
@@ -756,6 +780,27 @@ mod tests {
             });
             p.assert_next(SyntaxKind::Arrow, "=>");
             p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
+            p.assert_end();
+        });
+        p.assert_end();
+    }
+
+    #[test]
+    fn parse_array() {
+        let input = r#"
+            [1, 2, 3]
+        "#;
+
+        let mut p = assert_parse(input);
+
+        p.assert_next_children(SyntaxKind::Array, |p| {
+            p.assert_next(SyntaxKind::LeftBracket, "[");
+            p.assert_next(SyntaxKind::Int, "1");
+            p.assert_next(SyntaxKind::Comma, ",");
+            p.assert_next(SyntaxKind::Int, "2");
+            p.assert_next(SyntaxKind::Comma, ",");
+            p.assert_next(SyntaxKind::Int, "3");
+            p.assert_next(SyntaxKind::RightBracket, "]");
             p.assert_end();
         });
         p.assert_end();
