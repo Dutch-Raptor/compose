@@ -2,6 +2,8 @@ use compose_doc_macros::compose_doc;
 
 compose_doc! {
     /**
+    # 🌍 Overview
+    
     ## 🧱 Statements in Compose
 
     In Compose, programs are made up of **statements** each one representing a unit of execution. Statements can define variables, modify variables, or perform computations
@@ -12,7 +14,7 @@ compose_doc! {
 
     ### 1. **Expression Statement**
 
-    If you write an expression on its own, it’s treated as a statement. These are useful for triggering side effects or for quick debugging during development:
+    If you write an expression on its own, it’s treated as a statement. Useful for side effects:
 
     ```compose
     3 + 4;      // evaluates to 7, but does nothing with it
@@ -47,6 +49,7 @@ compose_doc! {
     let mut x = 42;
     x = 43
     ```
+    
 
     ---
 
@@ -244,7 +247,11 @@ compose_doc! {
     | Closure            | ✅                 | `(x) => x + 1`                     |
 
     In Compose, the idea is simple: **if it does something, it probably returns something too.**
+    
+    ---
+    
+    | [Back](crate::docs) | [Next: Variables and scopes](crate::docs::C2_Variables_and_Scopes) |
 
     */
-    pub enum C1_Introduction {}
+    pub mod C1_Overview {}
 }

@@ -18,13 +18,14 @@ Whether you're scripting quick logic or building more sophisticated constructs, 
 * **A strong, consistent AST and CST**: Behind the scenes, Compose uses a resilient parser and a fault-tolerant concrete syntax tree, making tooling and analysis more reliable and powerful.
 * **First-class closures**: Functions and closures are fully supported, and closures can capture boxed variables by reference, safely enabling functional patterns.
 
-To learn more, check out the [Introduction](docs::C1_Introduction) section.
+To learn more, check out the [Overview](docs::C1_Overview) section.
 
 ## Getting Started
 
 - [Docs](docs)
-    - [Introduction](docs::C1_Introduction)
-
+    - [Overview](docs::C1_Overview)
+    - [Variables and Scopes](docs::C2_Variables_and_Scopes)
+    - [Functions](docs::C4_Functions_and_closures)
 */
 pub mod docs;
 
