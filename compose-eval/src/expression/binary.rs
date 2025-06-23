@@ -1,5 +1,5 @@
-use crate::Eval;
 use crate::vm::{Machine, Tracked};
+use crate::{Eval, Evaluated};
 use compose_library::diag::{At, SourceResult, StrResult, bail};
 use compose_library::{Value, ops};
 use compose_syntax::ast;
@@ -7,9 +7,7 @@ use compose_syntax::ast::{AstNode, BinOp};
 use std::ops::Deref;
 
 impl Eval for ast::Binary<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         match self.op() {
             BinOp::Add => apply_binary(self, vm, ops::add),
             BinOp::Sub => apply_binary(self, vm, ops::sub),
@@ -33,19 +31,21 @@ fn apply_binary(
     binary: ast::Binary,
     vm: &mut Machine,
     op: fn(&Value, &Value) -> StrResult<Value>,
-) -> SourceResult<Value> {
+) -> SourceResult<Evaluated> {
     let l = binary.lhs();
     let lhs = l.eval(vm)?;
 
     // make sure we dont evaluate rhs when short-circuiting
-    if binary.op().short_circuits(&lhs) {
-        return Ok(lhs);
+    if binary.op().short_circuits(&lhs.value) {
+        return Ok(Evaluated::mutable(lhs.value));
     }
 
     let r = binary.rhs();
     let rhs = r.eval(vm)?;
 
-    op(&lhs, &rhs).at(binary.span())
+    Ok(Evaluated::mutable(
+        op(&lhs.value, &rhs.value).at(binary.span())?,
+    ))
 }
 
 trait ShortCircuits {

@@ -1,33 +1,34 @@
 use crate::access::Access;
-use crate::{Eval, Machine};
-use compose_library::diag::{bail, At, SourceResult, StrResult};
-use compose_library::{ops, Heap, Value};
+use crate::{Eval, Evaluated, Machine};
+use compose_library::diag::{At, SourceResult, StrResult, bail};
+use compose_library::{Heap, Value, ops};
 use compose_syntax::ast::{AstNode, UnOp, Unary};
 
 impl Eval for Unary<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let rhs = self.expr().eval(vm)?;
 
         match self.op() {
-            UnOp::Plus => ops::unary_plus(rhs),
-            UnOp::Minus => ops::unary_minus(rhs),
-            UnOp::Bang => ops::unary_not(rhs),
-            UnOp::Tilde => ops::unary_bitwise_not(rhs),
+            UnOp::Plus => ops::unary_plus(rhs.value).map(Evaluated::mutable),
+            UnOp::Minus => ops::unary_minus(rhs.value).map(Evaluated::mutable),
+            UnOp::Bang => ops::unary_not(rhs.value).map(Evaluated::mutable),
+            UnOp::Tilde => ops::unary_bitwise_not(rhs.value).map(Evaluated::mutable),
             UnOp::Star => deref(rhs, &vm.heap),
         }
-            .at(self.span())
+        .at(self.span())
     }
 }
 
-fn deref(rhs: Value, heap: &Heap) -> StrResult<Value> {
-    match rhs {
+fn deref(rhs: Evaluated, heap: &Heap) -> StrResult<Evaluated> {
+    match rhs.value {
         Value::Box(b) => match b.get(heap) {
-            Some(value) => Ok(value.clone()),
+            Some(value) => Ok(Evaluated::new(value.clone(), rhs.mutable)),
             None => bail!("Use after free. This is a bug"),
         },
-        _ => bail!("only boxed values can be dereferenced. got a {}", rhs.ty()),
+        _ => bail!(
+            "only boxed values can be dereferenced. got a {}",
+            rhs.value.ty()
+        ),
     }
 }
 

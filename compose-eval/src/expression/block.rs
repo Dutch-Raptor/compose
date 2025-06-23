@@ -1,14 +1,12 @@
-use crate::{Eval, Machine};
+use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::SourceResult;
 use compose_library::Value;
 use compose_syntax::ast::CodeBlock;
 
 impl Eval for CodeBlock<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let flow = vm.flow.take();
-        let mut result = Value::unit();
+        let mut result = Evaluated::unit();
 
         let statements = self.statements();
 

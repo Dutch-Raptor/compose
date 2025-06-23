@@ -90,7 +90,7 @@ impl ArrayValue {
     }
 
     #[func]
-    fn push(self, vm: &mut dyn Vm, value: Value) -> StrResult<()> {
+    fn push(&mut self, vm: &mut dyn Vm, value: Value) -> StrResult<()> {
         let arr = self.0.try_get_mut(vm.heap_mut())?;
         
         arr.push(value);
@@ -99,13 +99,18 @@ impl ArrayValue {
     }
     
     #[func]
-    fn pop(self, vm: &mut dyn Vm) -> StrResult<Option<Value>> {
+    fn pop(&mut self, vm: &mut dyn Vm) -> StrResult<Option<Value>> {
         let arr = self.0.try_get_mut(vm.heap_mut())?;
         
         Ok(arr.pop())
     }
     
-    // fn extend
+    #[func]
+    pub fn shallow_clone(&self, vm: &mut dyn Vm) -> StrResult<Self> {
+        let clone = self.0.try_get(vm.heap())?.clone();
+        
+        Ok(Self(vm.heap_mut().alloc(clone)))
+    }
     
     
 }

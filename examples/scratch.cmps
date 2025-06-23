@@ -1,10 +1,11 @@
-let a = [1, 2, 3];
-println(a);
-a.push(4);
-println(a);
+let f = (mut a) => {
+    println(a);
+    a.push(4);
+    println(a);
+};
 
-println(a.pop(), a);
-println(a.pop(), a);
-println(a.pop(), a);
-println(a.pop(), a);
-println(a.pop(), a);
+let a = [1, 2, 3];
+
+f(a);
+
+println(a);

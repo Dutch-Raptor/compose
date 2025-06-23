@@ -1,12 +1,9 @@
-use crate::{Eval, Machine};
+use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::SourceResult;
-use compose_library::Value;
 use compose_syntax::ast;
 
 impl Eval for ast::Parenthesized<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         self.expr().eval(vm)
     }
 }

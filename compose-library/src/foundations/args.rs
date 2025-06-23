@@ -159,6 +159,29 @@ pub struct Arg {
     pub value: Spanned<Value>,
 }
 
+pub struct Meta(u8);
+
+impl Meta {
+    const REF: Meta = Meta(1);
+    const MUT: Meta = Meta(2);
+    
+    pub fn new() -> Meta {
+        Meta(0)
+    }
+
+    pub fn is_ref(&self) -> bool {
+        (self.0 & Meta::REF.0) > 0
+    }
+
+    pub fn is_mut(&self) -> bool {
+        (self.0 & Meta::MUT.0) > 0
+    }
+
+    pub fn join(&self, other: Meta) -> Meta {
+        Meta(self.0 | other.0)
+    }
+}
+
 impl Trace for Args {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
         for arg in &self.items {

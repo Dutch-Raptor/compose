@@ -1,15 +1,13 @@
 use crate::expression::bindings::destructure_pattern;
 use crate::vm::FlowEvent;
-use crate::{Eval, Machine};
+use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::{At, SourceResult};
 use compose_library::{BindingKind, IterValue, Value, ValueIterator};
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 
 impl Eval for ast::Conditional<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         if eval_condition(self.condition(), vm)? {
             return self.consequent().eval(vm);
         }
@@ -24,33 +22,29 @@ impl Eval for ast::Conditional<'_> {
             return cond_else.consequent().eval(vm);
         }
 
-        Ok(Value::unit())
+        Ok(Evaluated::unit())
     }
 }
 
 impl Eval for ast::WhileLoop<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let mut value = Value::unit();
         while eval_condition(self.condition(), vm)? {
-            value = self.body().eval(vm)?;
+            value = self.body().eval(vm)?.value;
         }
-        Ok(value)
+        Ok(Evaluated::mutable(value))
     }
 }
 
 impl Eval for ast::ForLoop<'_> {
-    type Output = Value;
-
     //noinspection RsUnnecessaryQualifications - False positive
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let mut output = Value::unit();
         let pattern = self.binding();
         let iterable_expr = self.iterable();
         let iterator = {
             let value = iterable_expr.eval(vm)?;
-            IterValue::try_from_value(value, &mut vm.heap).at(iterable_expr.span())?
+            IterValue::try_from_value(value.value, value.mutable, &mut vm.heap).at(iterable_expr.span())?
         };
         let body = self.body();
 
@@ -65,7 +59,7 @@ impl Eval for ast::ForLoop<'_> {
                     BindingKind::Immutable { first_assign: None },
                 )?;
 
-                output = body.eval(vm)?;
+                output = body.eval(vm)?.value;
 
                 SourceResult::Ok(())
             })?;
@@ -85,7 +79,7 @@ impl Eval for ast::ForLoop<'_> {
             vm.flow = Some(flow);
         }
 
-        Ok(output)
+        Ok(Evaluated::mutable(output))
     }
 }
 
@@ -94,5 +88,5 @@ impl Eval for ast::ForLoop<'_> {
 fn eval_condition(cond: ast::Condition<'_>, vm: &mut Machine) -> SourceResult<bool> {
     let cond_expr = cond.expr();
     let cond_value = cond_expr.eval(vm)?;
-    cond_value.cast::<bool>().at(cond_expr.span())
+    cond_value.value.cast::<bool>().at(cond_expr.span())
 }

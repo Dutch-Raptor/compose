@@ -1,5 +1,5 @@
 use crate::vm::{FlowEvent, Tracked, TrackedContainer};
-use crate::{Eval, Machine};
+use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::{IntoSourceDiagnostic, SourceResult, Spanned, bail, error};
 use compose_library::{
     Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError,
@@ -11,15 +11,13 @@ use ecow::{EcoString, EcoVec};
 use std::collections::HashMap;
 
 impl Eval for ast::Closure<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let guard = vm.temp_root_guard();
 
         let mut defaults = Vec::new();
         for param in self.params().children() {
             if let ast::ParamKind::Named(named) = param.kind() {
-                defaults.push(named.expr().eval(guard.vm)?);
+                defaults.push(named.expr().eval(guard.vm)?.value);
             }
         }
 
@@ -100,7 +98,9 @@ impl Eval for ast::Closure<'_> {
         }
 
         let param_span = self.params().span();
-        Ok(Value::Func(Func::from(closure)).spanned(param_span))
+        Ok(Evaluated::mutable(
+            Value::Func(Func::from(closure)).spanned(param_span),
+        ))
     }
 }
 
@@ -217,7 +217,7 @@ pub fn eval_closure(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRe
             // Ensure all args have been used
             args.finish()?;
 
-            let output = body.eval(vm)?;
+            let output = body.eval(vm)?.value;
             match &vm.flow {
                 None => {}
                 Some(FlowEvent::Return(_, Some(explicit))) => return Ok(explicit.clone()),

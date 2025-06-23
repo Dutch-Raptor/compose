@@ -1,7 +1,6 @@
-use crate::Eval;
 use crate::vm::{Machine, Tracked};
-use compose_library::diag::{At, SourceResult};
-use compose_library::{UnitValue, Value};
+use crate::{Eval, Evaluated};
+use compose_library::diag::{SourceResult};
 use compose_syntax::ast::{AstNode, Expr};
 
 mod assignment;
@@ -21,9 +20,7 @@ mod array;
 pub use closure::eval_closure;
 
 impl Eval for Expr<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let span = self.span();
         let v = match self {
             Expr::Int(i) => i.eval(vm),
@@ -31,7 +28,7 @@ impl Eval for Expr<'_> {
             Expr::LetBinding(l) => l.eval(vm),
             Expr::Ident(i) => i.eval(vm),
             Expr::CodeBlock(c) => c.eval(vm),
-            Expr::Unit(_) => Ok(Value::Unit(UnitValue)),
+            Expr::Unit(_) => Ok(Evaluated::unit()),
             Expr::Str(s) => s.eval(vm),
             Expr::Unary(u) => u.eval(vm),
             Expr::Bool(b) => b.eval(vm),

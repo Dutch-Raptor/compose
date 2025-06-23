@@ -33,6 +33,21 @@ impl Value {
     pub fn repr_(self, vm: &dyn Vm) -> EcoString {
         self.repr(vm)
     }
+
+    #[func(name = "clone")]
+    pub fn shallow_clone(self, vm: &mut dyn Vm) -> StrResult<Self> {
+        Ok(match self {
+            Value::Int(v) => Value::Int(v),
+            Value::Bool(v) => Value::Bool(v),
+            Value::Unit(v) => Value::Unit(v),
+            Value::Str(v) => Value::Str(v),
+            Value::Func(v) => Value::Func(v),
+            Value::Type(v) => Value::Type(v),
+            Value::Iterator(v) => Value::Iterator(v.shallow_clone(vm)?),
+            Value::Box(v) => Value::Box(v.shallow_clone(vm)?),
+            Value::Array(v) => Value::Array(v.shallow_clone(vm)?),
+        })
+    }
 }
 
 impl Value {
