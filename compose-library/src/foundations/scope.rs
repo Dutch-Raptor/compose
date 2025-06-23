@@ -436,9 +436,6 @@ impl Binding {
     }
 
     pub fn is_mutable(&self) -> bool {
-        matches!(
-            self.kind,
-            BindingKind::Mutable | BindingKind::UninitializedMutable
-        )
+        self.kind.is_mut()
     }
 }

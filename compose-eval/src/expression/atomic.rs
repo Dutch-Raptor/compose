@@ -1,30 +1,24 @@
 use crate::vm::Machine;
-use crate::Eval;
-use compose_library::diag::SourceResult;
+use crate::{Eval, Evaluated};
 use compose_library::Value;
+use compose_library::diag::SourceResult;
 use compose_syntax::ast;
 
 impl Eval for ast::Int<'_> {
-    type Output = Value;
-
-    fn eval(self, _vm: &mut Machine) -> SourceResult<Self::Output> {
-        Ok(Value::Int(self.get()))
+    fn eval(self, _vm: &mut Machine) -> SourceResult<Evaluated> {
+        Ok(Evaluated::mutable(Value::Int(self.get())))
     }
 }
 
 impl Eval for ast::Str<'_> {
-    type Output = Value;
-
-    fn eval(self, _vm: &mut Machine) -> SourceResult<Self::Output> {
-        Ok(Value::Str(self.get().into()))
+    fn eval(self, _vm: &mut Machine) -> SourceResult<Evaluated> {
+        Ok(Evaluated::mutable(Value::Str(self.get().into())))
     }
 }
 
 impl Eval for ast::Bool<'_> {
-    type Output = Value;
-
-    fn eval(self, _vm: &mut Machine) -> SourceResult<Self::Output> {
-        Ok(Value::Bool(self.get()))
+    fn eval(self, _vm: &mut Machine) -> SourceResult<Evaluated> {
+        Ok(Evaluated::mutable(Value::Bool(self.get())))
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::{HeapRef, Trace};
 use crate::{UntypedRef, Value};
-use compose_library::diag::{SourceResult, error};
+use compose_library::diag::{error, SourceResult};
 use compose_library::vm::Vm;
 use compose_library::{Func, Heap};
 use compose_macros::{func, scope, ty};
@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 mod iter_combinators;
 mod string_iter;
 
-use crate::diag::{SourceDiagnostic, UnSpanned};
+use crate::diag::{SourceDiagnostic, StrResult, UnSpanned};
 pub use iter_combinators::*;
 pub use string_iter::*;
 
@@ -37,10 +37,11 @@ impl IterValue {
 
     pub fn try_from_value(
         value: Value,
+        mutable: bool,
         _heap: &mut Heap,
     ) -> Result<IterValue, UnSpanned<SourceDiagnostic>> {
         match value {
-            Value::Iterator(i) => Ok(i),
+            Value::Iterator(i) if mutable => Ok(i),
 
             Value::Str(_) => Err(error!(
                 Span::detached(), "cannot iterate over a string directly";
@@ -62,8 +63,25 @@ impl IterValue {
             | Value::Unit(_)) => {
                 Err(error!(Span::detached(), "cannot iterate over type {}", other.ty()).into())
             }
+            immut => requires_mutable_iter(immut),
         }
     }
+
+    pub(crate) fn shallow_clone(&self, vm: &mut dyn Vm) -> StrResult<Self> {
+        let self_ = self.iter.try_get(vm.heap()).cloned()?;
+        Ok(Self {
+            iter: vm.heap_mut().alloc(self_),
+        })
+    }
+}
+
+pub fn requires_mutable_iter<T>(value: Value) -> Result<T, UnSpanned<SourceDiagnostic>> {
+    Err(error!(
+        Span::detached(),
+        "cannot iterate over a value of type {} that is not marked as mutable",
+        value.ty()
+    )
+    .into())
 }
 
 #[derive(Clone, Debug, PartialEq)]

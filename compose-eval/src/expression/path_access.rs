@@ -1,19 +1,19 @@
-use crate::{Eval, Machine};
+use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::SourceResult;
-use compose_library::Value;
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 
 impl Eval for ast::PathAccess<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let target_expr = self.target();
         let member = self.member();
 
         let target = target_expr.eval(vm)?;
 
         let span = member.span();
-        target.path(&member, span, vm.sink_mut())
+        target
+            .value
+            .path(&member, span, vm.sink_mut())
+            .map(|v| target.with_value(v))
     }
 }

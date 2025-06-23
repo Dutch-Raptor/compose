@@ -1,18 +1,19 @@
-use crate::{Eval, Machine};
+use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::SourceResult;
 use compose_library::{ArrayValue, Value, Vm};
 use compose_syntax::ast;
 
 impl<'a> Eval for ast::Array<'a> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let elements = self.elements();
 
         let inner = elements
-            .map(|e| e.eval(vm))
+            .map(|e| e.eval(vm).map(|v| v.value))
             .collect::<SourceResult<Vec<Value>>>()?;
 
-        Ok(Value::Array(ArrayValue::from(vm.heap_mut(), inner)))
+        Ok(Evaluated::mutable(Value::Array(ArrayValue::from(
+            vm.heap_mut(),
+            inner,
+        ))))
     }
 }

@@ -132,6 +132,17 @@ impl Func {
             FuncKind::Closure(_) => false,
         }
     }
+    
+    pub fn requires_mut_self(&self) -> bool {
+        match self.kind {
+            FuncKind::Native(n) => match n.fn_type {
+                FuncType::Method => false,
+                FuncType::MethodMut => true,
+                FuncType::Associated => false,
+            },
+            FuncKind::Closure(_) => false,
+        }
+    }
 }
 
 pub trait NativeFunc {

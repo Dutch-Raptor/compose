@@ -1,14 +1,12 @@
 use crate::access::Access;
-use crate::{Eval, Machine};
-use compose_library::diag::{bail, At, SourceResult, StrResult};
-use compose_library::{ops, Value};
+use crate::{Eval, Evaluated, Machine};
+use compose_library::diag::{At, SourceResult, StrResult, bail};
+use compose_library::{Value, ops};
 use compose_syntax::ast;
 use compose_syntax::ast::{AssignOp, AstNode};
 
 impl Eval for ast::Assignment<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         match self.op() {
             AssignOp::Assign => apply_assignment(self, vm, |_init, rhs| Ok(rhs.clone())),
             AssignOp::AddAssign => apply_assignment(self, vm, ops::add),
@@ -23,13 +21,13 @@ fn apply_assignment(
     binary: ast::Assignment,
     vm: &mut Machine,
     op: fn(&Value, &Value) -> StrResult<Value>,
-) -> SourceResult<Value> {
+) -> SourceResult<Evaluated> {
     // assignments are right associative
     let rhs = binary.rhs().eval(vm)?;
 
-    let mut lhs = binary.lhs().access(vm)?;
-    let value = op(&lhs, &rhs).at(binary.span())?;
+    let lhs = binary.lhs().access(vm)?;
+    let value = op(&lhs, &rhs.value).at(binary.span())?;
     *lhs = value;
 
-    Ok(Value::default())
+    Ok(Evaluated::unit())
 }

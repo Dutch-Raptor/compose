@@ -1,22 +1,78 @@
 mod access;
 mod expression;
 mod statement;
-mod vm;
 pub mod test;
+mod vm;
 
 pub use crate::vm::Machine;
-use compose_library::diag::{error, SourceDiagnostic, SourceResult, Warned};
+use crate::vm::Tracked;
 use compose_library::Value;
+use compose_library::diag::{SourceDiagnostic, SourceResult, Warned, error};
 use compose_syntax::ast::Statement;
-use compose_syntax::Source;
-use ecow::{eco_vec, EcoVec};
+use compose_syntax::{Source, Span};
+use ecow::{EcoVec, eco_vec};
 use std::cmp::min;
 use std::ops::Range;
 
 pub trait Eval {
-    type Output;
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated>;
+}
 
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output>;
+#[derive(Debug, Clone, PartialEq)]
+pub struct Evaluated {
+    pub value: Value,
+    /// Whether the value is allowed to be mutated.
+    ///
+    /// True for any expression except for reading or dereferencing immutable values.
+    pub mutable: bool,
+    /// The span of the binding this value is related to
+    pub origin: Option<Span>,
+}
+
+impl Evaluated {
+    pub fn new(value: Value, mutable: bool) -> Self {
+        Self { value, mutable, origin: None }
+    }
+
+    pub fn mutable(value: Value) -> Self {
+        Self::new(value, true)
+    }
+    
+    pub fn immutable(value: Value) -> Self {
+        Self::new(value, false)
+    }
+
+    pub fn unit() -> Self {
+        Self::new(Value::unit(), true)
+    }
+
+    pub fn spanned(self, span: Span) -> Self {
+        Self {
+            value: self.value.spanned(span),
+            ..self
+        }
+    }
+    
+    pub fn with_origin(self, origin: Span) -> Self {
+        Self { origin: Some(origin), ..self }
+    }
+    
+    pub fn with_value(self, value: Value) -> Self {
+        Self { value, ..self }
+    }
+    
+    pub fn make_mutable(self) -> Self {
+        Self { mutable: true, ..self }
+    }
+}
+
+impl Tracked for Evaluated {
+    fn track_tmp_root(self, vm: &mut Machine) -> Self {
+        Self {
+            value: self.value.track_tmp_root(vm),
+            ..self
+        }
+    }
 }
 
 #[derive(Default)]
@@ -25,8 +81,11 @@ pub struct EvalConfig {
     pub include_syntax_warnings: bool,
 }
 
-
-pub fn eval(source: &Source, vm: &mut Machine, eval_config: &EvalConfig) -> Warned<SourceResult<Value>> {
+pub fn eval(
+    source: &Source,
+    vm: &mut Machine,
+    eval_config: &EvalConfig,
+) -> Warned<SourceResult<Value>> {
     eval_range(source, 0..usize::MAX, vm, eval_config)
 }
 
@@ -71,7 +130,7 @@ pub fn eval_range(
             }
         };
         result = match statement.eval(vm) {
-            Ok(value) => value,
+            Ok(value) => value.value,
             Err(err) => return build_err(&syntax_warnings, vm, err, config),
         }
     }

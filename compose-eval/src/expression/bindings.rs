@@ -1,31 +1,28 @@
 use crate::vm::{ErrorMode, Machine};
-use crate::Eval;
+use crate::{Eval, Evaluated};
 use compose_library::diag::{At, SourceResult, Spanned};
-use compose_library::{diag, BindingKind, Value};
+use compose_library::{BindingKind, Value, diag};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, Expr, Pattern};
 use ecow::eco_vec;
 
 impl<'a> Eval for ast::Ident<'a> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let span = self.span();
-        Ok(vm
-            .frames
-            .top
-            .scopes
-            .get(&self)
-            .at(span)?
-            .read_checked(span, &mut vm.engine.sink)
-            .clone())
+        let binding = vm.frames.top.scopes.get(&self).at(span)?;
+
+        let mutable = binding.is_mutable();
+
+        Ok(Evaluated::new(
+            binding.read_checked(span, &mut vm.engine.sink).clone(),
+            mutable,
+        )
+        .with_origin(binding.span()))
     }
 }
 
 impl<'a> Eval for ast::LetBinding<'a> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let has_init = self.has_initial_value();
         let init = self.initial_value();
 
@@ -40,17 +37,17 @@ impl<'a> Eval for ast::LetBinding<'a> {
             Some(expr) => {
                 vm.with_closure_capture_errors_mode(ErrorMode::Deferred, |vm| expr.eval(vm))?
             }
-            None => Value::unit(),
+            None => Evaluated::unit(),
         };
 
         // handle control flow
         if vm.flow.is_some() {
-            return Ok(Value::unit());
+            return Ok(Evaluated::unit());
         }
 
-        destructure_pattern(vm, self.pattern(), value, binding_kind)?;
+        destructure_pattern(vm, self.pattern(), value.value, binding_kind)?;
 
-        Ok(Value::unit())
+        Ok(Evaluated::unit())
     }
 }
 
@@ -99,7 +96,7 @@ fn destructure_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{assert_eval, assert_eval_with_vm, eval_code_with_vm, TestWorld};
+    use crate::test::{TestWorld, assert_eval, assert_eval_with_vm, eval_code_with_vm};
     use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
     use compose_library::{BindingKind, UnitValue};
 

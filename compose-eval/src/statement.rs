@@ -1,12 +1,9 @@
-use crate::{Eval, Machine};
+use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::SourceResult;
-use compose_library::Value;
 use compose_syntax::ast;
 
 impl Eval for ast::Statement<'_> {
-    type Output = Value;
-
-    fn eval(self, vm: &mut Machine) -> SourceResult<Self::Output> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let guard = vm.temp_root_guard();
         let result = match self {
             ast::Statement::Expr(e) => e.eval(guard.vm),
