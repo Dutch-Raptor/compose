@@ -1,16 +1,7 @@
-let f = (mut a) => {
-    println(a);
-    a.push(4);
-    println(a);
-};
-
-let a = [1, 2, 3];
-
-f(a);
-println(a);
-
-for v in a {
+let a = [0,1,2,3];
+let mut b = box::new(4);
+let times = |ref b| (a) => a * *b;
+for v in a.iter().map(times) {
     println(v);
-};
-
-println(a);
+    *b -= 1;
+}

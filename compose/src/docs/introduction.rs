@@ -12,7 +12,7 @@ compose_doc! {
 
     ---
 
-    ### 1. **Expression Statement**
+    ### 1. Expression Statement
 
     If you write an expression on its own, it’s treated as a statement. Useful for side effects:
 
@@ -32,7 +32,7 @@ compose_doc! {
 
     ---
 
-    ### 2. **Let Binding**
+    ### 2. Let Binding
 
     To introduce a new variable, use a `let` statement:
 
@@ -53,7 +53,7 @@ compose_doc! {
 
     ---
 
-    ### 3. **Assignment**
+    ### 3. Assignment
 
     Assignments are statements that modify the value of an existing variable.
 
@@ -249,7 +249,9 @@ compose_doc! {
     In Compose, the idea is simple: **if it does something, it probably returns something too.**
     
     ---
-    
+
+    | Previous            | Next                                                                 |
+    |---------------------|--------------------------------------------------------------------|
     | [Back](crate::docs) | [Next: Variables and scopes](crate::docs::C2_Variables_and_Scopes) |
 
     */
