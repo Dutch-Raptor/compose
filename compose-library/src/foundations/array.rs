@@ -77,6 +77,12 @@ impl Repr for ArrayValue {
     }
 }
 
+impl ArrayValue {
+    pub(crate) fn try_get<'a>(&self, heap: &'a Heap) -> StrResult<&'a Array> {
+        self.0.try_get(heap)
+    }
+}
+
 #[scope]
 impl ArrayValue {
     #[func]
@@ -111,6 +117,4 @@ impl ArrayValue {
         
         Ok(Self(vm.heap_mut().alloc(clone)))
     }
-    
-    
 }

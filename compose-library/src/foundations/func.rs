@@ -1,14 +1,15 @@
-use crate::diag::{bail, SourceResult, StrResult};
+use crate::diag::{SourceResult, StrResult, bail};
 use crate::foundations::args::Args;
 use crate::vm::Vm;
 use crate::{Sink, Trace, Value};
-use compose_library::diag::{error, Spanned};
+use compose_error_codes::E0010_UNCAPTURED_VARIABLE;
+use compose_library::diag::{Spanned, error};
 use compose_library::{Scope, UntypedRef};
 use compose_macros::{cast, ty};
 use compose_syntax::ast::AstNode;
-use compose_syntax::{ast, Label, Span, SyntaxNode};
+use compose_syntax::{Label, Span, SyntaxNode, ast};
 use compose_utils::Static;
-use ecow::{eco_format, eco_vec, EcoString};
+use ecow::{EcoString, eco_format, eco_vec};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::LazyLock;
@@ -132,7 +133,7 @@ impl Func {
             FuncKind::Closure(_) => false,
         }
     }
-    
+
     pub fn requires_mut_self(&self) -> bool {
         match self.kind {
             FuncKind::Native(n) => match n.fn_type {
@@ -163,7 +164,6 @@ impl NativeFuncData {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Closure {
     pub node: SyntaxNode,
@@ -184,14 +184,14 @@ impl Closure {
     pub fn resolve(&self) -> SourceResult<()> {
         if !self.unresolved_captures.is_empty() {
             let mut captures = self.unresolved_captures.iter();
-            
+
             let names = self
                 .unresolved_captures
                 .keys()
                 .map(|name| name.trim())
                 .collect::<Vec<_>>()
                 .join(", ");
-            
+
             let params = self
                 .node
                 .cast::<ast::Closure>()
@@ -201,12 +201,14 @@ impl Closure {
                 .map(|p| p.to_untyped().to_text())
                 .collect::<Vec<_>>()
                 .join(", ");
-            
+
             let (first_name, first_span) = captures.next().unwrap();
 
             let mut err = error!(*first_span, "outer variables used in closure but not captured";
                 label_message: "outer variable `{first_name}` used here";
-                hint: "explicitly capture them by adding them to a capture group: `|{names}| ({params}) => ...`");
+                hint: "explicitly capture them by adding them to a capture group: `|{names}| ({params}) => ...`";
+                code: &E0010_UNCAPTURED_VARIABLE
+            );
 
             for (name, span) in captures {
                 err = err.with_label(Label::primary(

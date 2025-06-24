@@ -8,8 +8,6 @@ pub trait GcTriggerPolicy: Debug {
     fn after_gc(&mut self, clean_result: &CleanResult, gc_data: &GcData);
 }
 pub enum GcEvent {
-    Alloc,
-    BlockEnd,
     MaybeGc,
 }
 

@@ -44,7 +44,7 @@ impl Eval for ast::ForLoop<'_> {
         let iterable_expr = self.iterable();
         let iterator = {
             let value = iterable_expr.eval(vm)?;
-            IterValue::try_from_value(value.value, value.mutable, &mut vm.heap).at(iterable_expr.span())?
+            IterValue::try_from_value(value.value, value.mutable, vm).at(iterable_expr.span())?
         };
         let body = self.body();
 

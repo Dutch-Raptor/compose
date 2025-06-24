@@ -1,9 +1,8 @@
-use crate::vm::{FlowEvent, Tracked, TrackedContainer};
+use crate::vm::{FlowEvent, TrackedContainer};
 use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::{IntoSourceDiagnostic, SourceResult, Spanned, bail, error};
 use compose_library::{
     Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError,
-    World,
 };
 use compose_syntax::ast::{AstNode, Expr, Ident, Param};
 use compose_syntax::{Label, Span, SyntaxNode, ast};
@@ -118,7 +117,7 @@ fn validate_capture<'a>(
             label: Label::secondary(binding.span(), "was defined as immutable here");
             note: "captured mutable references must match the mutability of the original declaration";
             hint: "declare the variable as mutable: `let mut {name} = ...`";
-            hint: "or remove `mut` from the capture: `|ref {name}, ...|"
+            hint: "or remove `mut` from the capture: `|ref {name}, ...|";
         );
     }
 
@@ -167,6 +166,7 @@ fn define(
     Ok(())
 }
 
+//noinspection RsUnnecessaryQualifications - False Positive
 pub fn eval_closure(closure: &Closure, vm: &mut Machine, args: Args) -> SourceResult<Value> {
     let guard = vm.temp_root_guard();
     let ast_closure = closure
@@ -198,7 +198,7 @@ pub fn eval_closure(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRe
             for p in params.children() {
                 match p.kind() {
                     ast::ParamKind::Pos(pattern) => match pattern {
-                        ast::Pattern::Single(ast::Expr::Ident(ident)) => {
+                        ast::Pattern::Single(Expr::Ident(ident)) => {
                             define(vm, ident, args.expect(&ident)?, p)?;
                         }
                         pattern => bail!(pattern.span(), "Patterns not supported in closures yet"),

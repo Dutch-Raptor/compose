@@ -1,6 +1,5 @@
 use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::SourceResult;
-use compose_library::Value;
 use compose_syntax::ast::CodeBlock;
 
 impl Eval for CodeBlock<'_> {
@@ -30,8 +29,8 @@ impl Eval for CodeBlock<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::test::assert_eval;
+    use compose_library::Value;
 
     #[test]
     fn test_block() {
