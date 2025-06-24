@@ -48,11 +48,15 @@ impl Heap {
 
         let gc_duration = start.elapsed();
 
-        CleanResult {
+        let result = CleanResult {
             sweeped,
             total_allocated,
             gc_duration,
-        }
+        };
+        
+        self.policy.after_gc(&result, &self.data());
+        
+        result
     }
 }
 

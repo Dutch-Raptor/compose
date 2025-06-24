@@ -1,14 +1,16 @@
 use crate::{HeapRef, Trace};
 use crate::{UntypedRef, Value};
-use compose_library::diag::{error, SourceResult};
+use compose_library::diag::{error, At, SourceResult};
+use compose_library::foundations::iterator::array_iter::ArrayIter;
 use compose_library::vm::Vm;
-use compose_library::{Func, Heap};
+use compose_library::Func;
 use compose_macros::{func, scope, ty};
 use compose_syntax::Span;
 use dyn_clone::DynClone;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
+mod array_iter;
 mod iter_combinators;
 mod string_iter;
 
@@ -38,7 +40,7 @@ impl IterValue {
     pub fn try_from_value(
         value: Value,
         mutable: bool,
-        _heap: &mut Heap,
+        vm: &mut dyn Vm,
     ) -> Result<IterValue, UnSpanned<SourceDiagnostic>> {
         match value {
             Value::Iterator(i) if mutable => Ok(i),
@@ -53,9 +55,13 @@ impl IterValue {
                 hint: "try dereferencing the box first with `*`"
             )
             .into()),
-            Value::Array(_) => {
-                Err(error!(Span::detached(), "Not yet supported, stay tuned!").into())
-            }
+            Value::Array(arr) => Ok(IterValue::new(
+                Iter::Array(ArrayIter::new(
+                    arr.try_get(vm.heap())
+                        .map_err(|e| SourceDiagnostic::error(Span::detached(), e))?,
+                )),
+                vm,
+            )),
             other @ (Value::Int(_)
             | Value::Func(_)
             | Value::Type(_)
@@ -87,6 +93,7 @@ pub fn requires_mutable_iter<T>(value: Value) -> Result<T, UnSpanned<SourceDiagn
 #[derive(Clone, Debug, PartialEq)]
 pub enum Iter {
     String(StringIterator),
+    Array(ArrayIter),
     Take(TakeIter),
     TakeWhile(TakeWhileIter),
     Map(MapIter),
@@ -101,6 +108,7 @@ impl Trace for Iter {
             Iter::Take(iter) => iter.visit_refs(f),
             Iter::Skip(iter) => iter.visit_refs(f),
             Iter::Map(iter) => iter.visit_refs(f),
+            Iter::Array(arr) => arr.visit_refs(f),
         }
     }
 }
@@ -113,6 +121,7 @@ impl Iter {
             Iter::TakeWhile(t) => t.next(vm),
             Iter::Map(m) => m.next(vm),
             Iter::Skip(s) => s.next(vm),
+            Iter::Array(a) => a.next(vm),
         }
     }
 }

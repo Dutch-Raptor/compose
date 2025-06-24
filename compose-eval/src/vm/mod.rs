@@ -3,15 +3,18 @@ mod stack;
 //noinspection RsUnusedImport - false positive, actually used
 use crate::expression::eval_closure;
 use crate::vm::stack::{StackFrames, TrackMarker};
-use compose_library::diag::{error, At, SourceDiagnostic, SourceResult};
-use compose_library::{Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink, Trace, UntypedRef, Value, VariableAccessError, Vm, World};
+use compose_library::diag::{At, SourceDiagnostic, SourceResult, error};
+use compose_library::{
+    Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink,
+    Trace, UntypedRef, Value, VariableAccessError, Vm, World,
+};
 use compose_syntax::ast::AstNode;
-use compose_syntax::{ast, Span};
+use compose_syntax::{Span, ast};
 use ecow::EcoString;
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
 pub use stack::Tracked;
 pub use stack::TrackedContainer;
+use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
 
 pub struct Machine<'a> {
     pub frames: StackFrames<'a>,
@@ -40,16 +43,11 @@ impl<'a> Vm<'a> for Machine<'a> {
 
     fn call_func(&mut self, func: &Func, args: Args) -> SourceResult<Value> {
         match &func.kind {
-            FuncKind::Native(native) => {
-                native.call(self, args)
-            }
-            FuncKind::Closure(closure) => {
-                eval_closure(closure, self, args)
-            }
+            FuncKind::Native(native) => native.call(self, args),
+            FuncKind::Closure(closure) => eval_closure(closure, self, args),
         }
     }
 }
-
 
 impl<'a> Machine<'a> {
     pub(crate) fn sink_mut(&mut self) -> &mut Sink {
@@ -84,6 +82,17 @@ pub enum FlowEvent {
     Continue(Span),
     Break(Span),
     Return(Span, Option<Value>),
+}
+
+impl Trace for FlowEvent {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        match self {
+            FlowEvent::Continue(_) => {}
+            FlowEvent::Break(_) => {}
+            FlowEvent::Return(_, Some(value)) => value.visit_refs(f),
+            FlowEvent::Return(_, None) => {}
+        }
+    }
 }
 
 impl FlowEvent {
@@ -144,6 +153,9 @@ pub struct VmRoots<'a> {
 impl Trace for VmRoots<'_> {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
         self.frames.visit_refs(f);
+        if let Some(flow) = self.flow {
+            flow.visit_refs(f);
+        }
     }
 }
 
@@ -157,11 +169,14 @@ impl<'a> Machine<'a> {
     }
 
     pub fn pop_temp_roots(&mut self, marker: TrackMarker) {
-        self.frames.top.forget(marker);   
+        self.frames.top.forget(marker);
     }
-    
+
     /// Automatically forgets any tracked values during `f` after f is finished
-    pub fn temp_root_scope(&mut self, f: impl FnOnce(&mut Machine<'a>) -> SourceResult<Value>) -> SourceResult<Value> {
+    pub fn temp_root_scope(
+        &mut self,
+        f: impl FnOnce(&mut Machine<'a>) -> SourceResult<Value>,
+    ) -> SourceResult<Value> {
         let marker = self.temp_root_marker();
         let result = f(self);
         self.pop_temp_roots(marker);
@@ -220,16 +235,13 @@ impl<'a, 'b> Drop for TempRootGuard<'a, 'b> {
 impl<'a> Machine<'a> {
     pub fn temp_root_guard<'b>(&'b mut self) -> TempRootGuard<'a, 'b> {
         let marker = self.temp_root_marker();
-        TempRootGuard {
-            marker,
-            vm: self,
-        }
+        TempRootGuard { marker, vm: self }
     }
 }
 
 impl<'a, 'b> Deref for TempRootGuard<'a, 'b> {
     type Target = Machine<'a>;
-    
+
     fn deref(&self) -> &Self::Target {
         self.vm
     }
@@ -242,8 +254,7 @@ impl<'a, 'b> DerefMut for TempRootGuard<'a, 'b> {
 }
 
 pub fn routines() -> Routines {
-    Routines {
-    }
+    Routines {}
 }
 
 #[derive(Debug, Clone, Default)]
@@ -269,7 +280,11 @@ impl Machine<'_> {
     /// Run f with closure capture errors deferred.
     ///
     /// This makes the caller responsible for either handling or emitting the unresolved errors.
-    pub fn with_closure_capture_errors_mode<T>(&mut self, mode: ErrorMode, f: impl FnOnce(&mut Machine) -> SourceResult<T>) -> SourceResult<T> {
+    pub fn with_closure_capture_errors_mode<T>(
+        &mut self,
+        mode: ErrorMode,
+        f: impl FnOnce(&mut Machine) -> SourceResult<T>,
+    ) -> SourceResult<T> {
         let old = self.context.closure_capture;
         self.context.closure_capture = mode;
         let result = f(self);

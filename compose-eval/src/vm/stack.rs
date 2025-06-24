@@ -52,7 +52,6 @@ impl Trace for StackFrames<'_> {
 pub struct StackFrame<'a> {
     pub scopes: Scopes<'a>,
     tracked: Vec<UntypedRef>,
-    markers: Vec<TrackMarker>,
 }
 
 impl<'a> StackFrame<'a> {
@@ -60,7 +59,6 @@ impl<'a> StackFrame<'a> {
         Self {
             scopes: Scopes::new(library),
             tracked: vec![],
-            markers: vec![],
         }
     }
 }

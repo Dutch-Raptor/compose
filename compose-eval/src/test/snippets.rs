@@ -1,5 +1,5 @@
-use crate::test::assert_eval;
-use compose_library::Value;
+#[cfg(test)]
+use {crate::test::assert_eval, compose_library::Value};
 
 #[test]
 fn fibonacci() {

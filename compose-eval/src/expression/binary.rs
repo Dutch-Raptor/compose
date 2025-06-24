@@ -1,10 +1,9 @@
-use crate::vm::{Machine, Tracked};
+use crate::vm::{Machine};
 use crate::{Eval, Evaluated};
 use compose_library::diag::{At, SourceResult, StrResult, bail};
 use compose_library::{Value, ops};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
-use std::ops::Deref;
 
 impl Eval for ast::Binary<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
