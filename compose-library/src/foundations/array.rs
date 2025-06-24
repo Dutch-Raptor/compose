@@ -1,10 +1,10 @@
-use std::ops::{Deref, DerefMut};
 use crate::repr::Repr;
-use crate::{HeapRef, Trace};
+use crate::{HeapRef, Iter, IterValue, Trace};
 use compose_library::diag::StrResult;
-use compose_library::{Heap, UntypedRef, Value, Vm};
+use compose_library::{ArrayIter, Heap, UntypedRef, Value, Vm};
 use compose_macros::{func, scope, ty};
 use ecow::{eco_format, EcoString};
+use std::ops::{Deref, DerefMut};
 
 #[ty(scope, cast, name = "array")]
 #[derive(Debug, Clone, PartialEq)]
@@ -17,9 +17,7 @@ pub struct Array {
 
 impl From<Vec<Value>> for Array {
     fn from(value: Vec<Value>) -> Self {
-        Self {
-            values: value,
-        }
+        Self { values: value }
     }
 }
 
@@ -55,7 +53,7 @@ impl ArrayValue {
     pub fn new(heap: &mut Heap) -> Self {
         Self(heap.alloc(Array::new()))
     }
-    
+
     pub fn from(heap: &mut Heap, values: Vec<Value>) -> Self {
         Self(heap.alloc(Array::from(values)))
     }
@@ -98,23 +96,31 @@ impl ArrayValue {
     #[func]
     fn push(&mut self, vm: &mut dyn Vm, value: Value) -> StrResult<()> {
         let arr = self.0.try_get_mut(vm.heap_mut())?;
-        
+
         arr.push(value);
-        
+
         Ok(())
     }
-    
+
     #[func]
     fn pop(&mut self, vm: &mut dyn Vm) -> StrResult<Option<Value>> {
         let arr = self.0.try_get_mut(vm.heap_mut())?;
-        
+
         Ok(arr.pop())
     }
-    
+
     #[func]
     pub fn shallow_clone(&self, vm: &mut dyn Vm) -> StrResult<Self> {
         let clone = self.0.try_get(vm.heap())?.clone();
-        
+
         Ok(Self(vm.heap_mut().alloc(clone)))
+    }
+
+    #[func]
+    pub fn iter(&self, vm: &mut dyn Vm) -> StrResult<IterValue> {
+        let arr = self.0.try_get(vm.heap())?;
+
+        let iter = Iter::Array(ArrayIter::new(arr));
+        Ok(IterValue::new(iter, vm))
     }
 }

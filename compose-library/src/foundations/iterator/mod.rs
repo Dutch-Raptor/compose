@@ -1,7 +1,6 @@
 use crate::{HeapRef, Trace};
 use crate::{UntypedRef, Value};
-use compose_library::diag::{error, At, SourceResult};
-use compose_library::foundations::iterator::array_iter::ArrayIter;
+use compose_library::diag::{error, SourceResult};
 use compose_library::vm::Vm;
 use compose_library::Func;
 use compose_macros::{func, scope, ty};
@@ -17,6 +16,7 @@ mod string_iter;
 use crate::diag::{SourceDiagnostic, StrResult, UnSpanned};
 pub use iter_combinators::*;
 pub use string_iter::*;
+pub use array_iter::*;
 
 #[ty(scope, cast, name = "Iterator")]
 #[derive(Debug, Clone, PartialEq, Copy)]

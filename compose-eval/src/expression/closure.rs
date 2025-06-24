@@ -4,7 +4,7 @@ use compose_library::diag::{IntoSourceDiagnostic, SourceResult, Spanned, bail, e
 use compose_library::{
     Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError,
 };
-use compose_syntax::ast::{AstNode, Expr, Ident, Param};
+use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind};
 use compose_syntax::{Label, Span, SyntaxNode, ast};
 use ecow::{EcoString, EcoVec};
 use std::collections::HashMap;
@@ -75,7 +75,7 @@ impl Eval for ast::Closure<'_> {
                 Some(guard.vm.engine.world.library()),
                 &captured,
             );
-            visitor.visit(self.body().to_untyped());
+            visitor.visit_closure(self);
             visitor.finish()
         };
 
@@ -257,6 +257,26 @@ impl<'a> CapturesVisitor<'a> {
         }
 
         inst
+    }
+    pub(crate) fn visit_closure(&mut self, closure: ast::Closure<'a>) {
+        for param in closure.params().children() {
+            match param.kind() {
+                ParamKind::Pos(pat) => {
+                    for ident in pat.bindings() {
+                        self.bind(ident);
+                    }
+                }
+                ParamKind::Named(named) => {
+                    self.bind(named.name());
+                }
+            }
+        }
+
+        for capture in closure.captures().children() {
+            self.visit(capture.to_untyped());
+        }
+        
+        self.visit(closure.body().to_untyped());
     }
 
     pub fn visit(&mut self, node: &'a SyntaxNode) {
@@ -442,6 +462,8 @@ mod tests {
         existing.define("b", 0i64);
         existing.define("c", 0i64);
         let e = &existing;
+
+        test(s, e, "x => x * 2;", &[]);
 
         // let binding
         test(s, e, "let t = x;", &["x"]);

@@ -37,7 +37,7 @@ impl Evaluated {
     pub fn mutable(value: Value) -> Self {
         Self::new(value, true)
     }
-    
+
     pub fn immutable(value: Value) -> Self {
         Self::new(value, false)
     }
@@ -52,15 +52,15 @@ impl Evaluated {
             ..self
         }
     }
-    
+
     pub fn with_origin(self, origin: Span) -> Self {
         Self { origin: Some(origin), ..self }
     }
-    
+
     pub fn with_value(self, value: Value) -> Self {
         Self { value, ..self }
     }
-    
+
     pub fn make_mutable(self) -> Self {
         Self { mutable: true, ..self }
     }
@@ -110,15 +110,20 @@ pub fn eval_range(
         .map(|e| e.into())
         .collect::<EcoVec<SourceDiagnostic>>();
 
-    let syntax_warnings = nodes
-        .iter()
-        .flat_map(|n| n.warnings())
-        .map(|e| e.into())
-        .collect::<EcoVec<SourceDiagnostic>>();
+    let syntax_warnings = if config.include_syntax_warnings {
+        nodes
+            .iter()
+            .flat_map(|n| n.warnings())
+            .map(|e| e.into())
+            .collect::<EcoVec<SourceDiagnostic>>()
+    } else {
+        eco_vec![]
+    };
 
     if !errors.is_empty() {
         return Warned::new(Err(errors)).with_warnings(syntax_warnings);
     }
+
     for node in nodes {
         let statement: Statement = match node.cast() {
             Some(expr) => expr,
