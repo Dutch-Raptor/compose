@@ -7,7 +7,7 @@ use compose_editor::renderer::full::CrosstermRenderer;
 use compose_eval::{EvalConfig, Machine};
 use compose_library::diag::{eco_format, Warned};
 use compose_library::{Value, World};
-use compose_syntax::Source;
+use compose_syntax::{FileId, Lexer, Source, SyntaxKind};
 use std::fs;
 
 mod editor;
@@ -191,6 +191,10 @@ pub fn eval_repl_input(vm: &mut Machine, world: &SystemWorld, input: &str, args:
 
     let source = entrypoint(world);
     let len_after_edit = source.nodes().len();
+    
+    if args.print_tokens {
+        print_tokens(input, source.id());
+    }
 
     if args.print_ast {
         let nodes = source.nodes().get(len_before_edit..len_after_edit).unwrap();
@@ -230,4 +234,17 @@ pub fn eval_repl_input(vm: &mut Machine, world: &SystemWorld, input: &str, args:
             crate::print_diagnostics(world, &err, &warnings).unwrap();
         }
     }
+}
+
+pub fn print_tokens(input: &str, file_id: FileId) {
+    let mut l = Lexer::new(input, file_id);
+    let mut tokens = Vec::new();
+    loop {
+        match l.next() {
+            (SyntaxKind::End, _) => break,
+            (_, node) => tokens.push(node),
+        }
+    }
+
+    println!("Tokens: {:#?}\n", tokens);
 }

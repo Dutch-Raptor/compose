@@ -45,6 +45,9 @@ pub struct FileArgs {
     #[clap(long)]
     /// Print the ast of the file before executing
     pub print_ast: bool,
+    
+    #[clap(long)]
+    pub print_tokens: bool,
 }
 
 #[derive(Debug, clap::Parser)]
@@ -58,6 +61,9 @@ pub struct ReplArgs {
     #[clap(long)]
     /// Start REPL from this file.
     pub from: Option<PathBuf>,
+
+    #[clap(long)]
+    pub print_tokens: bool,
 }
 
 #[derive(Debug, clap::Parser)]

@@ -3,12 +3,17 @@ use crate::world::SystemWorld;
 use crate::FileArgs;
 use compose_eval::{EvalConfig, Machine};
 use compose_library::diag::Warned;
+use crate::repl::print_tokens;
 
 pub fn file(args: FileArgs) -> Result<(), CliError> {
     let file = args.file;
     let world = SystemWorld::from_file(file)?;
     let mut vm = Machine::new(&world);
     let source = world.entry_point_source()?;
+    
+    if args.print_tokens {
+        print_tokens(source.text(), source.id())
+    }
 
     if args.print_ast {
         println!("AST: {:#?}\n", source.nodes());
