@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SyntaxKind {
-    Ampersand,
-    AmpersandAmpersand,
+    Amp,
+    AmpAmp,
     AmpersandEq,
     Apostrophe,
     Args,
@@ -104,6 +104,7 @@ pub enum SyntaxKind {
     While,
     WhileLoop,
     Array,
+    Range,
 }
 
 impl SyntaxKind {
@@ -116,8 +117,8 @@ impl SyntaxKind {
 
     pub(crate) fn descriptive_name(&self) -> &'static str {
         match self {
-            SyntaxKind::Ampersand => "&",
-            SyntaxKind::AmpersandAmpersand => "&&",
+            SyntaxKind::Amp => "&",
+            SyntaxKind::AmpAmp => "&&",
             SyntaxKind::AmpersandEq => "&=",
             SyntaxKind::Apostrophe => "'",
             SyntaxKind::Args => "argument list",
@@ -202,6 +203,7 @@ impl SyntaxKind {
             SyntaxKind::Plus => "+",
             SyntaxKind::PlusEq => "+=",
             SyntaxKind::Pub => "pub",
+            SyntaxKind::Range => "range",
             SyntaxKind::Return => "return",
             SyntaxKind::Ref => "ref",
             SyntaxKind::RightBrace => "}",

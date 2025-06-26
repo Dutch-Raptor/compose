@@ -53,13 +53,13 @@ pub const BINARY_OP: SyntaxSet = syntax_set![
     Plus, Minus, Star, Slash, Percent, 
     
     // Bitwise
-    Hat, Ampersand, Pipe,
+    Hat, Amp, Pipe,
     
     // Comparison
     Gt, GtEq, Lt, LtEq, EqEq, BangEq,
     
     // Logical
-    PipePipe, AmpersandAmpersand, 
+    PipePipe, AmpAmp,
 ];
 
 pub const ASSIGN_OP: SyntaxSet = syntax_set![Eq, MinusEq, PlusEq, StarEq, SlashEq, AmpersandEq, HatEq, PipeEq, AmpersandEq,];

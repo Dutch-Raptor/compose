@@ -38,7 +38,7 @@ impl BinOp {
             SyntaxKind::Star => Self::Mul,
             SyntaxKind::Slash => Self::Div,
             SyntaxKind::Percent => Self::Mod,
-            SyntaxKind::AmpersandAmpersand => Self::And,
+            SyntaxKind::AmpAmp => Self::And,
             SyntaxKind::PipePipe => Self::Or,
 
             SyntaxKind::EqEq => Self::Eq,
@@ -48,7 +48,7 @@ impl BinOp {
             SyntaxKind::Gt => Self::Gt,
             SyntaxKind::GtEq => Self::Gte,
 
-            SyntaxKind::Ampersand => Self::BitAnd,
+            SyntaxKind::Amp => Self::BitAnd,
             SyntaxKind::Pipe => Self::BitOr,
             SyntaxKind::Hat => Self::BitXor,
             SyntaxKind::LtLt => Self::BitShl,
