@@ -119,8 +119,16 @@ impl Lexer<'_> {
             '/' if self.s.eat_if('=') => SyntaxKind::SlashEq,
             '!' if self.s.eat_if('=') => SyntaxKind::BangEq,
 
-            '.' if self.s.eat_if('.') && self.s.eat_if('.') => SyntaxKind::Ellipsis,
-            '.' if self.s.eat_if('.') && self.s.eat_if('=') => SyntaxKind::DotsEq,
+            '.' if self.s.at('.') && self.s.scout(1) == Some('.') => {
+                self.s.eat();
+                self.s.eat();
+                SyntaxKind::Ellipsis
+            }
+            '.' if self.s.at('.') && self.s.scout(1) == Some('=') => {
+                self.s.eat();
+                self.s.eat();
+                SyntaxKind::DotsEq
+            },
             '.' if self.s.eat_if('.') => SyntaxKind::Dots,
 
             '<' if self.s.eat_if('<') => SyntaxKind::LtLt,
@@ -130,7 +138,7 @@ impl Lexer<'_> {
 
             '|' if self.s.eat_if('|') => SyntaxKind::PipePipe,
             '|' if self.s.eat_if('=') => SyntaxKind::PipeEq,
-            '&' if self.s.eat_if('&') => SyntaxKind::AmpersandAmpersand,
+            '&' if self.s.eat_if('&') => SyntaxKind::AmpAmp,
             '&' if self.s.eat_if('=') => SyntaxKind::AmpersandEq,
 
             '~' if self.s.eat_if('=') => SyntaxKind::TildeEq,
@@ -166,7 +174,7 @@ impl Lexer<'_> {
             '!' => SyntaxKind::Bang,
             '~' => SyntaxKind::Tilde,
             '|' => SyntaxKind::Pipe,
-            '&' => SyntaxKind::Ampersand,
+            '&' => SyntaxKind::Amp,
             '>' => SyntaxKind::Gt,
             '<' => SyntaxKind::Lt,
             '=' => SyntaxKind::Eq,

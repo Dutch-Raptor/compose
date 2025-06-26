@@ -2,11 +2,11 @@ use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
 use crate::parser::funcs::closure;
-use crate::parser::{funcs, statements, ExprContext};
+use crate::parser::{ExprContext, funcs, statements};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{syntax_set, SyntaxSet, UNARY_OP};
-use crate::{ast, set, Label};
+use crate::set::{SyntaxSet, UNARY_OP, syntax_set};
+use crate::{Label, ast, set};
 use compose_error_codes::{
     E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT, E0008_EXPECTED_EXPRESSION,
 };
@@ -105,6 +105,19 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
             err_assign_in_expr_context(p);
         }
 
+        if p.at_set(syntax_set!(Dots, DotsEq)) {
+            if Precedence::Range < min_prec {
+                break;
+            }
+            // handle range
+            p.eat();
+            if p.at_set(set::EXPR) {
+                code_expression(p);
+            }
+            p.wrap(m, SyntaxKind::Range);
+            continue;
+        }
+
         break;
     }
 }
@@ -174,6 +187,14 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             p.assert(SyntaxKind::RightParen);
             p.wrap(m, SyntaxKind::Unit)
         }
+        SyntaxKind::DotsEq | SyntaxKind::Dots => {
+            p.eat();
+            // for ..= an expression on the rhs is required
+            if p.at(SyntaxKind::DotsEq) || p.at_set(set::EXPR) {
+                code_expression(p);
+            }
+            p.wrap(m, SyntaxKind::Range);
+        }
         SyntaxKind::LeftBracket => array(p),
         SyntaxKind::If => conditional(p),
         SyntaxKind::While => while_loop(p),
@@ -234,7 +255,7 @@ fn block(p: &mut Parser) {
     if !p.expect_closing_delimiter(m, SyntaxKind::RightBrace) {
         p.eat();
     }
-    
+
     p.wrap(m, SyntaxKind::CodeBlock)
 }
 
@@ -680,10 +701,7 @@ mod tests {
             let a = 4;
         "#;
 
-        let mut p = assert_parse_with_errors(
-            input,
-            &[E0001_UNCLOSED_DELIMITER],
-        );
+        let mut p = assert_parse_with_errors(input, &[E0001_UNCLOSED_DELIMITER]);
         p.assert_next_children(SyntaxKind::CodeBlock, |p| {
             p.assert_next_error(E0001_UNCLOSED_DELIMITER); // unclosed `{`
             p.assert_next_children(SyntaxKind::FuncCall, |_| {});
@@ -804,5 +822,385 @@ mod tests {
             p.assert_end();
         });
         p.assert_end();
+    }
+
+    #[test]
+    fn parse_range_full() {
+        assert_parse("..")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_end();
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn parse_range_to_inclusive() {
+        assert_parse("..=4")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next(SyntaxKind::DotsEq, "..=");
+                p.assert_next(SyntaxKind::Int, "4");
+                p.assert_end();
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn parse_range_to_exclusive() {
+        assert_parse("..4")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next(SyntaxKind::Int, "4");
+                p.assert_end();
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn parse_range_from() {
+        assert_parse("4..")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next(SyntaxKind::Int, "4");
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_end();
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn parse_range_from_to_inclusive() {
+        assert_parse("4..=8")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next(SyntaxKind::Int, "4");
+                p.assert_next(SyntaxKind::DotsEq, "..=");
+                p.assert_next(SyntaxKind::Int, "8");
+                p.assert_end();
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn parse_range_from_to_exclusive() {
+        assert_parse("4..8")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next(SyntaxKind::Int, "4");
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next(SyntaxKind::Int, "8");
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn parse_range_in_the_wild() {
+        assert_parse("foo(..2); a[2..]; b[..=2]; (1..=2);")
+            .assert_next_children(SyntaxKind::FuncCall, |p| {
+                p.assert_next(SyntaxKind::Ident, "foo");
+                p.assert_next_children(SyntaxKind::Args, |p| {
+                    p.assert_next(SyntaxKind::LeftParen, "(");
+                    p.assert_next_children(SyntaxKind::Range, |p| {
+                        p.assert_next(SyntaxKind::Dots, "..");
+                        p.assert_next(SyntaxKind::Int, "2");
+                        p.assert_end();
+                    });
+                    p.assert_next(SyntaxKind::RightParen, ")");
+                    p.assert_end();
+                });
+                p.assert_end();
+            })
+            .assert_next_children(SyntaxKind::IndexAccess, |p| {
+                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next(SyntaxKind::LeftBracket, "[");
+                p.assert_next_children(SyntaxKind::Range, |p| {
+                    p.assert_next(SyntaxKind::Int, "2");
+                    p.assert_next(SyntaxKind::Dots, "..");
+                    p.assert_end();
+                });
+                p.assert_next(SyntaxKind::RightBracket, "]");
+                p.assert_end();
+            })
+            .assert_next_children(SyntaxKind::IndexAccess, |p| {
+                p.assert_next(SyntaxKind::Ident, "b");
+                p.assert_next(SyntaxKind::LeftBracket, "[");
+                p.assert_next_children(SyntaxKind::Range, |p| {
+                    p.assert_next(SyntaxKind::DotsEq, "..=");
+                    p.assert_next(SyntaxKind::Int, "2");
+                    p.assert_end();
+                });
+                p.assert_next(SyntaxKind::RightBracket, "]");
+                p.assert_end();
+            })
+            .assert_next_children(SyntaxKind::Parenthesized, |p| {
+                p.assert_next(SyntaxKind::LeftParen, "(");
+                p.assert_next_children(SyntaxKind::Range, |p| {
+                    p.assert_next(SyntaxKind::Int, "1");
+                    p.assert_next(SyntaxKind::DotsEq, "..=");
+                    p.assert_next(SyntaxKind::Int, "2");
+                    p.assert_end();
+                });
+                p.assert_next(SyntaxKind::RightParen, ")");
+                p.assert_end();
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_expressions() {
+        assert_parse("(1 + 2)..(3 * 4)")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::Parenthesized, |p| {
+                    p.assert_next(SyntaxKind::LeftParen, "(");
+                    p.assert_next_children(SyntaxKind::Binary, |p| {
+                        p.assert_next(SyntaxKind::Int, "1");
+                        p.assert_next(SyntaxKind::Plus, "+");
+                        p.assert_next(SyntaxKind::Int, "2");
+                    });
+                    p.assert_next(SyntaxKind::RightParen, ")");
+                });
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next_children(SyntaxKind::Parenthesized, |p| {
+                    p.assert_next(SyntaxKind::LeftParen, "(");
+
+                    p.assert_next_children(SyntaxKind::Binary, |p| {
+                        p.assert_next(SyntaxKind::Int, "3");
+                        p.assert_next(SyntaxKind::Star, "*");
+                        p.assert_next(SyntaxKind::Int, "4");
+                    });
+                    p.assert_next(SyntaxKind::RightParen, ")");
+                    p.assert_end();
+                });
+                p.assert_end();
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_function_calls() {
+        assert_parse("min()..max()")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::FuncCall, |p| {
+                    p.assert_next(SyntaxKind::Ident, "min");
+                    p.assert_next_children(SyntaxKind::Args, |p| {
+                        p.assert_next(SyntaxKind::LeftParen, "(");
+                        p.assert_next(SyntaxKind::RightParen, ")");
+                    });
+                });
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next_children(SyntaxKind::FuncCall, |p| {
+                    p.assert_next(SyntaxKind::Ident, "max");
+                    p.assert_next_children(SyntaxKind::Args, |p| {
+                        p.assert_next(SyntaxKind::LeftParen, "(");
+                        p.assert_next(SyntaxKind::RightParen, ")");
+                    });
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_variables() {
+        assert_parse("start..=end")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next(SyntaxKind::Ident, "start");
+                p.assert_next(SyntaxKind::DotsEq, "..=");
+                p.assert_next(SyntaxKind::Ident, "end");
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_nested_ranges() {
+        assert_parse("(1..5)..10")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::Parenthesized, |p| {
+                    p.assert_next(SyntaxKind::LeftParen, "(");
+                    p.assert_next_children(SyntaxKind::Range, |p| {
+                        p.assert_next(SyntaxKind::Int, "1");
+                        p.assert_next(SyntaxKind::Dots, "..");
+                        p.assert_next(SyntaxKind::Int, "5");
+                    });
+                    p.assert_next(SyntaxKind::RightParen, ")");
+                });
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next(SyntaxKind::Int, "10");
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_field_access() {
+        assert_parse("obj.start..obj.end")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                    p.assert_next(SyntaxKind::Ident, "obj");
+                    p.assert_next(SyntaxKind::Dot, ".");
+                    p.assert_next(SyntaxKind::Ident, "start");
+                });
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                    p.assert_next(SyntaxKind::Ident, "obj");
+                    p.assert_next(SyntaxKind::Dot, ".");
+                    p.assert_next(SyntaxKind::Ident, "end");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_method_calls() {
+        assert_parse("vec.first()..=vec.last()")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::FuncCall, |p| {
+                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                        p.assert_next(SyntaxKind::Ident, "vec");
+                        p.assert_next(SyntaxKind::Dot, ".");
+                        p.assert_next(SyntaxKind::Ident, "first");
+                    });
+                    p.assert_next_children(SyntaxKind::Args, |p| {
+                        p.assert_next(SyntaxKind::LeftParen, "(");
+                        p.assert_next(SyntaxKind::RightParen, ")");
+                    });
+                });
+                p.assert_next(SyntaxKind::DotsEq, "..=");
+                p.assert_next_children(SyntaxKind::FuncCall, |p| {
+                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                        p.assert_next(SyntaxKind::Ident, "vec");
+                        p.assert_next(SyntaxKind::Dot, ".");
+                        p.assert_next(SyntaxKind::Ident, "last");
+                    });
+                    p.assert_next_children(SyntaxKind::Args, |p| {
+                        p.assert_next(SyntaxKind::LeftParen, "(");
+                        p.assert_next(SyntaxKind::RightParen, ")");
+                    });
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_arithmetic_operators() {
+        // Range should bind looser than arithmetic operators
+        assert_parse("1 + 2 .. 3 * 4")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Int, "1");
+                    p.assert_next(SyntaxKind::Plus, "+");
+                    p.assert_next(SyntaxKind::Int, "2");
+                });
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Int, "3");
+                    p.assert_next(SyntaxKind::Star, "*");
+                    p.assert_next(SyntaxKind::Int, "4");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_bitwise_operators() {
+        // Range should bind looser than bitwise operators
+        assert_parse("1 & 2 ..= 3 | 4")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Int, "1");
+                    p.assert_next(SyntaxKind::Amp, "&");
+                    p.assert_next(SyntaxKind::Int, "2");
+                });
+                p.assert_next(SyntaxKind::DotsEq, "..=");
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Int, "3");
+                    p.assert_next(SyntaxKind::Pipe, "|");
+                    p.assert_next(SyntaxKind::Int, "4");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_comparison_operators() {
+        // Range should bind looser than comparison operators
+        assert_parse("x < 5 .. y > 10")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Ident, "x");
+                    p.assert_next(SyntaxKind::Lt, "<");
+                    p.assert_next(SyntaxKind::Int, "5");
+                });
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Ident, "y");
+                    p.assert_next(SyntaxKind::Gt, ">");
+                    p.assert_next(SyntaxKind::Int, "10");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_logical_operators() {
+        // Range should bind looser than logical operators
+        assert_parse("a && b .. c || d")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Ident, "a");
+                    p.assert_next(SyntaxKind::AmpAmp, "&&");
+                    p.assert_next(SyntaxKind::Ident, "b");
+                });
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Ident, "c");
+                    p.assert_next(SyntaxKind::PipePipe, "||");
+                    p.assert_next(SyntaxKind::Ident, "d");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_shift_operators() {
+        // Range should bind looser than shift operators
+        assert_parse("1 << 2 .. 3 >> 4")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Int, "1");
+                    p.assert_next(SyntaxKind::LtLt, "<<");
+                    p.assert_next(SyntaxKind::Int, "2");
+                });
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Int, "3");
+                    p.assert_next(SyntaxKind::GtGt, ">>");
+                    p.assert_next(SyntaxKind::Int, "4");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_parse_range_with_mixed_operators() {
+        // Range should bind looser than all other operators
+        assert_parse("1 + 2 * 3 .. 4 | 5 && 6")
+            .assert_next_children(SyntaxKind::Range, |p| {
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next(SyntaxKind::Int, "1");
+                    p.assert_next(SyntaxKind::Plus, "+");
+                    p.assert_next_children(SyntaxKind::Binary, |p| {
+                        p.assert_next(SyntaxKind::Int, "2");
+                        p.assert_next(SyntaxKind::Star, "*");
+                        p.assert_next(SyntaxKind::Int, "3");
+                    });
+                });
+                p.assert_next(SyntaxKind::Dots, "..");
+                p.assert_next_children(SyntaxKind::Binary, |p| {
+                    p.assert_next_children(SyntaxKind::Binary, |p| {
+                        p.assert_next(SyntaxKind::Int, "4");
+                        p.assert_next(SyntaxKind::Pipe, "|");
+                        p.assert_next(SyntaxKind::Int, "5");
+                    });
+                    p.assert_next(SyntaxKind::AmpAmp, "&&");
+                    p.assert_next(SyntaxKind::Int, "6");
+                });
+            })
+            .assert_end();
     }
 }
