@@ -1,9 +1,9 @@
 use crate::kind::SyntaxKind;
-use crate::parser::{expressions, patterns};
 use crate::parser::{ExprContext, Parser};
+use crate::parser::{expressions, patterns};
 use crate::precedence::Precedence;
 use crate::set;
-use crate::set::{syntax_set, ARG_RECOVER};
+use crate::set::{ARG_RECOVER, syntax_set};
 use compose_error_codes::E0009_ARGS_MISSING_COMMAS;
 use compose_utils::trace_fn;
 use std::collections::HashSet;
@@ -45,7 +45,7 @@ fn arg(p: &mut Parser) {
 
         if had_modifiers {
             p[m_mods].convert_to_error("argument modifiers like `ref` and `mut` go before the expression in named arguments")
-            .with_label_message("help: move the modifiers to the right of the `=`");
+                .with_label_message("help: move the modifiers to the right of the `=`");
         }
 
         expressions::code_expression(p);
@@ -196,305 +196,233 @@ fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_parse_tree;
     use crate::test_utils::*;
     use compose_error_codes::E0001_UNCLOSED_DELIMITER;
 
     #[test]
     fn test_parse_closure_multiple_params() {
-        let input = r#"
-            (a, b, c) => {};
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::Closure, |p| {
-            p.assert_next_children(SyntaxKind::Params, |p| {
-                p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next_children(SyntaxKind::Param, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                });
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next_children(SyntaxKind::Param, |p| {
-                    p.assert_next(SyntaxKind::Ident, "b");
-                });
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next_children(SyntaxKind::Param, |p| {
-                    p.assert_next(SyntaxKind::Ident, "c");
-                });
-                p.assert_next(SyntaxKind::RightParen, ")");
-                p.assert_end();
-            });
-            p.assert_next(SyntaxKind::Arrow, "=>");
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!(
+            "(a, b, c) => {}",
+            Closure [
+                Params [
+                    LeftParen("(")
+                    Param [ Ident("a") ]
+                    Comma(",")
+                    Param [ Ident("b") ]
+                    Comma(",")
+                    Param [ Ident("c") ]
+                    RightParen(")")
+                ]
+                Arrow("=>")
+                CodeBlock [
+                    ...
+                ]
+            ]
+        );
     }
 
     #[test]
-    fn test_parse_closure_single_param() {
-        let input = r#"
-            (a) => {};
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::Closure, |p| {
-            p.assert_next_children(SyntaxKind::Params, |p| {
-                p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next_children(SyntaxKind::Param, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::RightParen, ")");
-                p.assert_end();
-            });
-            p.assert_next(SyntaxKind::Arrow, "=>");
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-            p.assert_end();
-        });
-        p.assert_end();
+    fn test_parse_closure_single_param_parens() {
+        assert_parse_tree!(
+            "(a) => {}",
+            Closure [
+                Params [
+                    LeftParen("(")
+                    Param [ Ident("a") ]
+                    RightParen(")")
+                ]
+                Arrow("=>")
+                CodeBlock [ ... ]
+            ]
+        );
     }
 
     #[test]
     fn test_parse_closure_single_param_no_parens() {
-        let input = r#"
-            a => {};
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::Closure, |p| {
-            p.assert_next_children(SyntaxKind::Params, |p| {
-                p.assert_next_children(SyntaxKind::Param, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                    p.assert_end();
-                });
-                p.assert_end();
-            });
-            p.assert_next(SyntaxKind::Arrow, "=>");
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-        });
-        p.assert_end();
+        assert_parse_tree!(
+            "a => {}",
+            Closure [
+                Params [
+                    Param [ Ident("a") ]
+                ]
+                Arrow("=>")
+                CodeBlock [ ... ]
+            ]
+        );
     }
 
     #[test]
     fn test_parse_closure_discard_param() {
-        let input = r#"
-            _ => {};
-        "#;
-
-        let mut p = assert_parse(input);
-        p.assert_next_children(SyntaxKind::Closure, |p| {
-            p.assert_next_children(SyntaxKind::Params, |p| {
-                p.assert_next_children(SyntaxKind::Param, |p| {
-                    p.assert_next(SyntaxKind::Underscore, "_");
-                    p.assert_end();
-                });
-                p.assert_end();
-            });
-            p.assert_next(SyntaxKind::Arrow, "=>");
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!(
+            "_ => {}",
+            Closure [
+                Params [
+                    Param [ Underscore("_") ]
+                ]
+                Arrow("=>")
+                CodeBlock [ ... ]
+            ]
+        );
     }
 
     #[test]
     fn test_parse_closure_named_param() {
-        let input = r#"
-            (a = b) => {};
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::Closure, |p| {
-            p.assert_next_children(SyntaxKind::Params, |p| {
-                p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next_children(SyntaxKind::Param, |p| {
-                    p.assert_next_children(SyntaxKind::Named, |p| {
-                        p.assert_next(SyntaxKind::Ident, "a");
-                        p.assert_next(SyntaxKind::Eq, "=");
-                        p.assert_next(SyntaxKind::Ident, "b");
-                    });
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::RightParen, ")");
-                p.assert_end();
-            });
-            p.assert_next(SyntaxKind::Arrow, "=>");
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!(
+            "(a = b) => {}",
+            Closure [
+                Params [
+                    LeftParen("(")
+                    Param [
+                        Named [ Ident("a") Eq("=") Ident("b") ]
+                    ]
+                    RightParen(")")
+                ]
+                Arrow("=>")
+                CodeBlock [ ... ]
+            ]
+        );
     }
 
     #[test]
     fn test_parse_args() {
-        let input = r#"
-            f(a, b, c)
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::FuncCall, |p| {
-            p.assert_next(SyntaxKind::Ident, "f");
-            p.assert_next_children(SyntaxKind::Args, |p| {
-                p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next(SyntaxKind::Ident, "a");
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next(SyntaxKind::Ident, "b");
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next(SyntaxKind::Ident, "c");
-                p.assert_next(SyntaxKind::RightParen, ")");
-                p.assert_end();
-            });
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!(
+            "f(a, b, c)",
+            FuncCall [
+                Ident("f")
+                Args [
+                    LeftParen("(")
+                    Ident("a")
+                    Comma(",")
+                    Ident("b")
+                    Comma(",")
+                    Ident("c")
+                    RightParen(")")
+                ]
+            ]
+        );
     }
 
     #[test]
     fn test_parse_args_empty() {
-        let input = r#"
-            f()
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::FuncCall, |p| {
-            p.assert_next(SyntaxKind::Ident, "f");
-            p.assert_next_children(SyntaxKind::Args, |p| {
-                p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next(SyntaxKind::RightParen, ")");
-                p.assert_end();
-            });
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!(
+            "f()",
+            FuncCall [
+                Ident("f")
+                Args [
+                    LeftParen("(")
+                    RightParen(")")
+                ]
+            ]
+        );
     }
 
     #[test]
     fn test_parse_args_named() {
-        let input = r#"
-            f(a: b)
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::FuncCall, |p| {
-            p.assert_next(SyntaxKind::Ident, "f");
-            p.assert_next_children(SyntaxKind::Args, |p| {
-                p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next_children(SyntaxKind::Named, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                    p.assert_next(SyntaxKind::Colon, ":");
-                    p.assert_next(SyntaxKind::Ident, "b");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::RightParen, ")");
-                p.assert_end();
-            });
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!(
+            "f(a: b)",
+            FuncCall [
+                Ident("f")
+                Args [
+                    LeftParen("(")
+                    Named [ Ident("a") Colon(":") Ident("b") ]
+                    RightParen(")")
+                ]
+            ]
+        );
     }
 
     #[test]
     fn test_parse_args_named_and_positional() {
-        let input = r#"
-            f(a: b, c)
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::FuncCall, |p| {
-            p.assert_next(SyntaxKind::Ident, "f");
-            p.assert_next_children(SyntaxKind::Args, |p| {
-                p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next_children(SyntaxKind::Named, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                    p.assert_next(SyntaxKind::Colon, ":");
-                    p.assert_next(SyntaxKind::Ident, "b");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next(SyntaxKind::Ident, "c");
-                p.assert_next(SyntaxKind::RightParen, ")");
-                p.assert_end();
-            });
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!(
+            "f(a, b: c)",
+            FuncCall [
+                Ident("f")
+                Args [
+                    LeftParen("(")
+                    Ident("a")
+                    Comma(",")
+                    Named [ Ident("b") Colon(":") Ident("c") ]
+                    RightParen(")")
+                ]
+            ]
+        );
     }
 
     #[test]
     fn test_parse_args_malformed() {
-        let input = r#"
+        assert_parse_tree!(
+            r#"
             f(a, b, c
             1 + 2
-        "#;
-
-        let mut p = assert_parse_with_errors(
-            input,
-            &[E0001_UNCLOSED_DELIMITER, E0009_ARGS_MISSING_COMMAS],
+            "#,
+            FuncCall [
+                Ident("f")
+                Args [
+                    Error(E0001_UNCLOSED_DELIMITER)
+                    Ident("a")
+                    Comma(",")
+                    Ident("b")
+                    Comma(",")
+                    Ident("c")
+                    Error(E0009_ARGS_MISSING_COMMAS)
+                    Binary [
+                        Int("1")
+                        Plus("+")
+                        Int("2")
+                    ]
+                ]
+            ]
         );
-
-        p.assert_next_children(SyntaxKind::FuncCall, |p| {
-            p.assert_next(SyntaxKind::Ident, "f");
-            p.assert_next_children(SyntaxKind::Args, |p| {
-                p.assert_next_error(E0001_UNCLOSED_DELIMITER);
-                p.assert_next(SyntaxKind::Ident, "a");
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next(SyntaxKind::Ident, "b");
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next(SyntaxKind::Ident, "c");
-                p.assert_next_error(E0009_ARGS_MISSING_COMMAS);
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Int, "1");
-                    p.assert_next(SyntaxKind::Plus, "+");
-                    p.assert_next(SyntaxKind::Int, "2");
-                    p.assert_end();
-                });
-                p.assert_end();
-            });
-            p.assert_end();
-        });
-
-        p.assert_end();
     }
 
     #[test]
     fn test_parse_params_ref_mut_combinations() {
-        for (ref_, mut_) in [(true, false), (false, true), (true, true), (false, false)] {
-            let input = format!(
-                r#"
-                    ({ref} {mut} a) => {{}}
-                "#,
-                ref = if ref_ { "ref " } else { "" },
-                mut = if mut_ { "mut " } else { "" }
-            );
-
-            let mut p = assert_parse(&input);
-            p.assert_next_children(SyntaxKind::Closure, |p| {
-                p.assert_next_children(SyntaxKind::Params, |p| {
-                    p.assert_next(SyntaxKind::LeftParen, "(");
-                    p.assert_next_children(SyntaxKind::Param, |p| {
-                        if ref_ {
-                            p.assert_next(SyntaxKind::Ref, "ref");
-                        }
-                        if mut_ {
-                            p.assert_next(SyntaxKind::Mut, "mut");
-                        }
-                        p.assert_next(SyntaxKind::Ident, "a");
-                        p.assert_end();
-                    });
-                    p.assert_next(SyntaxKind::RightParen, ")");
-                    p.assert_end();
-                });
-            });
-            p.assert_end();
-        }
+        assert_parse_tree!(
+            "(ref a) => {}",
+            Closure [
+                Params [
+                    LeftParen("(")
+                    Param [
+                        Ref("ref")
+                        Ident("a")
+                    ]
+                    RightParen(")")
+                ]
+                ...
+            ]
+        );
+        
+        assert_parse_tree!(
+            "(mut a) => {}",
+            Closure [
+                Params [
+                    LeftParen("(")
+                    Param [
+                        Mut("mut")
+                        Ident("a")
+                    ]
+                    RightParen(")")
+                ]
+                ...
+            ]
+        );
+        
+        assert_parse_tree!(
+            "(ref mut a) => {}",
+            Closure [
+                Params [
+                    LeftParen("(")
+                    Param [
+                        Ref("ref")
+                        Mut("mut")
+                        Ident("a")
+                    ]
+                    RightParen(")")
+                ]
+                ...
+            ]
+        );
     }
 
     #[test]

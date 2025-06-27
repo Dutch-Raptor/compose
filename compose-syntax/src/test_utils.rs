@@ -150,8 +150,11 @@ impl NodesTester {
 
     #[track_caller]
     fn assert_next_node(&mut self) -> SyntaxNode {
-        let node = self.nodes.get(self.pos).cloned().unwrap_or_else(|| panic!("Expected a node at {:?}. Out of nodes!",
-            self.path));
+        let node = self
+            .nodes
+            .get(self.pos)
+            .cloned()
+            .unwrap_or_else(|| panic!("Expected a node at {:?}. Out of nodes!", self.path));
         self.pos += 1;
         node
     }
@@ -188,6 +191,10 @@ impl NodesTester {
         self.pos += 1;
 
         self
+    }
+
+    pub fn move_to_end(&mut self) {
+        self.pos = self.nodes.len();
     }
 
     #[track_caller]
@@ -262,3 +269,180 @@ impl NodesTester {
         );
     }
 }
+
+
+/// Macro to assert the structure and content of the parsed syntax tree from source code.
+///
+/// # Purpose
+///
+/// `assert_parse_tree!` allows you to declaratively specify the expected abstract syntax tree (AST)
+/// shape and tokens produced by your parser for a given source code snippet. It recursively
+/// matches nodes by their kinds (`SyntaxKind`) and token text, verifying both the hierarchical
+/// structure and token lexemes precisely.
+///
+/// This macro is primarily useful in parser/unit tests where you want to:
+/// - Assert nodes and their nested children are present in expected order.
+/// - Assert leaf tokens have expected text content.
+/// - Assert presence of parser errors and warnings at specific nodes.
+///
+///
+/// # Syntax Overview
+///
+/// ```ignore
+/// assert_parse_tree!(
+///     "source code string",
+///     RootNodeKind [            // Node with children
+///         ChildNodeKind1 ( "token_text" )  // Leaf node with exact text
+///         ChildNodeKind2 [                  // Nested node with children
+///             ...
+///         ]
+///         Warn(WARNING_CODE)               // Warning node with an error code enum or const
+///         Error(ERROR_CODE)                // Error node with an error code enum or const
+///         ...                             // Ellipsis to skip remaining children in this subtree
+///     ]
+/// );
+/// ```
+///
+/// - **Root node**: The first argument is the source code string to parse.
+/// - **Nodes with children**: Use `KindName [ ... ]` where `KindName` is a variant of your `SyntaxKind` enum.
+/// - **Leaf tokens**: Use `KindName("token_text")` where the string is the exact matched source token text.
+/// - **Warnings and errors**: Use `Warn(WARNING_CODE)` and `Error(ERROR_CODE)` where the code is a known error/warning enum or constant.
+/// - **Ellipsis (`...`)**: Use to ignore remaining children in a node subtree (useful to reduce test verbosity).
+///
+///
+/// # Notes
+///
+/// - `KindName` must be a variant of your `SyntaxKind` enum (without the `SyntaxKind::` prefix).
+/// - Leaf nodes *must* specify the exact token text as a string literal.
+/// - `Warn` and `Error` are reserved special nodes recognized by the macro for diagnostics.
+/// - The macro performs strict ordering checks: children must appear in exact order as specified.
+///
+///
+/// # Example: Simple function call
+///
+/// ```rust
+/// compose_syntax::assert_parse_tree!(
+///     "f(a, b: c)",
+///     FuncCall [
+///         Ident("f")
+///         Args [
+///             LeftParen("(")
+///             Ident("a")
+///             Comma(",")
+///             Named [ Ident("b") Colon(":") Ident("c") ]
+///             RightParen(")")
+///         ]
+///     ]
+/// );
+/// ```
+///
+/// # Example: Error recovery with warnings and errors
+///
+/// ```rust
+/// compose_syntax::assert_parse_tree!(
+///     r#"
+///     f(a, b, c
+///     1 + 2
+///     "#,
+///     FuncCall [
+///         Ident("f")
+///         Args [
+///             Error(E0001_UNCLOSED_DELIMITER)
+///             Ident("a")
+///             Comma(",")
+///             Ident("b")
+///             Comma(",")
+///             Ident("c")
+///             Error(E0009_ARGS_MISSING_COMMAS)
+///             Binary [
+///                 Int("1")
+///                 Plus("+")
+///                 Int("2")
+///             ]
+///         ]
+///     ]
+/// );
+/// ```
+///
+/// # Example: Skipping subtree content
+///
+/// ```rust
+/// compose_syntax::assert_parse_tree!(
+///     "(ref mut a) => {}",
+///     Closure [
+///         Params [
+///             LeftParen("(")
+///             Param [
+///                 Ref("ref")
+///                 Mut("mut")
+///                 Ident("a")
+///             ]
+///             RightParen(")")
+///         ]
+///         ...
+///     ]
+/// );
+/// ```
+///
+/// # Common mistakes
+///
+/// - Forgetting to provide the exact token text string for leaf nodes results in a compile error.
+/// - Using `Warn` or `Error` as `SyntaxKind` variants inside children nodes causes errors; they must use the special macro arms.
+/// # See also
+/// - [`SyntaxKind`] enum variants — the node/kind names used in this macro.
+/// - Parser error codes for `Warn` and `Error` nodes.
+/// - [`NodesTester`] struct for underlying test traversal and assertions.
+#[macro_export]
+macro_rules! assert_parse_tree {
+    // Entry point
+    ($src:expr, $($tree:tt)+) => {{
+        let nodes = $crate::test_utils::test_parse($src);
+        let mut p = $crate::test_utils::NodesTester::new(nodes);
+        assert_parse_tree!(@seq p, $($tree)+);
+    }};
+
+    // Warning node
+    (@seq $parser:ident, Warn ( $code:expr ) $($rest:tt)*) => {
+        $parser.assert_next_warning($code);
+        assert_parse_tree!(@seq $parser, $($rest)*);
+    };
+
+    // Error node
+    (@seq $parser:ident, Error ( $code:expr ) $($rest:tt)*) => {
+        $parser.assert_next_error($code);
+        assert_parse_tree!(@seq $parser, $($rest)*);
+    };
+
+    // Node with children
+    (@seq $parser:ident, $kind:ident [ $($children:tt)+ ] $($rest:tt)*) => {
+        $parser.assert_next_children(SyntaxKind::$kind, |p| {
+            assert_parse_tree!(@seq p, $($children)+);
+        });
+        assert_parse_tree!(@seq $parser, $($rest)*);
+    };
+
+
+    // Leaf node with string text
+    (@seq $parser:ident, $kind:ident ( $text:expr ) $($rest:tt)*) => {
+        $parser.assert_next(SyntaxKind::$kind, $text);
+        assert_parse_tree!(@seq $parser, $($rest)*);
+    };
+
+    // Invalid usage: leaf node without text — catch this as a helpful error
+    (@seq $parser:ident, $kind:ident $($rest:tt)*) => {
+        compile_error!(concat!("Leaf node `", stringify!($kind), "` must provide a string literal as text, like `", stringify!($kind), "(\"...\")`."))
+    };
+
+    // Deliberately empty children
+    (@seq $parser:ident, ...) => {
+        // ignore children
+        $parser.move_to_end();
+    };
+
+    // End
+    (@seq $parser:ident,) => {
+        $parser.assert_end();
+    };
+}
+
+pub use assert_parse_tree;

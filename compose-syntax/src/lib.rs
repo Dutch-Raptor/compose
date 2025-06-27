@@ -4,7 +4,7 @@ mod node;
 mod span;
 mod file;
 mod kind;
-mod test_utils;
+pub mod test_utils;
 mod source;
 mod parser;
 mod set;
