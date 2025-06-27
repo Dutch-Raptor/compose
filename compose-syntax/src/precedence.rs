@@ -17,6 +17,7 @@ pub enum Precedence {
     Index,       // array[index]
     Call,        // myFunction(X)
     Member,      // foo.member
+    Path,        // int::parse
 }
 
 pub trait PrecedenceTrait {

@@ -40,6 +40,9 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
     loop {
         trace_fn!("parse_code_expr_prec loop", "{:?}", p.current());
         if p.at(SyntaxKind::LeftParen) {
+            if Precedence::Call < min_prec {
+                break;
+            }
             funcs::args(p);
             p.wrap(m, SyntaxKind::FuncCall);
             continue;
@@ -53,6 +56,9 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
 
         // handle path access `a::b::c`
         if p.eat_if(SyntaxKind::ColonColon) {
+            if Precedence::Path < min_prec {
+                break;
+            }
             p.expect(SyntaxKind::Ident);
             p.wrap(m, SyntaxKind::PathAccess);
             continue;
@@ -60,6 +66,9 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
 
         // Handle field access `a.b.c`
         if p.eat_if(SyntaxKind::Dot) {
+            if Precedence::Member < min_prec {
+                break;
+            }
             p.expect(SyntaxKind::Ident);
             p.wrap(m, SyntaxKind::FieldAccess);
             continue;
@@ -67,9 +76,13 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
 
         // Handle index access `a[2]`
         if p.eat_if(SyntaxKind::LeftBracket) {
+            if Precedence::Index < min_prec {
+                break;
+            }
             code_expression(p);
             p.expect(SyntaxKind::RightBracket);
-            p.wrap(m, SyntaxKind::IndexAccess)
+            p.wrap(m, SyntaxKind::IndexAccess);
+            continue;
         }
 
         let bin_op = BinOp::from_kind(p.current());
@@ -377,9 +390,10 @@ pub(in crate::parser) fn err_unclosed_delim(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+use super::*;
     use crate::test_utils::*;
     use compose_error_codes::E0006_UNTERMINATED_STATEMENT;
+    use crate::assert_parse_tree;
 
     #[test]
     fn test_parse_parenthesized() {
@@ -716,33 +730,26 @@ mod tests {
 
     #[test]
     fn test_parse_assignment_in_expression_context() {
-        let input = r#"
-            let inc = v => v += 1;
-        "#;
-
-        let mut p = assert_parse_with_errors(input, &[E0002_INVALID_ASSIGNMENT]);
-
-        p.assert_next_children(SyntaxKind::LetBinding, |p| {
-            p.assert_next(SyntaxKind::Let, "let");
-            p.assert_next(SyntaxKind::Ident, "inc");
-            p.assert_next(SyntaxKind::Eq, "=");
-            p.assert_next_children(SyntaxKind::Closure, |p| {
-                p.assert_next_children(SyntaxKind::Params, |p| {
-                    p.assert_next_children(SyntaxKind::Param, |p| {
-                        p.assert_next(SyntaxKind::Ident, "v");
-                        p.assert_end();
-                    });
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::Arrow, "=>");
-                p.assert_next(SyntaxKind::Ident, "v");
-                p.assert_next_error(E0002_INVALID_ASSIGNMENT);
-                p.assert_next(SyntaxKind::PlusEq, "+=");
-                p.assert_next(SyntaxKind::Int, "1");
-                p.assert_end();
-                p.assert_end();
-            });
-        });
+        assert_parse_tree!(
+            "let inc = v => v += 1;",
+            LetBinding [
+                Let("let")
+                Ident("inc")
+                Eq("=")
+                Closure [
+                    Params [
+                        Param [
+                            Ident("v")
+                        ]
+                    ]
+                    Arrow("=>")
+                    Ident("v")
+                    Error(E0002_INVALID_ASSIGNMENT)
+                    PlusEq("+=")
+                    Int("1")
+                ]
+            ]
+        );
     }
 
     #[test]
@@ -1200,6 +1207,318 @@ mod tests {
                     p.assert_next(SyntaxKind::AmpAmp, "&&");
                     p.assert_next(SyntaxKind::Int, "6");
                 });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_member_access_precedence() {
+        // Member access should bind tighter than arithmetic
+        assert_parse("a + b.method")
+            .assert_next_children(SyntaxKind::Binary, |p| {
+                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next(SyntaxKind::Plus, "+");
+                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                    p.assert_next(SyntaxKind::Ident, "b");
+                    p.assert_next(SyntaxKind::Dot, ".");
+                    p.assert_next(SyntaxKind::Ident, "method");
+                });
+            })
+            .assert_end();
+
+        // Member access with multiply
+        assert_parse("a * b.method")
+            .assert_next_children(SyntaxKind::Binary, |p| {
+                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next(SyntaxKind::Star, "*");
+                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                    p.assert_next(SyntaxKind::Ident, "b");
+                    p.assert_next(SyntaxKind::Dot, ".");
+                    p.assert_next(SyntaxKind::Ident, "method");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_path_access_precedence() {
+        // Path access should bind tighter than arithmetic
+        assert_parse("a + b::c")
+            .assert_next_children(SyntaxKind::Binary, |p| {
+                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next(SyntaxKind::Plus, "+");
+                p.assert_next_children(SyntaxKind::PathAccess, |p| {
+                    p.assert_next(SyntaxKind::Ident, "b");
+                    p.assert_next(SyntaxKind::ColonColon, "::");
+                    p.assert_next(SyntaxKind::Ident, "c");
+                });
+            })
+            .assert_end();
+
+        // Path access with multiply
+        assert_parse("a * b::c")
+            .assert_next_children(SyntaxKind::Binary, |p| {
+                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next(SyntaxKind::Star, "*");
+                p.assert_next_children(SyntaxKind::PathAccess, |p| {
+                    p.assert_next(SyntaxKind::Ident, "b");
+                    p.assert_next(SyntaxKind::ColonColon, "::");
+                    p.assert_next(SyntaxKind::Ident, "c");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_index_access_precedence() {
+        // Index access should bind tighter than arithmetic
+        assert_parse("a + b[i]")
+            .assert_next_children(SyntaxKind::Binary, |p| {
+                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next(SyntaxKind::Plus, "+");
+                p.assert_next_children(SyntaxKind::IndexAccess, |p| {
+                    p.assert_next(SyntaxKind::Ident, "b");
+                    p.assert_next(SyntaxKind::LeftBracket, "[");
+                    p.assert_next(SyntaxKind::Ident, "i");
+                    p.assert_next(SyntaxKind::RightBracket, "]");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_function_call_precedence() {
+        // Function calls should bind tighter than arithmetic
+        assert_parse_tree!(
+            "a + foo()",
+            Binary [
+                Ident("a")
+                Plus("+")
+                FuncCall [
+                    Ident("foo")
+                    Args [
+                        LeftParen("(")
+                        RightParen(")")
+                    ]
+                ]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_mixed_member_call_precedence() {
+        // Complex expression mixing member access and function calls
+        assert_parse("a + b.foo()")
+            .assert_next_children(SyntaxKind::Binary, |p| {
+                p.assert_next(SyntaxKind::Ident, "a");
+                p.assert_next(SyntaxKind::Plus, "+");
+                p.assert_next_children(SyntaxKind::FuncCall, |p| {
+                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                        p.assert_next(SyntaxKind::Ident, "b");
+                        p.assert_next(SyntaxKind::Dot, ".");
+                        p.assert_next(SyntaxKind::Ident, "foo");
+                    });
+                    p.assert_next_children(SyntaxKind::Args, |p| {
+                        p.assert_next(SyntaxKind::LeftParen, "(");
+                        p.assert_next(SyntaxKind::RightParen, ")");
+                        p.assert_end();
+                    });
+                    p.assert_end();
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_nested_field_access_precedence() {
+        // Test nested field access with different operators
+        assert_parse("a.b.c + d.e.f")
+            .assert_next_children(SyntaxKind::Binary, |p| {
+                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                        p.assert_next(SyntaxKind::Ident, "a");
+                        p.assert_next(SyntaxKind::Dot, ".");
+                        p.assert_next(SyntaxKind::Ident, "b");
+                    });
+                    p.assert_next(SyntaxKind::Dot, ".");
+                    p.assert_next(SyntaxKind::Ident, "c");
+                });
+                p.assert_next(SyntaxKind::Plus, "+");
+                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                        p.assert_next(SyntaxKind::Ident, "d");
+                        p.assert_next(SyntaxKind::Dot, ".");
+                        p.assert_next(SyntaxKind::Ident, "e");
+                    });
+                    p.assert_next(SyntaxKind::Dot, ".");
+                    p.assert_next(SyntaxKind::Ident, "f");
+                });
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_mixed_access_types() {
+        // Mix field access, path access, and indexing
+        assert_parse("a.b::c[d].e")
+            .assert_next_children(SyntaxKind::FieldAccess, |p| {
+                p.assert_next_children(SyntaxKind::IndexAccess, |p| {
+                    p.assert_next_children(SyntaxKind::PathAccess, |p| {
+                        p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                            p.assert_next(SyntaxKind::Ident, "a");
+                            p.assert_next(SyntaxKind::Dot, ".");
+                            p.assert_next(SyntaxKind::Ident, "b");
+                        });
+                        p.assert_next(SyntaxKind::ColonColon, "::");
+                        p.assert_next(SyntaxKind::Ident, "c");
+                    });
+                    p.assert_next(SyntaxKind::LeftBracket, "[");
+                    p.assert_next(SyntaxKind::Ident, "d");
+                    p.assert_next(SyntaxKind::RightBracket, "]");
+                });
+                p.assert_next(SyntaxKind::Dot, ".");
+                p.assert_next(SyntaxKind::Ident, "e");
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_path_field_access_precedence() {
+        assert_parse_tree!(
+            "a::b.c",
+            FieldAccess [
+                PathAccess [
+                    Ident("a")
+                    ColonColon("::")
+                    Ident("b")
+                ]
+                Dot(".")
+                Ident("c")
+            ]
+        )
+    }
+
+    #[test]
+    fn test_parse_complex_chain() {
+        assert_parse_tree!(
+        "a.b().c::d().e[f]()",
+        FuncCall [
+            IndexAccess [
+                FieldAccess [
+                    FuncCall [
+                        PathAccess [
+                            FieldAccess [
+                                FuncCall [
+                                    FieldAccess [
+                                        Ident("a")
+                                        Dot(".")
+                                        Ident("b")
+                                    ]
+                                    Args [
+                                        LeftParen("(")
+                                        RightParen(")")
+                                    ]
+                                ]
+                                Dot(".")
+                                Ident("c")
+                            ]
+                            ColonColon("::")
+                            Ident("d")
+                        ]
+                        Args [
+                            LeftParen("(")
+                            RightParen(")")
+                        ]
+                    ]
+                    Dot(".")
+                    Ident("e")
+                ]
+                LeftBracket("[")
+                Ident("f")
+                RightBracket("]")
+            ]
+            Args [
+                LeftParen("(")
+                RightParen(")")
+            ]
+        ]
+    );
+    }
+
+    #[test]
+    fn test_nested_indexing_with_expressions() {
+        // Test complex index expressions
+        assert_parse("a[b.c[d::e]].f")
+            .assert_next_children(SyntaxKind::FieldAccess, |p| {
+                p.assert_next_children(SyntaxKind::IndexAccess, |p| {
+                    p.assert_next(SyntaxKind::Ident, "a");
+                    p.assert_next(SyntaxKind::LeftBracket, "[");
+                    p.assert_next_children(SyntaxKind::IndexAccess, |p| {
+                        p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                            p.assert_next(SyntaxKind::Ident, "b");
+                            p.assert_next(SyntaxKind::Dot, ".");
+                            p.assert_next(SyntaxKind::Ident, "c");
+                        });
+                        p.assert_next(SyntaxKind::LeftBracket, "[");
+                        p.assert_next_children(SyntaxKind::PathAccess, |p| {
+                            p.assert_next(SyntaxKind::Ident, "d");
+                            p.assert_next(SyntaxKind::ColonColon, "::");
+                            p.assert_next(SyntaxKind::Ident, "e");
+                        });
+                        p.assert_next(SyntaxKind::RightBracket, "]");
+                    });
+                    p.assert_next(SyntaxKind::RightBracket, "]");
+                });
+                p.assert_next(SyntaxKind::Dot, ".");
+                p.assert_next(SyntaxKind::Ident, "f");
+            })
+            .assert_end();
+    }
+
+    #[test]
+    fn test_call_with_complex_arguments() {
+        // Test function calls with complex argument expressions
+        assert_parse("a.b(c::d.e[f], g.h())")
+            .assert_next_children(SyntaxKind::FuncCall, |p| {
+                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                    p.assert_next(SyntaxKind::Ident, "a");
+                    p.assert_next(SyntaxKind::Dot, ".");
+                    p.assert_next(SyntaxKind::Ident, "b");
+                });
+                p.assert_next_children(SyntaxKind::Args, |p| {
+                    p.assert_next(SyntaxKind::LeftParen, "(");
+                    p.assert_next_children(SyntaxKind::IndexAccess, |p| {
+                        p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                            p.assert_next_children(SyntaxKind::PathAccess, |p| {
+                                p.assert_next(SyntaxKind::Ident, "c");
+                                p.assert_next(SyntaxKind::ColonColon, "::");
+                                p.assert_next(SyntaxKind::Ident, "d");
+                            });
+                            p.assert_next(SyntaxKind::Dot, ".");
+                            p.assert_next(SyntaxKind::Ident, "e");
+                        });
+                        p.assert_next(SyntaxKind::LeftBracket, "[");
+                        p.assert_next(SyntaxKind::Ident, "f");
+                        p.assert_next(SyntaxKind::RightBracket, "]");
+                    });
+                    p.assert_next(SyntaxKind::Comma, ",");
+                    p.assert_next_children(SyntaxKind::FuncCall, |p| {
+                        p.assert_next_children(SyntaxKind::FieldAccess, |p| {
+                            p.assert_next(SyntaxKind::Ident, "g");
+                            p.assert_next(SyntaxKind::Dot, ".");
+                            p.assert_next(SyntaxKind::Ident, "h");
+                        });
+                        p.assert_next_children(SyntaxKind::Args, |p| {
+                            p.assert_next(SyntaxKind::LeftParen, "(");
+                            p.assert_next(SyntaxKind::RightParen, ")");
+                            p.assert_end();
+                        });
+                        p.assert_end();
+                    });
+                    p.assert_next(SyntaxKind::RightParen, ")");
+                    p.assert_end();
+                });
+                p.assert_end();
             })
             .assert_end();
     }

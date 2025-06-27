@@ -12,7 +12,9 @@ mod parenthesized;
 mod statement;
 mod assignment;
 mod control_flow;
+mod range;
 
+use ecow::EcoString;
 use crate::node::SyntaxNode;
 use crate::span::Span;
 
@@ -36,6 +38,10 @@ pub trait AstNode<'a>: Sized {
     fn to_untyped(self) -> &'a SyntaxNode;
     fn span(self) -> Span {
         self.to_untyped().span()
+    }
+    
+    fn to_text(self) -> EcoString {
+        self.to_untyped().to_text()
     }
 }
 
