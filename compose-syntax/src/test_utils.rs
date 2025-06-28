@@ -485,11 +485,90 @@ impl<'a> Lexer<'a> {
         self
     }
 }
-
+/// Asserts that the token stream produced by the lexer exactly matches a sequence of expected tokens.
+///
+/// This macro is designed for testing your lexer. It verifies that each token is correctly
+/// identified and assigned the right text and span (`Range`), and that errors are reported as expected.
+///
+/// # Usage
+///
+/// The macro takes the source code as the first argument, followed by a list of expected tokens.
+/// Each token must be specified in the format:
+///
+/// ```ignore
+/// TokenKind("text", start..end)
+/// ```
+///
+/// Error tokens use a special syntax:
+///
+/// ```ignore
+/// !Error("message", "source", range)
+/// ```
+///
+/// # Examples
+///
+/// Basic token matching:
+///
+/// ```rust
+/// # use compose_syntax::assert_tokens;
+///
+/// assert_tokens!(
+///     "1.method()",
+///     Int("1", 0..1)
+///     Dot(".", 1..2)
+///     Ident("method", 2..8)
+///     LeftParen("(", 8..9)
+///     RightParen(")", 9..10)
+/// );
+/// ```
+///
+/// Unterminated string with error:
+///
+/// ```rust
+/// # use compose_syntax::assert_tokens;
+///
+/// assert_tokens!(
+///     "\"abc",
+///     !Error("unclosed string", "\"abc", 0..4)
+/// );
+/// ```
+///
+/// Float literal with exponent:
+///
+/// ```rust
+/// # use compose_syntax::assert_tokens;
+///
+/// assert_tokens!("1.0e1", Float("1.0e1", 0..5));
+/// assert_tokens!("1.0e-1", Float("1.0e-1", 0..6));
+/// ```
+///
+/// # Error Handling
+///
+/// If a token is incorrectly specified (e.g. an error is missing fields), a helpful
+/// compile-time error is emitted to guide correct macro usage:
+///
+/// ```ignore
+/// assert_tokens!(
+///     "abc",
+///     !Error("some msg") // ❌ Compile-time error: missing text and range
+/// );
+/// ```
+///
+/// # Implementation Notes
+///
+/// Internally, this macro expands into a recursive sequence of assertions on a `Lexer`.
+/// It ensures that the entire token stream is consumed, and provides detailed failure messages
+/// if any token mismatches occur.
+///
+/// # See Also
+///
+/// - [`SyntaxKind`] — The enum used to represent token types
+/// - [`assert_parse_tree`] — For testing parser output instead of lexer output
 #[macro_export]
 macro_rules! assert_tokens {
     // Entry point
     ($src:expr, $($tokens:tt)+) => {{
+        use $crate::test_utils::LexerAssert;
         let file_id = $crate::test_utils::test_file_id();
         let mut lexer = $crate::Lexer::new($src, file_id);
         $crate::assert_tokens!(@seq lexer, $($tokens)+);
