@@ -13,7 +13,6 @@ pub(crate) const fn test_file_id() -> FileId {
 pub fn test_parse(code: &str) -> Vec<SyntaxNode> {
     let file_id = FileId::new("main.comp");
     let nodes = crate::parse(code, file_id);
-    dbg!(&nodes);
     nodes
 }
 
@@ -125,7 +124,7 @@ impl NodesTester {
 
     #[track_caller]
     pub fn assert_next(&mut self, kind: SyntaxKind, text: &str) -> &mut Self {
-        let node = self.assert_next_node();
+        let node = self.nodes.get(self.pos).or_else(|| panic!("No more nodes at {:?}. Expected: {kind:?}", self.path)).cloned().unwrap();
 
         assert_eq!(
             node.kind(),
@@ -144,24 +143,16 @@ impl NodesTester {
             node.text(),
             self.path
         );
+        
+        self.pos += 1;
 
         self
     }
 
-    #[track_caller]
-    fn assert_next_node(&mut self) -> SyntaxNode {
-        let node = self
-            .nodes
-            .get(self.pos)
-            .cloned()
-            .unwrap_or_else(|| panic!("Expected a node at {:?}. Out of nodes!", self.path));
-        self.pos += 1;
-        node
-    }
 
     #[track_caller]
     pub fn assert_next_warning(&mut self, warning: ErrorCode) -> &mut Self {
-        let node = self.nodes.get(self.pos).expect("No more nodes");
+        let node = self.nodes.get(self.pos).or_else(|| panic!("No more nodes at {:?}. Expected warning: {warning:?}", self.path)).cloned().unwrap();
 
         assert_eq!(
             node.kind(),
@@ -199,7 +190,7 @@ impl NodesTester {
 
     #[track_caller]
     pub fn assert_next_error(&mut self, error: ErrorCode) -> &mut Self {
-        let node = self.nodes.get(self.pos).expect("No more nodes");
+        let node = self.nodes.get(self.pos).or_else(|| panic!("No more nodes at {:?}. Expected error: {error:?}", self.path)).cloned().unwrap();
 
         assert_eq!(
             node.kind(),
@@ -237,7 +228,7 @@ impl NodesTester {
         kind: SyntaxKind,
         test_children: impl FnOnce(&mut Self),
     ) -> &mut Self {
-        let node = self.nodes.get(self.pos).expect("No more nodes");
+        let node = self.nodes.get(self.pos).or_else(|| panic!("No more nodes at {:?}. Expected: {kind:?}", self.path)).cloned().unwrap();
 
         assert_eq!(
             node.kind(),
@@ -264,8 +255,9 @@ impl NodesTester {
         assert_eq!(
             self.pos,
             self.nodes.len(),
-            "Not all nodes were consumed. at {:?}",
-            self.path
+            "Not all nodes were consumed. at {:?}. Remaining: {:#?}",
+            self.path,
+            &self.nodes[self.pos..]
         );
     }
 }
@@ -321,7 +313,7 @@ impl NodesTester {
 /// # Example: Simple function call
 ///
 /// ```rust
-/// compose_syntax::assert_parse_tree!(
+/// compose_syntax::test_utils::assert_parse_tree!(
 ///     "f(a, b: c)",
 ///     FuncCall [
 ///         Ident("f")
@@ -339,7 +331,7 @@ impl NodesTester {
 /// # Example: Error recovery with warnings and errors
 ///
 /// ```rust
-/// compose_syntax::assert_parse_tree!(
+/// compose_syntax::test_utils::assert_parse_tree!(
 ///     r#"
 ///     f(a, b, c
 ///     1 + 2
@@ -347,13 +339,13 @@ impl NodesTester {
 ///     FuncCall [
 ///         Ident("f")
 ///         Args [
-///             Error(E0001_UNCLOSED_DELIMITER)
+///             Error(compose_error_codes::E0001_UNCLOSED_DELIMITER)
 ///             Ident("a")
 ///             Comma(",")
 ///             Ident("b")
 ///             Comma(",")
 ///             Ident("c")
-///             Error(E0009_ARGS_MISSING_COMMAS)
+///             Error(compose_error_codes::E0009_ARGS_MISSING_COMMAS)
 ///             Binary [
 ///                 Int("1")
 ///                 Plus("+")
@@ -367,7 +359,7 @@ impl NodesTester {
 /// # Example: Skipping subtree content
 ///
 /// ```rust
-/// compose_syntax::assert_parse_tree!(
+/// compose_syntax::test_utils::assert_parse_tree!(
 ///     "(ref mut a) => {}",
 ///     Closure [
 ///         Params [
@@ -398,34 +390,34 @@ macro_rules! assert_parse_tree {
     ($src:expr, $($tree:tt)+) => {{
         let nodes = $crate::test_utils::test_parse($src);
         let mut p = $crate::test_utils::NodesTester::new(nodes);
-        assert_parse_tree!(@seq p, $($tree)+);
+        $crate::test_utils::assert_parse_tree!(@seq p, $($tree)+);
     }};
 
     // Warning node
     (@seq $parser:ident, Warn ( $code:expr ) $($rest:tt)*) => {
         $parser.assert_next_warning($code);
-        assert_parse_tree!(@seq $parser, $($rest)*);
+        $crate::test_utils::assert_parse_tree!(@seq $parser, $($rest)*);
     };
 
     // Error node
     (@seq $parser:ident, Error ( $code:expr ) $($rest:tt)*) => {
         $parser.assert_next_error($code);
-        assert_parse_tree!(@seq $parser, $($rest)*);
+        $crate::test_utils::assert_parse_tree!(@seq $parser, $($rest)*);
     };
 
     // Node with children
     (@seq $parser:ident, $kind:ident [ $($children:tt)+ ] $($rest:tt)*) => {
-        $parser.assert_next_children(SyntaxKind::$kind, |p| {
-            assert_parse_tree!(@seq p, $($children)+);
+        $parser.assert_next_children($crate::SyntaxKind::$kind, |p| {
+            $crate::test_utils::assert_parse_tree!(@seq p, $($children)+);
         });
-        assert_parse_tree!(@seq $parser, $($rest)*);
+        $crate::test_utils::assert_parse_tree!(@seq $parser, $($rest)*);
     };
 
 
     // Leaf node with string text
     (@seq $parser:ident, $kind:ident ( $text:expr ) $($rest:tt)*) => {
-        $parser.assert_next(SyntaxKind::$kind, $text);
-        assert_parse_tree!(@seq $parser, $($rest)*);
+        $parser.assert_next($crate::SyntaxKind::$kind, $text);
+        $crate::test_utils::assert_parse_tree!(@seq $parser, $($rest)*);
     };
 
     // Invalid usage: leaf node without text — catch this as a helpful error

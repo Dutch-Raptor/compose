@@ -17,5 +17,6 @@ mod tests {
     use compose_library::Vm;
 
     /// Make sure that Vm is dyn compatible.
-    fn dyn_compatible(vm: &mut dyn Vm) {}
+    #[allow(dead_code)]
+    fn dyn_compatible(_vm: &mut dyn Vm) {}
 }
