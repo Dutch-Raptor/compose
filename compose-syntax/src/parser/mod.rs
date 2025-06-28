@@ -7,13 +7,12 @@ mod statements;
 use crate::file::FileId;
 use crate::kind::SyntaxKind;
 use crate::node::SyntaxNode;
-use crate::set::{SyntaxSet, syntax_set};
+use crate::set::{syntax_set, SyntaxSet};
 use crate::{Lexer, Span, SyntaxError};
 use compose_utils::trace_log;
-use ecow::{EcoString, eco_format};
+use ecow::{eco_format, EcoString};
 use expressions::err_unclosed_delim;
 use std::collections::HashMap;
-use std::iter;
 use std::ops::{Index, IndexMut, Range};
 
 /// Represents the context in which an expression is being parsed.
@@ -454,19 +453,6 @@ impl<'s> Parser<'s> {
         
         let mut lexer = Lexer::new(text, file_id);
         lexer.jump(offset);
-
-        {
-            let mut lexer = lexer.clone();
-            let nodes = iter::from_fn(move || {
-                let (kind, node) = lexer.next();
-                match kind {
-                    SyntaxKind::End => None,
-                    _ => Some(node)
-                }
-            }).collect::<Vec<_>>();
-            
-            dbg!(&nodes);
-        }
 
         let token = Self::lex(&mut lexer);
 

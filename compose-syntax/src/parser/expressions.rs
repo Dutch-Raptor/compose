@@ -390,10 +390,10 @@ pub(in crate::parser) fn err_unclosed_delim(
 
 #[cfg(test)]
 mod tests {
-use super::*;
+    use super::*;
+    use crate::assert_parse_tree;
     use crate::test_utils::*;
     use compose_error_codes::E0006_UNTERMINATED_STATEMENT;
-    use crate::assert_parse_tree;
 
     #[test]
     fn test_parse_parenthesized() {
@@ -899,403 +899,90 @@ use super::*;
 
     #[test]
     fn parse_range_in_the_wild() {
-        assert_parse("foo(..2); a[2..]; b[..=2]; (1..=2);")
-            .assert_next_children(SyntaxKind::FuncCall, |p| {
-                p.assert_next(SyntaxKind::Ident, "foo");
-                p.assert_next_children(SyntaxKind::Args, |p| {
-                    p.assert_next(SyntaxKind::LeftParen, "(");
-                    p.assert_next_children(SyntaxKind::Range, |p| {
-                        p.assert_next(SyntaxKind::Dots, "..");
-                        p.assert_next(SyntaxKind::Int, "2");
-                        p.assert_end();
-                    });
-                    p.assert_next(SyntaxKind::RightParen, ")");
-                    p.assert_end();
-                });
-                p.assert_end();
-            })
-            .assert_next_children(SyntaxKind::IndexAccess, |p| {
-                p.assert_next(SyntaxKind::Ident, "a");
-                p.assert_next(SyntaxKind::LeftBracket, "[");
-                p.assert_next_children(SyntaxKind::Range, |p| {
-                    p.assert_next(SyntaxKind::Int, "2");
-                    p.assert_next(SyntaxKind::Dots, "..");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::RightBracket, "]");
-                p.assert_end();
-            })
-            .assert_next_children(SyntaxKind::IndexAccess, |p| {
-                p.assert_next(SyntaxKind::Ident, "b");
-                p.assert_next(SyntaxKind::LeftBracket, "[");
-                p.assert_next_children(SyntaxKind::Range, |p| {
-                    p.assert_next(SyntaxKind::DotsEq, "..=");
-                    p.assert_next(SyntaxKind::Int, "2");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::RightBracket, "]");
-                p.assert_end();
-            })
-            .assert_next_children(SyntaxKind::Parenthesized, |p| {
-                p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next_children(SyntaxKind::Range, |p| {
-                    p.assert_next(SyntaxKind::Int, "1");
-                    p.assert_next(SyntaxKind::DotsEq, "..=");
-                    p.assert_next(SyntaxKind::Int, "2");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::RightParen, ")");
-                p.assert_end();
-            })
-            .assert_end();
+        assert_parse_tree!(
+            "foo(..2)",
+            FuncCall [
+                Ident("foo")
+                Args [
+                    LeftParen("(")
+                    Range [
+                        Dots("..")
+                        Int("2")
+                    ]
+                    RightParen(")")
+                ]
+            ]
+        );
+        
+        assert_parse_tree!(
+            "a[2..]",
+            IndexAccess [
+                Ident("a")
+                LeftBracket("[")
+                Range [
+                    Int("2")
+                    Dots("..")
+                ]
+                RightBracket("]")
+            ]
+        );
+        assert_parse_tree!(
+            "b[..=2]",
+            IndexAccess [
+                Ident("b")
+                LeftBracket("[")
+                Range [
+                    DotsEq("..=")
+                    Int("2")
+                ]
+                RightBracket("]")
+            ]
+        );
     }
 
     #[test]
     fn test_parse_range_with_expressions() {
-        assert_parse("(1 + 2)..(3 * 4)")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::Parenthesized, |p| {
-                    p.assert_next(SyntaxKind::LeftParen, "(");
-                    p.assert_next_children(SyntaxKind::Binary, |p| {
-                        p.assert_next(SyntaxKind::Int, "1");
-                        p.assert_next(SyntaxKind::Plus, "+");
-                        p.assert_next(SyntaxKind::Int, "2");
-                    });
-                    p.assert_next(SyntaxKind::RightParen, ")");
-                });
-                p.assert_next(SyntaxKind::Dots, "..");
-                p.assert_next_children(SyntaxKind::Parenthesized, |p| {
-                    p.assert_next(SyntaxKind::LeftParen, "(");
-
-                    p.assert_next_children(SyntaxKind::Binary, |p| {
-                        p.assert_next(SyntaxKind::Int, "3");
-                        p.assert_next(SyntaxKind::Star, "*");
-                        p.assert_next(SyntaxKind::Int, "4");
-                    });
-                    p.assert_next(SyntaxKind::RightParen, ")");
-                    p.assert_end();
-                });
-                p.assert_end();
-            })
-            .assert_end();
+        assert_parse_tree!(
+            "(1 + 2)..(3 + 4)",
+            Range [
+                Parenthesized [
+                    LeftParen("(")
+                    Binary [
+                        Int("1")
+                        Plus("+")
+                        Int("2")
+                    ]
+                    RightParen(")")
+                ]
+                Dots("..")
+                Parenthesized [
+                    LeftParen("(")
+                    Binary [
+                        Int("3")
+                        Plus("+")
+                        Int("4")
+                    ]
+                    RightParen(")")
+                ]
+            ]
+        );
     }
 
     #[test]
     fn test_parse_range_with_function_calls() {
-        assert_parse("min()..max()")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::FuncCall, |p| {
-                    p.assert_next(SyntaxKind::Ident, "min");
-                    p.assert_next_children(SyntaxKind::Args, |p| {
-                        p.assert_next(SyntaxKind::LeftParen, "(");
-                        p.assert_next(SyntaxKind::RightParen, ")");
-                    });
-                });
-                p.assert_next(SyntaxKind::Dots, "..");
-                p.assert_next_children(SyntaxKind::FuncCall, |p| {
-                    p.assert_next(SyntaxKind::Ident, "max");
-                    p.assert_next_children(SyntaxKind::Args, |p| {
-                        p.assert_next(SyntaxKind::LeftParen, "(");
-                        p.assert_next(SyntaxKind::RightParen, ")");
-                    });
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_range_with_variables() {
-        assert_parse("start..=end")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next(SyntaxKind::Ident, "start");
-                p.assert_next(SyntaxKind::DotsEq, "..=");
-                p.assert_next(SyntaxKind::Ident, "end");
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_nested_ranges() {
-        assert_parse("(1..5)..10")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::Parenthesized, |p| {
-                    p.assert_next(SyntaxKind::LeftParen, "(");
-                    p.assert_next_children(SyntaxKind::Range, |p| {
-                        p.assert_next(SyntaxKind::Int, "1");
-                        p.assert_next(SyntaxKind::Dots, "..");
-                        p.assert_next(SyntaxKind::Int, "5");
-                    });
-                    p.assert_next(SyntaxKind::RightParen, ")");
-                });
-                p.assert_next(SyntaxKind::Dots, "..");
-                p.assert_next(SyntaxKind::Int, "10");
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_range_with_field_access() {
-        assert_parse("obj.start..obj.end")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                    p.assert_next(SyntaxKind::Ident, "obj");
-                    p.assert_next(SyntaxKind::Dot, ".");
-                    p.assert_next(SyntaxKind::Ident, "start");
-                });
-                p.assert_next(SyntaxKind::Dots, "..");
-                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                    p.assert_next(SyntaxKind::Ident, "obj");
-                    p.assert_next(SyntaxKind::Dot, ".");
-                    p.assert_next(SyntaxKind::Ident, "end");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_range_with_method_calls() {
-        assert_parse("vec.first()..=vec.last()")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::FuncCall, |p| {
-                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                        p.assert_next(SyntaxKind::Ident, "vec");
-                        p.assert_next(SyntaxKind::Dot, ".");
-                        p.assert_next(SyntaxKind::Ident, "first");
-                    });
-                    p.assert_next_children(SyntaxKind::Args, |p| {
-                        p.assert_next(SyntaxKind::LeftParen, "(");
-                        p.assert_next(SyntaxKind::RightParen, ")");
-                    });
-                });
-                p.assert_next(SyntaxKind::DotsEq, "..=");
-                p.assert_next_children(SyntaxKind::FuncCall, |p| {
-                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                        p.assert_next(SyntaxKind::Ident, "vec");
-                        p.assert_next(SyntaxKind::Dot, ".");
-                        p.assert_next(SyntaxKind::Ident, "last");
-                    });
-                    p.assert_next_children(SyntaxKind::Args, |p| {
-                        p.assert_next(SyntaxKind::LeftParen, "(");
-                        p.assert_next(SyntaxKind::RightParen, ")");
-                    });
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_range_with_arithmetic_operators() {
-        // Range should bind looser than arithmetic operators
-        assert_parse("1 + 2 .. 3 * 4")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Int, "1");
-                    p.assert_next(SyntaxKind::Plus, "+");
-                    p.assert_next(SyntaxKind::Int, "2");
-                });
-                p.assert_next(SyntaxKind::Dots, "..");
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Int, "3");
-                    p.assert_next(SyntaxKind::Star, "*");
-                    p.assert_next(SyntaxKind::Int, "4");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_range_with_bitwise_operators() {
-        // Range should bind looser than bitwise operators
-        assert_parse("1 & 2 ..= 3 | 4")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Int, "1");
-                    p.assert_next(SyntaxKind::Amp, "&");
-                    p.assert_next(SyntaxKind::Int, "2");
-                });
-                p.assert_next(SyntaxKind::DotsEq, "..=");
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Int, "3");
-                    p.assert_next(SyntaxKind::Pipe, "|");
-                    p.assert_next(SyntaxKind::Int, "4");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_range_with_comparison_operators() {
-        // Range should bind looser than comparison operators
-        assert_parse("x < 5 .. y > 10")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Ident, "x");
-                    p.assert_next(SyntaxKind::Lt, "<");
-                    p.assert_next(SyntaxKind::Int, "5");
-                });
-                p.assert_next(SyntaxKind::Dots, "..");
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Ident, "y");
-                    p.assert_next(SyntaxKind::Gt, ">");
-                    p.assert_next(SyntaxKind::Int, "10");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_range_with_logical_operators() {
-        // Range should bind looser than logical operators
-        assert_parse("a && b .. c || d")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                    p.assert_next(SyntaxKind::AmpAmp, "&&");
-                    p.assert_next(SyntaxKind::Ident, "b");
-                });
-                p.assert_next(SyntaxKind::Dots, "..");
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Ident, "c");
-                    p.assert_next(SyntaxKind::PipePipe, "||");
-                    p.assert_next(SyntaxKind::Ident, "d");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_range_with_shift_operators() {
-        // Range should bind looser than shift operators
-        assert_parse("1 << 2 .. 3 >> 4")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Int, "1");
-                    p.assert_next(SyntaxKind::LtLt, "<<");
-                    p.assert_next(SyntaxKind::Int, "2");
-                });
-                p.assert_next(SyntaxKind::Dots, "..");
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Int, "3");
-                    p.assert_next(SyntaxKind::GtGt, ">>");
-                    p.assert_next(SyntaxKind::Int, "4");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_parse_range_with_mixed_operators() {
-        // Range should bind looser than all other operators
-        assert_parse("1 + 2 * 3 .. 4 | 5 && 6")
-            .assert_next_children(SyntaxKind::Range, |p| {
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Int, "1");
-                    p.assert_next(SyntaxKind::Plus, "+");
-                    p.assert_next_children(SyntaxKind::Binary, |p| {
-                        p.assert_next(SyntaxKind::Int, "2");
-                        p.assert_next(SyntaxKind::Star, "*");
-                        p.assert_next(SyntaxKind::Int, "3");
-                    });
-                });
-                p.assert_next(SyntaxKind::Dots, "..");
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next_children(SyntaxKind::Binary, |p| {
-                        p.assert_next(SyntaxKind::Int, "4");
-                        p.assert_next(SyntaxKind::Pipe, "|");
-                        p.assert_next(SyntaxKind::Int, "5");
-                    });
-                    p.assert_next(SyntaxKind::AmpAmp, "&&");
-                    p.assert_next(SyntaxKind::Int, "6");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_member_access_precedence() {
-        // Member access should bind tighter than arithmetic
-        assert_parse("a + b.method")
-            .assert_next_children(SyntaxKind::Binary, |p| {
-                p.assert_next(SyntaxKind::Ident, "a");
-                p.assert_next(SyntaxKind::Plus, "+");
-                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                    p.assert_next(SyntaxKind::Ident, "b");
-                    p.assert_next(SyntaxKind::Dot, ".");
-                    p.assert_next(SyntaxKind::Ident, "method");
-                });
-            })
-            .assert_end();
-
-        // Member access with multiply
-        assert_parse("a * b.method")
-            .assert_next_children(SyntaxKind::Binary, |p| {
-                p.assert_next(SyntaxKind::Ident, "a");
-                p.assert_next(SyntaxKind::Star, "*");
-                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                    p.assert_next(SyntaxKind::Ident, "b");
-                    p.assert_next(SyntaxKind::Dot, ".");
-                    p.assert_next(SyntaxKind::Ident, "method");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_path_access_precedence() {
-        // Path access should bind tighter than arithmetic
-        assert_parse("a + b::c")
-            .assert_next_children(SyntaxKind::Binary, |p| {
-                p.assert_next(SyntaxKind::Ident, "a");
-                p.assert_next(SyntaxKind::Plus, "+");
-                p.assert_next_children(SyntaxKind::PathAccess, |p| {
-                    p.assert_next(SyntaxKind::Ident, "b");
-                    p.assert_next(SyntaxKind::ColonColon, "::");
-                    p.assert_next(SyntaxKind::Ident, "c");
-                });
-            })
-            .assert_end();
-
-        // Path access with multiply
-        assert_parse("a * b::c")
-            .assert_next_children(SyntaxKind::Binary, |p| {
-                p.assert_next(SyntaxKind::Ident, "a");
-                p.assert_next(SyntaxKind::Star, "*");
-                p.assert_next_children(SyntaxKind::PathAccess, |p| {
-                    p.assert_next(SyntaxKind::Ident, "b");
-                    p.assert_next(SyntaxKind::ColonColon, "::");
-                    p.assert_next(SyntaxKind::Ident, "c");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_index_access_precedence() {
-        // Index access should bind tighter than arithmetic
-        assert_parse("a + b[i]")
-            .assert_next_children(SyntaxKind::Binary, |p| {
-                p.assert_next(SyntaxKind::Ident, "a");
-                p.assert_next(SyntaxKind::Plus, "+");
-                p.assert_next_children(SyntaxKind::IndexAccess, |p| {
-                    p.assert_next(SyntaxKind::Ident, "b");
-                    p.assert_next(SyntaxKind::LeftBracket, "[");
-                    p.assert_next(SyntaxKind::Ident, "i");
-                    p.assert_next(SyntaxKind::RightBracket, "]");
-                });
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_function_call_precedence() {
-        // Function calls should bind tighter than arithmetic
         assert_parse_tree!(
-            "a + foo()",
-            Binary [
-                Ident("a")
-                Plus("+")
+            "min()..max()",
+            Range [
                 FuncCall [
-                    Ident("foo")
+                    Ident("min")
+                    Args [
+                        LeftParen("(")
+                        RightParen(")")
+                    ]
+                ]
+                Dots("..")
+                FuncCall [
+                    Ident("max")
                     Args [
                         LeftParen("(")
                         RightParen(")")
@@ -1306,220 +993,247 @@ use super::*;
     }
 
     #[test]
-    fn test_mixed_member_call_precedence() {
-        // Complex expression mixing member access and function calls
-        assert_parse("a + b.foo()")
-            .assert_next_children(SyntaxKind::Binary, |p| {
-                p.assert_next(SyntaxKind::Ident, "a");
-                p.assert_next(SyntaxKind::Plus, "+");
-                p.assert_next_children(SyntaxKind::FuncCall, |p| {
-                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                        p.assert_next(SyntaxKind::Ident, "b");
-                        p.assert_next(SyntaxKind::Dot, ".");
-                        p.assert_next(SyntaxKind::Ident, "foo");
-                    });
-                    p.assert_next_children(SyntaxKind::Args, |p| {
-                        p.assert_next(SyntaxKind::LeftParen, "(");
-                        p.assert_next(SyntaxKind::RightParen, ")");
-                        p.assert_end();
-                    });
-                    p.assert_end();
-                });
-            })
-            .assert_end();
+    fn test_parse_range_with_variables() {
+        assert_parse_tree!(
+            "start..=end",
+            Range [
+                Ident("start")
+                DotsEq("..=")
+                Ident("end")
+            ]
+        );
     }
 
     #[test]
-    fn test_nested_field_access_precedence() {
-        // Test nested field access with different operators
-        assert_parse("a.b.c + d.e.f")
-            .assert_next_children(SyntaxKind::Binary, |p| {
-                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                        p.assert_next(SyntaxKind::Ident, "a");
-                        p.assert_next(SyntaxKind::Dot, ".");
-                        p.assert_next(SyntaxKind::Ident, "b");
-                    });
-                    p.assert_next(SyntaxKind::Dot, ".");
-                    p.assert_next(SyntaxKind::Ident, "c");
-                });
-                p.assert_next(SyntaxKind::Plus, "+");
-                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                    p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                        p.assert_next(SyntaxKind::Ident, "d");
-                        p.assert_next(SyntaxKind::Dot, ".");
-                        p.assert_next(SyntaxKind::Ident, "e");
-                    });
-                    p.assert_next(SyntaxKind::Dot, ".");
-                    p.assert_next(SyntaxKind::Ident, "f");
-                });
-            })
-            .assert_end();
+    fn test_parse_nested_ranges() {
+        assert_parse_tree!(
+            "a..=b..=c",
+            Range [
+                Ident("a")
+                DotsEq("..=")
+                Range [
+                    Ident("b") DotsEq("..=") Ident("c")
+                ]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_range_with_field_access() {
+        assert_parse_tree!(
+            "obj.start..obj.end",
+            Range [
+                FieldAccess [
+                    Ident("obj")
+                    Dot(".")
+                    Ident("start")
+                ]
+                Dots("..")
+                FieldAccess [
+                    Ident("obj")
+                    Dot(".")
+                    Ident("end")
+                ]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_range_with_method_calls() {
+        assert_parse_tree!(
+            "obj.start()..obj.end()",
+            Range [
+                FuncCall [
+                    FieldAccess [
+                        Ident("obj")
+                        Dot(".")
+                        Ident("start")
+                    ]
+                    Args [
+                        LeftParen("(")
+                        RightParen(")")
+                    ]
+                ]
+                Dots("..")
+                FuncCall [
+                    FieldAccess [
+                        Ident("obj")
+                        Dot(".")
+                        Ident("end")
+                    ]
+                    Args [
+                        LeftParen("(")
+                        RightParen(")")
+                    ]
+                ]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_range_with_arithmetic_operators() {
+        // Range should bind looser than arithmetic operators
+        assert_parse_tree!(
+            "a + b..c",
+            Range [
+                Binary [
+                    Ident("a")
+                    Plus("+")
+                    Ident("b")
+                ]
+                Dots("..")
+                Ident("c")
+            ]
+        );
+    }
+
+    #[test]
+    fn test_path_access_precedence() {
+        // Path access should bind tighter than calls
+        assert_parse_tree!(
+            "b::c()",
+            FuncCall [
+                PathAccess [
+                    Ident("b")
+                    ColonColon("::")
+                    Ident("c")
+                ]
+                Args [
+                    LeftParen("(")
+                    RightParen(")")
+                ]
+            ]
+        );
     }
 
     #[test]
     fn test_mixed_access_types() {
-        // Mix field access, path access, and indexing
-        assert_parse("a.b::c[d].e")
-            .assert_next_children(SyntaxKind::FieldAccess, |p| {
-                p.assert_next_children(SyntaxKind::IndexAccess, |p| {
-                    p.assert_next_children(SyntaxKind::PathAccess, |p| {
-                        p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                            p.assert_next(SyntaxKind::Ident, "a");
-                            p.assert_next(SyntaxKind::Dot, ".");
-                            p.assert_next(SyntaxKind::Ident, "b");
-                        });
-                        p.assert_next(SyntaxKind::ColonColon, "::");
-                        p.assert_next(SyntaxKind::Ident, "c");
-                    });
-                    p.assert_next(SyntaxKind::LeftBracket, "[");
-                    p.assert_next(SyntaxKind::Ident, "d");
-                    p.assert_next(SyntaxKind::RightBracket, "]");
-                });
-                p.assert_next(SyntaxKind::Dot, ".");
-                p.assert_next(SyntaxKind::Ident, "e");
-            })
-            .assert_end();
-    }
-
-    #[test]
-    fn test_path_field_access_precedence() {
         assert_parse_tree!(
-            "a::b.c",
+            "a.b::c[d].e",
             FieldAccess [
-                PathAccess [
-                    Ident("a")
-                    ColonColon("::")
-                    Ident("b")
+                IndexAccess [
+                    PathAccess [
+                        FieldAccess [
+                            Ident("a")
+                            Dot(".")
+                            Ident("b")
+                        ]
+                        ColonColon("::")
+                        Ident("c")
+                    ]
+                    LeftBracket("[")
+                    Ident("d")
+                    RightBracket("]")
                 ]
                 Dot(".")
-                Ident("c")
+                Ident("e")
             ]
-        )
+        );
     }
 
     #[test]
     fn test_parse_complex_chain() {
         assert_parse_tree!(
-        "a.b().c::d().e[f]()",
-        FuncCall [
-            IndexAccess [
-                FieldAccess [
-                    FuncCall [
-                        PathAccess [
-                            FieldAccess [
-                                FuncCall [
-                                    FieldAccess [
-                                        Ident("a")
-                                        Dot(".")
-                                        Ident("b")
+            "a.b().c::d().e[f]()",
+            FuncCall [
+                IndexAccess [
+                    FieldAccess [
+                        FuncCall [
+                            PathAccess [
+                                FieldAccess [
+                                    FuncCall [
+                                        FieldAccess [
+                                            Ident("a")
+                                            Dot(".")
+                                            Ident("b")
+                                        ]
+                                        Args [
+                                            LeftParen("(")
+                                            RightParen(")")
+                                        ]
                                     ]
-                                    Args [
-                                        LeftParen("(")
-                                        RightParen(")")
-                                    ]
+                                    Dot(".")
+                                    Ident("c")
                                 ]
-                                Dot(".")
-                                Ident("c")
+                                ColonColon("::")
+                                Ident("d")
                             ]
-                            ColonColon("::")
-                            Ident("d")
+                            Args [
+                                LeftParen("(")
+                                RightParen(")")
+                            ]
                         ]
-                        Args [
-                            LeftParen("(")
-                            RightParen(")")
-                        ]
+                        Dot(".")
+                        Ident("e")
                     ]
-                    Dot(".")
-                    Ident("e")
+                    LeftBracket("[")
+                    Ident("f")
+                    RightBracket("]")
                 ]
-                LeftBracket("[")
-                Ident("f")
-                RightBracket("]")
+                Args [
+                    LeftParen("(")
+                    RightParen(")")
+                ]
             ]
-            Args [
-                LeftParen("(")
-                RightParen(")")
-            ]
-        ]
-    );
+        );
     }
 
     #[test]
     fn test_nested_indexing_with_expressions() {
         // Test complex index expressions
-        assert_parse("a[b.c[d::e]].f")
-            .assert_next_children(SyntaxKind::FieldAccess, |p| {
-                p.assert_next_children(SyntaxKind::IndexAccess, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                    p.assert_next(SyntaxKind::LeftBracket, "[");
-                    p.assert_next_children(SyntaxKind::IndexAccess, |p| {
-                        p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                            p.assert_next(SyntaxKind::Ident, "b");
-                            p.assert_next(SyntaxKind::Dot, ".");
-                            p.assert_next(SyntaxKind::Ident, "c");
-                        });
-                        p.assert_next(SyntaxKind::LeftBracket, "[");
-                        p.assert_next_children(SyntaxKind::PathAccess, |p| {
-                            p.assert_next(SyntaxKind::Ident, "d");
-                            p.assert_next(SyntaxKind::ColonColon, "::");
-                            p.assert_next(SyntaxKind::Ident, "e");
-                        });
-                        p.assert_next(SyntaxKind::RightBracket, "]");
-                    });
-                    p.assert_next(SyntaxKind::RightBracket, "]");
-                });
-                p.assert_next(SyntaxKind::Dot, ".");
-                p.assert_next(SyntaxKind::Ident, "f");
-            })
-            .assert_end();
+        assert_parse_tree!(
+            "a[b.c[d::e]].f",
+            FieldAccess [
+                IndexAccess [
+                    Ident("a")
+                    LeftBracket("[")
+                    IndexAccess [
+                        FieldAccess [
+                            Ident("b")
+                            Dot(".")
+                            Ident("c")
+                        ]
+                        LeftBracket("[")
+                        PathAccess [
+                            Ident("d")
+                            ColonColon("::")
+                            Ident("e")
+                        ]
+                        RightBracket("]")
+                    ]
+                    RightBracket("]")
+                ]
+                Dot(".")
+                Ident("f")
+            ]
+        );
     }
 
     #[test]
     fn test_call_with_complex_arguments() {
         // Test function calls with complex argument expressions
-        assert_parse("a.b(c::d.e[f], g.h())")
-            .assert_next_children(SyntaxKind::FuncCall, |p| {
-                p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                    p.assert_next(SyntaxKind::Dot, ".");
-                    p.assert_next(SyntaxKind::Ident, "b");
-                });
-                p.assert_next_children(SyntaxKind::Args, |p| {
-                    p.assert_next(SyntaxKind::LeftParen, "(");
-                    p.assert_next_children(SyntaxKind::IndexAccess, |p| {
-                        p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                            p.assert_next_children(SyntaxKind::PathAccess, |p| {
-                                p.assert_next(SyntaxKind::Ident, "c");
-                                p.assert_next(SyntaxKind::ColonColon, "::");
-                                p.assert_next(SyntaxKind::Ident, "d");
-                            });
-                            p.assert_next(SyntaxKind::Dot, ".");
-                            p.assert_next(SyntaxKind::Ident, "e");
-                        });
-                        p.assert_next(SyntaxKind::LeftBracket, "[");
-                        p.assert_next(SyntaxKind::Ident, "f");
-                        p.assert_next(SyntaxKind::RightBracket, "]");
-                    });
-                    p.assert_next(SyntaxKind::Comma, ",");
-                    p.assert_next_children(SyntaxKind::FuncCall, |p| {
-                        p.assert_next_children(SyntaxKind::FieldAccess, |p| {
-                            p.assert_next(SyntaxKind::Ident, "g");
-                            p.assert_next(SyntaxKind::Dot, ".");
-                            p.assert_next(SyntaxKind::Ident, "h");
-                        });
-                        p.assert_next_children(SyntaxKind::Args, |p| {
-                            p.assert_next(SyntaxKind::LeftParen, "(");
-                            p.assert_next(SyntaxKind::RightParen, ")");
-                            p.assert_end();
-                        });
-                        p.assert_end();
-                    });
-                    p.assert_next(SyntaxKind::RightParen, ")");
-                    p.assert_end();
-                });
-                p.assert_end();
-            })
-            .assert_end();
+        assert_parse_tree!(
+            "a.b(c::d.e[f], g.h())",
+            FuncCall [
+                FieldAccess [ Ident("a") Dot(".") Ident("b") ]
+                Args [
+                    LeftParen("(")
+                    IndexAccess [
+                        FieldAccess [
+                            PathAccess [ Ident("c") ColonColon("::") Ident("d") ]
+                            Dot(".")
+                            Ident("e")
+                        ]
+                        LeftBracket("[") Ident("f") RightBracket("]")
+                    ]
+                    Comma(",")
+                    FuncCall [
+                        FieldAccess [ Ident("g") Dot(".") Ident("h") ]
+                        Args [ LeftParen("(") RightParen(")") ]
+                    ]
+                    RightParen(")")
+                ]
+            ]
+        );
     }
 }
