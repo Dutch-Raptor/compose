@@ -12,7 +12,7 @@ pub struct Lexer<'s> {
     s: Scanner<'s>,
     newline: bool,
     error: Option<SyntaxError>,
-    file_id: FileId,
+    pub(crate) file_id: FileId,
 }
 
 impl<'s> Lexer<'s> {
@@ -128,7 +128,7 @@ impl Lexer<'_> {
                 self.s.eat();
                 self.s.eat();
                 SyntaxKind::DotsEq
-            },
+            }
             '.' if self.s.eat_if('.') => SyntaxKind::Dots,
 
             '<' if self.s.eat_if('<') => SyntaxKind::LtLt,
@@ -341,141 +341,72 @@ fn is_ident_start(c: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::test_file_id;
-    use extension_traits::extension;
-
-    #[extension(trait LexerAssert)]
-    impl Lexer<'_> {
-        fn assert_next(&mut self, kind: SyntaxKind, text: &str, range: Range<usize>) {
-            assert_eq!(
-                self.next(),
-                (
-                    kind,
-                    SyntaxNode::leaf(kind, text, Span::new(self.file_id, range))
-                )
-            );
-        }
-
-        fn assert_next_error(
-            &mut self,
-            kind: SyntaxKind,
-            message: &str,
-            text: &str,
-            range: Range<usize>,
-        ) {
-            assert_eq!(
-                self.next(),
-                (
-                    kind,
-                    SyntaxNode::error(
-                        SyntaxError::new(message, Span::new(self.file_id, range)),
-                        text
-                    )
-                )
-            );
-        }
-
-        fn assert_end(&mut self, index: usize) {
-            assert_eq!(
-                self.next(),
-                (
-                    SyntaxKind::End,
-                    SyntaxNode::leaf(SyntaxKind::End, "", Span::new(self.file_id, index..index))
-                )
-            );
-        }
-    }
+    use crate::assert_tokens;
+    use crate::test_utils::{LexerAssert, test_file_id};
 
     #[test]
     fn test_int() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("123", file_id);
-        lexer.assert_next(SyntaxKind::Int, "123", 0..3);
-        lexer.assert_end(3);
+        assert_tokens!("123", Int("123", 0..3));
     }
 
     #[test]
     fn test_float() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("123.456", file_id);
-        lexer.assert_next(SyntaxKind::Float, "123.456", 0..7);
-        lexer.assert_end(7);
+        assert_tokens!("1.3", Float("1.3", 0..3))
     }
 
     #[test]
     fn test_integer_floats() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("1.0", file_id);
-        lexer.assert_next(SyntaxKind::Float, "1.0", 0..3);
-        lexer.assert_end(3);
+        assert_tokens!("1.0", Float("1.0", 0..3));
     }
 
     #[test]
     fn test_integer_methods_disambiguation() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("1.method()", file_id);
-        lexer.assert_next(SyntaxKind::Int, "1", 0..1);
-        lexer.assert_next(SyntaxKind::Dot, ".", 1..2);
-        lexer.assert_next(SyntaxKind::Ident, "method", 2..8);
-        lexer.assert_next(SyntaxKind::LeftParen, "(", 8..9);
-        lexer.assert_next(SyntaxKind::RightParen, ")", 9..10);
-        lexer.assert_end(10)
+        assert_tokens!(
+            "1.method()",
+            Int("1", 0..1)
+            Dot(".", 1..2)
+            Ident("method", 2..8)
+            LeftParen("(", 8..9)
+            RightParen(")", 9..10)
+        );
     }
 
     #[test]
-    fn test_float_methods_disambiguation() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("1.0.method()", file_id);
-        lexer.assert_next(SyntaxKind::Float, "1.0", 0..3);
-        lexer.assert_next(SyntaxKind::Dot, ".", 3..4);
-        lexer.assert_next(SyntaxKind::Ident, "method", 4..10);
-        lexer.assert_next(SyntaxKind::LeftParen, "(", 10..11);
-        lexer.assert_next(SyntaxKind::RightParen, ")", 11..12);
-        lexer.assert_end(12)
+    fn test_int_methods_disambiguation() {
+        assert_tokens!(
+            "1.method()",
+            Int("1", 0..1)
+            Dot(".", 1..2)
+            Ident("method", 2..8)
+            LeftParen("(", 8..9)
+            RightParen(")", 9..10)
+        );
     }
 
     #[test]
     fn test_float_with_exponent() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("1.0e1", file_id);
-        lexer.assert_next(SyntaxKind::Float, "1.0e1", 0..5);
-        lexer.assert_end(5);
-
-        let mut lexer = Lexer::new("1.0e-1", file_id);
-        lexer.assert_next(SyntaxKind::Float, "1.0e-1", 0..6);
-        lexer.assert_end(6);
+        assert_tokens!("1.0e1", Float("1.0e1", 0..5));
+        assert_tokens!("1.0e-1", Float("1.0e-1", 0..6));
     }
 
     #[test]
     fn test_string() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("\"abc\"", file_id);
-        lexer.assert_next(SyntaxKind::Str, "\"abc\"", 0..5);
-        lexer.assert_end(5);
+        assert_tokens!("\"abc\"", Str("abc", 0..5));
     }
 
     #[test]
     fn test_ident() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("abc", file_id);
-        lexer.assert_next(SyntaxKind::Ident, "abc", 0..3);
-        lexer.assert_end(3);
+        assert_tokens!("abc", Ident("abc", 0..3));
     }
 
     #[test]
     fn test_unterminated_string() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("\"abc", file_id);
-        lexer.assert_next_error(SyntaxKind::Error, "unclosed string", "\"abc", 0..4);
-        lexer.assert_end(4);
+        assert_tokens!("\"abc", !Error("unclosed string", "\"abc", 0..4));
     }
 
     #[test]
     fn test_escaped_strings() {
-        let file_id = test_file_id();
-        let mut lexer = Lexer::new("\"abc\\\"ndef\"", file_id);
-        lexer.assert_next(SyntaxKind::Str, "\"abc\\\"ndef\"", 0..11);
-        lexer.assert_end(11);
+        assert_tokens!("\"abc\\\"def\"", Str("\"abc\\\"def\"", 0..10));
     }
 
     #[test]
@@ -529,15 +460,8 @@ mod tests {
 
     #[test]
     fn test_comment_kinds() {
-        let file_id = test_file_id();
-
-        let mut lexer = Lexer::new("// regular comment", file_id);
-        lexer.assert_next(SyntaxKind::Comment, "// regular comment", 0..18);
-
-        let mut lexer = Lexer::new("/// doc comment", file_id);
-        lexer.assert_next(SyntaxKind::DocComment, "/// doc comment", 0..15);
-
-        let mut lexer = Lexer::new("/* block\ncomment */", file_id);
-        lexer.assert_next(SyntaxKind::Comment, "/* block\ncomment */", 0..19);
+        assert_tokens!("// regular comment", Comment("// regular comment", 0..18));
+        assert_tokens!("/// doc comment", DocComment("/// doc comment", 0..15));
+        assert_tokens!("/* block\ncomment */", Comment("/* block\ncomment */", 0..19));
     }
 }
