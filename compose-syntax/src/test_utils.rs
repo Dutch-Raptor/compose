@@ -1,12 +1,13 @@
-use crate::SyntaxNode;
+use crate::{Lexer, Span, SyntaxError, SyntaxNode};
 use crate::file::FileId;
 use crate::kind::SyntaxKind;
 use compose_error_codes::ErrorCode;
 use extension_traits::extension;
 use std::num::NonZeroU16;
+use std::ops::Range;
 
 /// Creates a non-interned file id for testing.
-pub(crate) const fn test_file_id() -> FileId {
+pub const fn test_file_id() -> FileId {
     FileId::from_raw(NonZeroU16::new(1).unwrap())
 }
 
@@ -143,7 +144,7 @@ impl NodesTester {
             node.text(),
             self.path
         );
-        
+
         self.pos += 1;
 
         self
@@ -438,3 +439,83 @@ macro_rules! assert_parse_tree {
 }
 
 pub use assert_parse_tree;
+
+
+#[extension(pub trait LexerAssert)]
+impl<'a> Lexer<'a> {
+    fn assert_next(&mut self, kind: SyntaxKind, text: &str, range: Range<usize>) -> &mut Lexer<'a> {
+        assert_eq!(
+            self.next(),
+            (
+                kind,
+                SyntaxNode::leaf(kind, text, Span::new(self.file_id, range))
+            )
+        );
+        self
+    }
+
+    fn assert_next_error(
+        &mut self,
+        kind: SyntaxKind,
+        message: &str,
+        text: &str,
+        range: Range<usize>,
+    ) -> &mut Lexer<'a> {
+        assert_eq!(
+            self.next(),
+            (
+                kind,
+                SyntaxNode::error(
+                    SyntaxError::new(message, Span::new(self.file_id, range)),
+                    text
+                )
+            )
+        );
+        self
+    }
+
+    fn assert_end(&mut self, index: usize) -> &mut Lexer<'a>  {
+        assert_eq!(
+            self.next(),
+            (
+                SyntaxKind::End,
+                SyntaxNode::leaf(SyntaxKind::End, "", Span::new(self.file_id, index..index))
+            )
+        );
+        self
+    }
+}
+
+#[macro_export]
+macro_rules! assert_tokens {
+    // Entry point
+    ($src:expr, $($tokens:tt)+) => {{
+        let file_id = $crate::test_utils::test_file_id();
+        let mut lexer = $crate::Lexer::new($src, file_id);
+        $crate::assert_tokens!(@seq lexer, $($tokens)+);
+    }};
+
+    // error
+    (@seq $lexer:ident, !Error ( $message:expr, $text:expr, $range:expr ) $($rest:tt)*) => {
+        $lexer.assert_next_error($crate::SyntaxKind::Error, $message, $text, $range);
+        $crate::assert_tokens!(@seq $lexer, $($rest)*);
+    };
+
+    // Leaf token
+    (@seq $lexer:ident, !Error ( $($tt:tt)* ) $($rest:tt)*) => {
+        compile_error!(concat!("Leaf node `Error` must provide a message, source text and a range, like `Error(\"message\", \"source text\", range)`."))
+    };
+
+    // Leaf token
+    (@seq $lexer:ident, $kind:ident ( $text:expr, $range:expr ) $($rest:tt)*) => {
+        $lexer.assert_next($crate::SyntaxKind::$kind, $text, $range);
+        $crate::assert_tokens!(@seq $lexer, $($rest)*);
+    };
+
+    // End
+    (@seq $lexer:ident,) => {
+        $lexer.assert_end($lexer.cursor());
+    };
+}
+
+pub use assert_tokens;
