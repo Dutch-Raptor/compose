@@ -360,14 +360,14 @@ mod tests {
     }
 
     #[test]
-    fn test_integer_methods_disambiguation() {
+    fn test_float_methods_disambiguation() {
         assert_tokens!(
-            "1.method()",
-            Int("1", 0..1)
-            Dot(".", 1..2)
-            Ident("method", 2..8)
-            LeftParen("(", 8..9)
-            RightParen(")", 9..10)
+            "1.3.method()",
+            Float("1.3", 0..3)
+            Dot(".", 3..4)
+            Ident("method", 4..10)
+            LeftParen("(", 10..11)
+            RightParen(")", 11..12)
         );
     }
 
@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn test_string() {
-        assert_tokens!("\"abc\"", Str("abc", 0..5));
+        assert_tokens!("\"abc\"", Str("\"abc\"", 0..5));
     }
 
     #[test]
