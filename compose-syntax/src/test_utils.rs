@@ -591,6 +591,12 @@ macro_rules! assert_tokens {
         $crate::assert_tokens!(@seq $lexer, $($rest)*);
     };
 
+    // Incomplete token
+    (@seq $lexer:ident, $kind:ident $($rest:tt)*) => (
+        $crate::SyntaxKind::$kind;
+        compile_error!(concat!("Incomplete token `", stringify!($kind), "` must provide a text and a range, like `", stringify!($kind), "(\"text\", range)`."))
+    );
+
     // End
     (@seq $lexer:ident,) => {
         $lexer.assert_end($lexer.cursor());
