@@ -14,6 +14,7 @@ mod unit;
 mod iterator;
 mod boxed;
 mod array;
+mod range;
 
 pub use args::*;
 pub use boxed::*;
@@ -28,3 +29,4 @@ pub use ty::*;
 pub use unit::*;
 pub use value::*;
 pub use array::*;
+pub use range::*;
