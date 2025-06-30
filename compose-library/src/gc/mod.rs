@@ -176,6 +176,7 @@ impl Trace for Value {
             Value::Iterator(i) => i.visit_refs(f),
             Value::Box(b) => f(b.key()),
             Value::Array(a) => a.visit_refs(f),
+            Value::Range(r) => r.visit_refs(f),
         }
     }
 }

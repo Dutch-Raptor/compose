@@ -52,6 +52,7 @@ pub fn library() -> Library {
     global.define_type::<Func>();
     global.define_type::<Boxed>();
     global.define_type::<ArrayValue>();
+    global.define_type::<RangeValue>();
     
     Library {
         global: Module::new("global", global),

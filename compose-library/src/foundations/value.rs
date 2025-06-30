@@ -13,6 +13,7 @@ use compose_macros::scope;
 use compose_syntax::Span;
 use ecow::{EcoString, eco_format};
 use std::fmt;
+use compose_library::foundations::range::RangeValue;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -25,6 +26,7 @@ pub enum Value {
     Iterator(IterValue),
     Box(Boxed),
     Array(ArrayValue),
+    Range(RangeValue),
 }
 
 #[scope]
@@ -46,6 +48,7 @@ impl Value {
             Value::Iterator(v) => Value::Iterator(v.shallow_clone(vm)?),
             Value::Box(v) => Value::Box(v.shallow_clone(vm)?),
             Value::Array(v) => Value::Array(v.shallow_clone(vm)?),
+            Value::Range(v) => Value::Range(v),
         })
     }
 }
@@ -68,6 +71,7 @@ impl Value {
             Value::Iterator(_) => Type::of::<IterValue>(),
             Value::Box(_) => Type::of::<Boxed>(),
             Value::Array(_) => Type::of::<ArrayValue>(),
+            Value::Range(_) => Type::of::<RangeValue>(),
         }
     }
 
@@ -164,6 +168,7 @@ impl fmt::Display for Value {
             Value::Iterator(v) => write!(f, "{:?}", v),
             Value::Box(v) => write!(f, "{}", v),
             Value::Array(v) => write!(f, "{:?}", v),
+            Value::Range(v) => write!(f, "{:?}", v),
         }
     }
 }
@@ -180,6 +185,7 @@ impl Repr for Value {
             Value::Iterator(v) => eco_format!("iterator({v:?})"),
             Value::Box(v) => eco_format!("{v}"),
             Value::Array(v) => v.repr(vm),
+            Value::Range(r) => r.repr(vm),
         }
     }
 }
@@ -241,3 +247,4 @@ primitive!(UnitValue: "unit", Unit);
 primitive!(IterValue: "iterator", Iterator);
 primitive!(Boxed: "box", Box);
 primitive!(ArrayValue: "array", Array);
+primitive!(RangeValue: "range", Range);
