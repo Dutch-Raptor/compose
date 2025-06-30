@@ -342,7 +342,7 @@ fn is_ident_start(c: char) -> bool {
 mod tests {
     use super::*;
     use crate::assert_tokens;
-    use crate::test_utils::{LexerAssert, test_file_id};
+    use crate::test_utils::{test_file_id, LexerAssert};
 
     #[test]
     fn test_int() {
@@ -413,21 +413,10 @@ mod tests {
     fn test_newline() {
         let file_id = test_file_id();
         let mut lexer = Lexer::new("a\nb", file_id);
-        assert_eq!(
-            lexer.next(),
-            (
-                SyntaxKind::Ident,
-                SyntaxNode::leaf(SyntaxKind::Ident, "a", Span::new(file_id, 0..1))
-            )
-        );
+
+        lexer.assert_next(SyntaxKind::Ident, "a", 0..1);
         assert!(!lexer.newline());
-        assert_eq!(
-            lexer.next(),
-            (
-                SyntaxKind::Ident,
-                SyntaxNode::leaf(SyntaxKind::Ident, "b", Span::new(file_id, 2..3))
-            )
-        );
+        lexer.assert_next(SyntaxKind::Ident, "b", 2..3);
         assert!(lexer.newline());
     }
 
@@ -435,27 +424,11 @@ mod tests {
     fn test_repeating_next_after_end() {
         let file_id = test_file_id();
         let mut lexer = Lexer::new("", file_id);
-        assert_eq!(
-            lexer.next(),
-            (
-                SyntaxKind::End,
-                SyntaxNode::leaf(SyntaxKind::End, "", Span::new(file_id, 0..0))
-            )
-        );
-        assert_eq!(
-            lexer.next(),
-            (
-                SyntaxKind::End,
-                SyntaxNode::leaf(SyntaxKind::End, "", Span::new(file_id, 0..0))
-            )
-        );
-        assert_eq!(
-            lexer.next(),
-            (
-                SyntaxKind::End,
-                SyntaxNode::leaf(SyntaxKind::End, "", Span::new(file_id, 0..0))
-            )
-        );
+        lexer.assert_end(0);
+        lexer.assert_end(0);
+        lexer.assert_end(0);
+        lexer.assert_end(0);
+        lexer.assert_end(0);
     }
 
     #[test]
