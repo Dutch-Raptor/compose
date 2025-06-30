@@ -1,11 +1,11 @@
 use crate::kind::SyntaxKind;
 use crate::node::SyntaxErrorSeverity;
+use crate::parser::Parser;
 use crate::parser::expressions::code_expression;
 use crate::parser::patterns::pattern;
 use crate::parser::statements::code;
-use crate::parser::Parser;
 use crate::set::syntax_set;
-use crate::{set, Label, Span, SyntaxError, SyntaxNode};
+use crate::{Label, Span, SyntaxError, SyntaxNode, set};
 use compose_error_codes::{
     E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES, W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION,
     W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION,
@@ -77,7 +77,7 @@ pub fn for_loop(p: &mut Parser) {
         pattern(p, true, &mut HashSet::new(), None);
 
         if !p.at(SyntaxKind::In) {
-            // Turns out it was not just a pattern. Maybe the loop pattern is wrapped in parens?
+            // Turns out it was not just a pattern. Maybe the entire loop expression is wrapped in parens?
             p.restore(checkpoint);
             wrapped = true;
             p.assert(SyntaxKind::LeftParen);
@@ -104,9 +104,9 @@ pub fn for_loop(p: &mut Parser) {
             "unnecessary parentheses in `for` expression",
             open,
         ))
-        .with_severity(SyntaxErrorSeverity::Warning)
-        .with_code(&W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION)
-        .with_label(Label::primary(close, "help: remove these parentheses"));
+            .with_severity(SyntaxErrorSeverity::Warning)
+            .with_code(&W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION)
+            .with_label(Label::primary(close, "help: remove these parentheses"));
     }
 
     parse_control_flow_block(p, ControlFlow::For);
@@ -124,9 +124,9 @@ fn condition(p: &mut Parser) {
             "unnecessary parentheses around condition",
             last_node.span(),
         ))
-        .with_severity(SyntaxErrorSeverity::Warning)
-        .with_code(&W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION)
-        .with_label_message("help: remove these parentheses");
+            .with_severity(SyntaxErrorSeverity::Warning)
+            .with_code(&W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION)
+            .with_label_message("help: remove these parentheses");
     }
     p.wrap(cond_marker, SyntaxKind::Condition);
 }
@@ -207,169 +207,128 @@ mod tests {
 
     #[test]
     fn test_parse_while() {
-        let mut p = assert_parse(
+        assert_parse_tree!(
             r#"
-        while true {
-            do_thing();
-        };
-        "#,
+            while true {
+                do_thing();
+            }
+            "#,
+            WhileLoop [
+                While("while")
+                Condition [ Bool("true") ]
+                CodeBlock [
+                    LeftBrace("{")
+                    FuncCall [
+                        Ident("do_thing")
+                        Args [ LeftParen("(") RightParen(")") ]
+                    ]
+                    RightBrace("}")
+                ]
+            ]
         );
-
-        p.assert_next_children(SyntaxKind::WhileLoop, |p| {
-            p.assert_next(SyntaxKind::While, "while");
-            p.assert_next_children(SyntaxKind::Condition, |p| {
-                p.assert_next(SyntaxKind::Bool, "true");
-                p.assert_end();
-            });
-            p.assert_next_children(SyntaxKind::CodeBlock, |p| {
-                p.assert_next(SyntaxKind::LeftBrace, "{");
-                p.assert_next_children(SyntaxKind::FuncCall, |p| {
-                    p.assert_next(SyntaxKind::Ident, "do_thing");
-                    p.assert_next_children(SyntaxKind::Args, |p| {
-                        p.assert_next(SyntaxKind::LeftParen, "(");
-                        p.assert_next(SyntaxKind::RightParen, ")");
-                        p.assert_end();
-                    });
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::RightBrace, "}");
-                p.assert_end();
-            });
-            p.assert_end();
-        });
-        p.assert_end();
     }
 
     #[test]
     fn test_parse_while_warns_for_parens() {
-        let mut p = assert_parse_with_warnings(
+        assert_parse_tree!(
             r#"
-        while (true) {
-            do_thing();
-        };
-        "#,
-            &[W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION],
+            while (true) {
+                do_thing();
+            }
+            "#,
+            WhileLoop [
+                While("while")
+                Condition [
+                    Parenthesized [...]
+                    Warn(W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION)
+                ]
+                CodeBlock [...]
+            ]
         );
-
-        p.assert_next_children(SyntaxKind::WhileLoop, |p| {
-            p.assert_next(SyntaxKind::While, "while");
-            p.assert_next_children(SyntaxKind::Condition, |p| {
-                p.assert_next_children(SyntaxKind::Parenthesized, |_| {});
-                p.assert_next_warning(W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION);
-                p.assert_end();
-            });
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-            p.assert_end();
-        });
-        p.assert_end();
     }
 
     #[test]
     fn test_parse_if() {
-        let mut p = assert_parse(
+        assert_parse_tree!(
             r#"
-        if true {
-            do_thing();
-        };
-        "#,
+            if true {
+                do_thing();
+            }
+            "#,
+            Conditional [
+                If("if")
+                Condition [ Bool("true") ]
+                CodeBlock [...]
+            ]
         );
-
-        p.assert_next_children(SyntaxKind::Conditional, |p| {
-            p.assert_next(SyntaxKind::If, "if");
-            p.assert_next_children(SyntaxKind::Condition, |p| {
-                p.assert_next(SyntaxKind::Bool, "true");
-                p.assert_end();
-            });
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-            p.assert_end();
-        });
-        p.assert_end();
     }
 
     #[test]
     fn test_if_missing_braces_reports_error() {
-        let mut p = assert_parse_with_errors(
-            r#"
-        if true
-            do_thing();
-        "#,
-            &[E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES],
+        assert_parse_tree!(r#"
+            if true
+                do_thing();
+            "#,
+            Conditional [
+                If("if")
+                Condition [ Bool("true") ]
+                CodeBlock [
+                    Error(E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES)
+                    FuncCall [
+                        Ident("do_thing")
+                        Args [ LeftParen("(") RightParen(")") ]
+                    ]
+                ]
+            ]
         );
-
-        p.assert_next_children(SyntaxKind::Conditional, |p| {
-            p.assert_next(SyntaxKind::If, "if");
-            p.assert_next_children(SyntaxKind::Condition, |_| {});
-            p.assert_next_children(SyntaxKind::CodeBlock, |p| {
-                p.assert_next_error(E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES);
-            });
-            p.assert_end();
-        });
-        p.assert_end();
     }
 
     #[test]
     fn test_if_else_if_else_chain() {
-        let mut p = assert_parse(
-            r#"
-        if cond1 {
-            do_one();
-        } else if cond2 {
-            do_two();
-        } else {
-            do_fallback();
-        };
-        "#,
+        assert_parse_tree!(r#"
+            if cond1 {
+                do_one();
+            } else if cond2 {
+                do_two();
+            } else {
+                do_fallback();
+            }
+            "#,
+            Conditional [
+                If("if")
+                Condition [ Ident("cond1") ] 
+                CodeBlock [...]
+                ConditionalAlternate [
+                    Else("else")
+                    If("if")
+                    Condition [ Ident("cond2") ] 
+                    CodeBlock [...]
+                ]
+                ConditionalElse [
+                    Else("else") 
+                    CodeBlock [...]
+                ]
+            ]
         );
-
-        p.assert_next_children(SyntaxKind::Conditional, |p| {
-            p.assert_next(SyntaxKind::If, "if");
-            p.assert_next_children(SyntaxKind::Condition, |p| {
-                p.assert_next(SyntaxKind::Ident, "cond1");
-                p.assert_end();
-            });
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-            p.assert_next_children(SyntaxKind::ConditionalAlternate, |p| {
-                p.assert_next(SyntaxKind::Else, "else");
-                p.assert_next(SyntaxKind::If, "if");
-                p.assert_next_children(SyntaxKind::Condition, |p| {
-                    p.assert_next(SyntaxKind::Ident, "cond2");
-                    p.assert_end();
-                });
-                p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-                p.assert_end();
-            });
-            p.assert_next_children(SyntaxKind::ConditionalElse, |p| {
-                p.assert_next(SyntaxKind::Else, "else");
-                p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-                p.assert_end();
-            });
-            p.assert_end();
-        });
-        p.assert_end();
     }
 
     #[test]
     fn test_for_with_wrapped_pattern_warns() {
-        let mut p = assert_parse_with_warnings(
-            r#"
-        for (x in items) {
-            do_thing();
-        };
-        "#,
-            &[W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION],
+        assert_parse_tree!(r#"
+            for (x in items) {
+                do_thing(x);
+            };
+            "#,
+            ForLoop [
+                For("for")
+                LeftParen("(")
+                Ident("x")
+                In("in")
+                Ident("items")
+                RightParen(")")
+                Warn(W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION)
+                CodeBlock [...]
+            ]
         );
-
-        p.assert_next_children(SyntaxKind::ForLoop, |p| {
-            p.assert_next(SyntaxKind::For, "for");
-            p.assert_next(SyntaxKind::LeftParen, "(");
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_next(SyntaxKind::In, "in");
-            p.assert_next(SyntaxKind::Ident, "items");
-            p.assert_next(SyntaxKind::RightParen, ")");
-            p.assert_next_warning(W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION);
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-            p.assert_end();
-        });
-        p.assert_end();
     }
 }

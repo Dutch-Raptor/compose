@@ -427,52 +427,27 @@ mod tests {
 
     #[test]
     fn test_parse_closure_with_capture_list() {
-        let input = r#"
-            |a, ref b, mut c, ref mut d| (e) => {}
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::Closure, |p| {
-            p.assert_next_children(SyntaxKind::CaptureList, |p| {
-                p.assert_next(SyntaxKind::Pipe, "|");
-                p.assert_next_children(SyntaxKind::Capture, |p| {
-                    p.assert_next(SyntaxKind::Ident, "a");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next_children(SyntaxKind::Capture, |p| {
-                    p.assert_next(SyntaxKind::Ref, "ref");
-                    p.assert_next(SyntaxKind::Ident, "b");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next_children(SyntaxKind::Capture, |p| {
-                    p.assert_next(SyntaxKind::Mut, "mut");
-                    p.assert_next(SyntaxKind::Ident, "c");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::Comma, ",");
-                p.assert_next_children(SyntaxKind::Capture, |p| {
-                    p.assert_next(SyntaxKind::Ref, "ref");
-                    p.assert_next(SyntaxKind::Mut, "mut");
-                    p.assert_next(SyntaxKind::Ident, "d");
-                    p.assert_end();
-                });
-                p.assert_next(SyntaxKind::Pipe, "|");
-                p.assert_end();
-            });
-            p.assert_next_children(SyntaxKind::Params, |p| {
-                p.assert_next(SyntaxKind::LeftParen, "(");
-                p.assert_next_children(SyntaxKind::Param, |p| {
-                    p.assert_next(SyntaxKind::Ident, "e");
-                    p.assert_end();
-                });
-            });
-            p.assert_next(SyntaxKind::Arrow, "=>");
-            p.assert_next_children(SyntaxKind::CodeBlock, |_| {});
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!("|a, ref b, mut c, ref mut d| (e) => {}",
+            Closure [
+                CaptureList [
+                    Pipe("|")
+                    Capture [ Ident("a") ]
+                    Comma(",")
+                    Capture [ Ref("ref") Ident("b") ]
+                    Comma(",")
+                    Capture [ Mut("mut") Ident("c") ]
+                    Comma(",")
+                    Capture [ Ref("ref") Mut("mut") Ident("d") ]
+                    Pipe("|")
+                ]
+                Params [
+                    LeftParen("(") 
+                    Param [ Ident("e") ]
+                    RightParen(")")
+                ]
+                Arrow("=>")
+                CodeBlock [ ... ]
+            ]
+        );
     }
 }
