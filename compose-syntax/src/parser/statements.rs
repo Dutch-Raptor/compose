@@ -1,10 +1,10 @@
 use crate::kind::SyntaxKind;
-use crate::parser::expressions::{code_expr_prec, code_expression};
 use crate::parser::Parser;
-use crate::parser::{patterns, ExprContext};
+use crate::parser::expressions::{code_expr_prec, code_expression};
+use crate::parser::{ExprContext, patterns};
 use crate::precedence::Precedence;
 use crate::set;
-use crate::set::{syntax_set, SyntaxSet, ASSIGN_OP};
+use crate::set::{ASSIGN_OP, SyntaxSet, syntax_set};
 use compose_error_codes::{
     E0003_EXPECTED_BINDING_AFTER_LET, E0006_UNTERMINATED_STATEMENT,
     E0007_MISSING_EQUALS_AFTER_LET_BINDING,
@@ -115,107 +115,73 @@ mod tests {
 
     #[test]
     fn test_parse_let_binding() {
-        let input = r#"
-            let x = 1;
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::LetBinding, |p| {
-            p.assert_next(SyntaxKind::Let, "let");
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_next(SyntaxKind::Eq, "=");
-            p.assert_next(SyntaxKind::Int, "1");
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!("let x = 1;",
+            LetBinding [
+                Let("let")
+                Ident("x")
+                Eq("=")
+                Int("1")
+            ]
+        );
     }
 
     #[test]
     fn test_parse_let_mut_binding() {
-        let input = r#"
-            let mut x = 1;
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::LetBinding, |p| {
-            p.assert_next(SyntaxKind::Let, "let");
-            p.assert_next(SyntaxKind::Mut, "mut");
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_next(SyntaxKind::Eq, "=");
-            p.assert_next(SyntaxKind::Int, "1");
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!("let mut x = 1;",
+            LetBinding [
+                Let("let")
+                Mut("mut")
+                Ident("x")
+                Eq("=")
+                Int("1")
+            ]
+        );
     }
 
     #[test]
     fn test_parse_let_binding_uninitialized() {
-        let input = r#"
-            let x;
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::LetBinding, |p| {
-            p.assert_next(SyntaxKind::Let, "let");
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!("let x;",
+            LetBinding [
+                Let("let")
+                Ident("x")
+            ]
+        );
     }
 
     #[test]
     fn test_parse_let_binding_missing_eq() {
-        let input = r#"
-            let x 1;
-        "#;
-
-        let mut p = assert_parse_with_errors(input, &[E0007_MISSING_EQUALS_AFTER_LET_BINDING]);
-        p.assert_next_children(SyntaxKind::LetBinding, |p| {
-            p.assert_next(SyntaxKind::Let, "let");
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_next_error(E0007_MISSING_EQUALS_AFTER_LET_BINDING);
-            p.assert_next(SyntaxKind::Int, "1");
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!("let x 1;",
+            LetBinding [
+                Let("let")
+                Ident("x")
+                Error(E0007_MISSING_EQUALS_AFTER_LET_BINDING)
+                Int("1")
+            ]
+        );
     }
 
     #[test]
     fn test_parse_let_mut_binding_missing_eq() {
-        let input = r#"
-            let mut x 1;
-        "#;
-
-        let mut p = assert_parse_with_errors(input, &[E0007_MISSING_EQUALS_AFTER_LET_BINDING]);
-        p.assert_next_children(SyntaxKind::LetBinding, |p| {
-            p.assert_next(SyntaxKind::Let, "let");
-            p.assert_next(SyntaxKind::Mut, "mut");
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_next_error(E0007_MISSING_EQUALS_AFTER_LET_BINDING);
-            p.assert_next(SyntaxKind::Int, "1");
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!("let mut x 1;",
+            LetBinding [
+                Let("let")
+                Mut("mut")
+                Ident("x")
+                Error(E0007_MISSING_EQUALS_AFTER_LET_BINDING)
+                Int("1")
+            ]
+        );
     }
 
     #[test]
     fn test_parse_assignment() {
-        let input = r#"
-            x = 1;
-        "#;
-
-        let mut p = assert_parse(input);
-
-        p.assert_next_children(SyntaxKind::Assignment, |p| {
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_next(SyntaxKind::Eq, "=");
-            p.assert_next(SyntaxKind::Int, "1");
-            p.assert_end();
-        });
-        p.assert_end();
+        assert_parse_tree!("x = 1;",
+            Assignment [
+                Ident("x")
+                Eq("=")
+                Int("1")
+            ]
+        );
     }
 
     #[test]
@@ -234,74 +200,58 @@ mod tests {
         ];
 
         for input in inputs {
-            let mut p = assert_parse(input);
-
-            p.assert_next_children(SyntaxKind::LetBinding, |p| {
-                p.assert_next(SyntaxKind::Let, "let");
-                p.assert_next(SyntaxKind::Ident, "x");
-                p.assert_next(SyntaxKind::Eq, "=");
-                p.assert_next(SyntaxKind::Int, "1");
-                p.assert_end();
-            });
-            p.assert_next_children(SyntaxKind::Assignment, |p| {
-                p.assert_next(SyntaxKind::Ident, "x");
-                p.assert_next(SyntaxKind::PlusEq, "+=");
-                p.assert_next_children(SyntaxKind::Binary, |p| {
-                    p.assert_next(SyntaxKind::Ident, "x");
-                    p.assert_next(SyntaxKind::Star, "*");
-                    p.assert_next(SyntaxKind::Int, "2");
-                    p.assert_end();
-                });
-                p.assert_end();
-            });
-            p.assert_next_children(SyntaxKind::LetBinding, |p| {
-                p.assert_next(SyntaxKind::Let, "let");
-                p.assert_next(SyntaxKind::Ident, "y");
-                p.assert_next(SyntaxKind::Eq, "=");
-                p.assert_next(SyntaxKind::Ident, "x");
-                p.assert_end();
-            });
-            p.assert_end();
+            assert_parse_tree!(input,
+                LetBinding [
+                    Let("let")
+                    Ident("x")
+                    Eq("=")
+                    Int("1")
+                ]
+                Assignment [
+                    Ident("x")
+                    PlusEq("+=")
+                    Binary [
+                        Ident("x")
+                        Star("*")
+                        Int("2")
+                    ]
+                ]
+                LetBinding [
+                    Let("let")
+                    Ident("y")
+                    Eq("=")
+                    Ident("x")
+                ]
+            );
         }
     }
 
+    #[test]
     fn test_parse_statements_unterminated() {
-        let input = r#"
-            let x = 1 x += x * 2 let y = x
-        "#;
-
-        let mut p = assert_parse_with_errors(
-            input,
-            &[E0006_UNTERMINATED_STATEMENT, E0006_UNTERMINATED_STATEMENT],
+        assert_parse_tree!("let x = 1 x += x * 2 let y = x",
+            LetBinding [
+                Let("let")
+                Ident("x")
+                Eq("=")
+                Int("1")
+            ]
+            Error(E0006_UNTERMINATED_STATEMENT)
+            Assignment [
+                Ident("x")
+                PlusEq("+=")
+                Binary [
+                    Ident("x")
+                    Star("*")
+                    Int("2")
+                ]
+            ]
+            Error(E0006_UNTERMINATED_STATEMENT)
+            LetBinding [
+                Let("let")
+                Ident("y")
+                Eq("=")
+                Ident("x")
+            ]
         );
-
-        p.assert_next_children(SyntaxKind::LetBinding, |p| {
-            p.assert_next(SyntaxKind::Let, "let");
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_next(SyntaxKind::Eq, "=");
-            p.assert_next(SyntaxKind::Int, "1");
-            p.assert_end();
-        });
-        p.assert_next_error(E0006_UNTERMINATED_STATEMENT);
-        p.assert_next_children(SyntaxKind::Assignment, |p| {
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_next(SyntaxKind::PlusEq, "+=");
-            p.assert_next_children(SyntaxKind::Binary, |p| {
-                p.assert_next(SyntaxKind::Ident, "x");
-                p.assert_next(SyntaxKind::Star, "*");
-                p.assert_next(SyntaxKind::Int, "2");
-                p.assert_end();
-            });
-            p.assert_end();
-        });
-        p.assert_next_error(E0006_UNTERMINATED_STATEMENT);
-        p.assert_next_children(SyntaxKind::LetBinding, |p| {
-            p.assert_next(SyntaxKind::Let, "let");
-            p.assert_next(SyntaxKind::Ident, "y");
-            p.assert_next(SyntaxKind::Eq, "=");
-            p.assert_next(SyntaxKind::Ident, "x");
-            p.assert_end();
-        });
-        p.assert_end();
     }
 }
