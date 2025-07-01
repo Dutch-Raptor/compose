@@ -5,13 +5,13 @@ use compose_library::vm::Vm;
 use compose_library::Func;
 use compose_macros::{func, scope, ty};
 use compose_syntax::Span;
-use dyn_clone::DynClone;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
 mod array_iter;
 mod iter_combinators;
 mod string_iter;
+mod range_iter;
 
 use crate::diag::{SourceDiagnostic, StrResult, UnSpanned};
 pub use iter_combinators::*;
@@ -195,6 +195,6 @@ impl IterValue {
     }
 }
 
-pub trait ValueIterator: DynClone + Debug + Send + Sync {
+pub trait ValueIterator: Debug + Send + Sync {
     fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>>;
 }
