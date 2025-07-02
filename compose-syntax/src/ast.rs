@@ -32,6 +32,7 @@ pub use parenthesized::*;
 pub use statement::*;
 pub use assignment::*;
 pub use control_flow::*;
+pub use range::*;
 
 pub trait AstNode<'a>: Sized {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self>;

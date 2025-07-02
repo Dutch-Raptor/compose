@@ -1,8 +1,8 @@
 use crate::{HeapRef, Trace};
 use crate::{UntypedRef, Value};
-use compose_library::diag::{error, SourceResult};
-use compose_library::vm::Vm;
 use compose_library::Func;
+use compose_library::diag::{SourceResult, error};
+use compose_library::vm::Vm;
 use compose_macros::{func, scope, ty};
 use compose_syntax::Span;
 use std::fmt::Debug;
@@ -10,13 +10,14 @@ use std::sync::{Arc, Mutex};
 
 mod array_iter;
 mod iter_combinators;
-mod string_iter;
 mod range_iter;
+mod string_iter;
 
 use crate::diag::{SourceDiagnostic, StrResult, UnSpanned};
+pub use array_iter::*;
+use compose_library::foundations::iterator::range_iter::RangeIter;
 pub use iter_combinators::*;
 pub use string_iter::*;
-pub use array_iter::*;
 
 #[ty(scope, cast, name = "Iterator")]
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -62,6 +63,13 @@ impl IterValue {
                 )),
                 vm,
             )),
+            Value::Range(range) => Ok(IterValue::new(
+                Iter::Range(
+                    RangeIter::new(range.inner().clone())
+                        .map_err(|e| SourceDiagnostic::error(Span::detached(), e))?,
+                ),
+                vm,
+            )),
             other @ (Value::Int(_)
             | Value::Func(_)
             | Value::Type(_)
@@ -98,6 +106,7 @@ pub enum Iter {
     TakeWhile(TakeWhileIter),
     Map(MapIter),
     Skip(SkipIter),
+    Range(RangeIter),
 }
 
 impl Trace for Iter {
@@ -109,6 +118,7 @@ impl Trace for Iter {
             Iter::Skip(iter) => iter.visit_refs(f),
             Iter::Map(iter) => iter.visit_refs(f),
             Iter::Array(arr) => arr.visit_refs(f),
+            Iter::Range(_) => {}
         }
     }
 }
@@ -122,6 +132,7 @@ impl Iter {
             Iter::Map(m) => m.next(vm),
             Iter::Skip(s) => s.next(vm),
             Iter::Array(a) => a.next(vm),
+            Iter::Range(r) => r.next(vm),
         }
     }
 }

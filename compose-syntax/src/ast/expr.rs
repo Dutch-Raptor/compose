@@ -4,6 +4,7 @@ use crate::ast::unary::Unary;
 use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, Int, Parenthesized, WhileLoop};
 use crate::ast::{Bool, Closure, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
 use crate::ast::control_flow::Conditional;
+use crate::ast::range::Range;
 use crate::kind::SyntaxKind;
 
 /// An expression. The base of Compose. Any "statement" is an expression.
@@ -36,6 +37,7 @@ pub enum Expr<'a> {
     WhileLoop(WhileLoop<'a>),
     ForLoop(ForLoop<'a>),
     Array(Array<'a>),
+    Range(Range<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -59,6 +61,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::WhileLoop => Some(Self::WhileLoop(WhileLoop::from_untyped(node)?)),       
             SyntaxKind::ForLoop => Some(Self::ForLoop(ForLoop::from_untyped(node)?)),       
             SyntaxKind::Array => Some(Self::Array(Array::from_untyped(node)?)),       
+            SyntaxKind::Range => Some(Self::Range(Range::from_untyped(node)?)),       
             _ => None,
         }
     }
@@ -83,6 +86,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::WhileLoop(while_loop) => while_loop.to_untyped(),       
             Self::ForLoop(for_loop) => for_loop.to_untyped(),       
             Self::Array(array) => array.to_untyped(),       
+            Self::Range(range) => range.to_untyped(),       
         }
     }
 }
