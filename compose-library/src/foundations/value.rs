@@ -185,7 +185,7 @@ impl Repr for Value {
             Value::Iterator(v) => eco_format!("iterator({v:?})"),
             Value::Box(v) => eco_format!("{v}"),
             Value::Array(v) => v.repr(vm),
-            Value::Range(r) => eco_format!("{r:?}"),       
+            Value::Range(r) => r.repr(vm),
         }
     }
 }

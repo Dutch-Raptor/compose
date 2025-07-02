@@ -64,6 +64,14 @@ impl Evaluated {
     pub fn make_mutable(self) -> Self {
         Self { mutable: true, ..self }
     }
+
+    pub fn value(&self) -> &Value {
+        &self.value
+    }
+
+    pub fn into_value(self) -> Value {
+        self.value
+    }
 }
 
 impl Tracked for Evaluated {

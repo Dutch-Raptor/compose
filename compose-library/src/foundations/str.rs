@@ -1,4 +1,5 @@
 use crate::Iter;
+use compose_library::diag::bail;
 use compose_library::repr::Repr;
 use compose_library::vm::Vm;
 use compose_library::{IterValue, StringIterator, Value};
@@ -96,4 +97,12 @@ cast! {
 cast! {
     char,
     self => Value::Str(EcoString::from(self).into()),
+    v: Str => {
+        let mut chars = v.0.chars();
+        match (chars.next(), chars.next()) {
+            (Some(_), Some(_)) => bail!("cannot convert a string with more than one character to char: {}", v.0),
+            (Some(c), None) => c,
+            (None, _) => bail!("cannot convert empty string to char"),
+        }
+    }
 }

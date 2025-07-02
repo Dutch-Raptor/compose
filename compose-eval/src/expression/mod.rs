@@ -16,6 +16,7 @@ mod parenthesized;
 mod path_access;
 mod unary;
 mod array;
+mod range;
 
 pub use closure::eval_closure;
 
@@ -41,6 +42,7 @@ impl Eval for Expr<'_> {
             Expr::WhileLoop(w) => w.eval(vm),
             Expr::ForLoop(f) => f.eval(vm),
             Expr::Array(a) => a.eval(vm),
+            Expr::Range(r) => r.eval(vm),
         }?
         .spanned(span)
         .track_tmp_root(vm);
