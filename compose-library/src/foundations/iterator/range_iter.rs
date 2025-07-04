@@ -12,18 +12,20 @@ enum RangeIterType {
 }
 
 impl RangeIterType {
-    fn advance(&mut self) -> Option<RangeIterType> {
+    fn nth(&mut self, n: usize) -> Option<RangeIterType> {
+        let cur_offset = n;
+        let next_offset = cur_offset + 1;
         match self {
             RangeIterType::Int(i) => {
-                let return_value = *i;
-                *i += 1;
+                let return_value = *i + cur_offset as i64;
+                *i += next_offset as i64;
                 Some(RangeIterType::Int(return_value))
             }
             RangeIterType::Char(c) => {
-                if char::from_u32(*c).is_none() {
+                if char::from_u32(*c + cur_offset as u32).is_none() {
                     return None;
                 };
-                *c += 1;
+                *c += next_offset as u32;
                 Some(RangeIterType::Char(*c))
             }
         }
@@ -70,7 +72,7 @@ impl PartialEq for RangeIter {
 }
 
 impl RangeIter {
-    pub fn new(range: Range) -> StrResult<Self> {
+    pub fn new(range: &Range) -> StrResult<Self> {
         let (cur, max, inclusive) = match range {
             Range::Int(r) => {
                 (r.start.map(RangeIterType::Int), r.end.map(RangeIterType::Int), r.include_end)
@@ -92,19 +94,14 @@ impl RangeIter {
     }
 }
 
-impl Value {
-    fn next(&self) -> StrResult<Value> {
-        Ok(match self {
-            Value::Int(v) => Value::Int(v + 1),
-            _ => bail!("Cannot increment value of type {}", self.ty().name()),
-        })
-    }
-}
-
 impl ValueIterator for RangeIter {
-    fn next(&self, _: &mut dyn Vm<'_>) -> SourceResult<Option<Value>> {
+    fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
+        self.nth(vm, 0)
+    }
+
+    fn nth(&self, _: &mut dyn Vm<'_>, n: usize) -> SourceResult<Option<Value>> {
         let mut current = self.current.lock().unwrap();
-        let Some(next) = current.advance() else {
+        let Some(next) = current.nth(n) else {
             return Ok(None);
         };
 

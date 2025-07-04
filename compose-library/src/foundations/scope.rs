@@ -9,6 +9,7 @@ use ecow::{eco_format, eco_vec, EcoString};
 use indexmap::map::Entry;
 use indexmap::IndexMap;
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::iter;
 use std::sync::LazyLock;
@@ -21,13 +22,22 @@ pub trait NativeScope {
 
 pub static EMPTY_SCOPE: LazyLock<Scope> = LazyLock::new(Scope::new);
 
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct Scopes<'a> {
     /// The current scope.
     pub top: Scope,
     /// The rest of the scopes.
     pub stack: Vec<Scope>,
     pub lib: Option<&'a Library>,
+}
+
+impl Debug for Scopes<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Scopes")
+            .field("top", &self.top)
+            .field("stack", &self.stack)
+            .finish()
+    }   
 }
 
 impl<'a> Scopes<'a> {

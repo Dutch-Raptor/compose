@@ -145,6 +145,7 @@ impl<'a> Machine<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct VmRoots<'a> {
     pub frames: &'a StackFrames<'a>,
     pub flow: &'a Option<FlowEvent>,
@@ -162,6 +163,16 @@ impl Trace for VmRoots<'_> {
 impl<'a> Machine<'a> {
     pub fn track_tmp_root(&mut self, value: &impl Trace) {
         self.frames.top.track(value);
+    }
+
+    // TODO: remove
+    pub fn debug_tracked(&self, from: &str) {
+        let mut tracked = Vec::new();
+        self
+            .frames
+            .visit_refs(&mut |k| tracked.push((k, self.heap.get_untyped(k))));
+        
+        dbg!(from, &tracked);
     }
 
     pub fn temp_root_marker(&mut self) -> TrackMarker {

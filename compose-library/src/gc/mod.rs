@@ -90,7 +90,7 @@ impl Heap {
         Self {
             map: SlotMap::with_key(),
             policy: Box::new(SimplePolicy {
-                heap_size_threshold: 50,
+                heap_size_threshold: 500,
             })
         }
     }
@@ -115,10 +115,14 @@ impl Heap {
     pub fn remove<T: HeapObject>(&mut self, key: HeapRef<T>) -> Option<HeapItem> {
         self.map.remove(*key)
     }
+    
+    pub fn get_untyped(&self, key: UntypedRef) -> Option<&HeapItem> {
+        self.map.get(key)
+    }
 }
 
 /// A type that can keep references to heap values
-pub trait Trace {
+pub trait Trace: Debug {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef));
 }
 

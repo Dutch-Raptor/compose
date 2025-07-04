@@ -6,6 +6,7 @@ use compose_library::UntypedRef;
 use compose_syntax::Span;
 use ecow::{eco_vec, EcoVec};
 
+#[derive(Debug, Clone)]
 pub struct Args {
     pub span: Span,
     pub items: EcoVec<Arg>,
