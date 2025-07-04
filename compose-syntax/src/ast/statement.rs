@@ -2,6 +2,7 @@ use crate::ast::{Assignment, AstNode, Expr, LetBinding};
 use crate::kind::SyntaxKind;
 use crate::SyntaxNode;
 
+#[derive(Debug, Clone, Copy)]
 pub enum Statement<'a> {
     Expr(Expr<'a>),
     Let(LetBinding<'a>),

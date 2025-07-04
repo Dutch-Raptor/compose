@@ -1,11 +1,21 @@
+use std::fmt::{Debug, Formatter};
 use crate::Machine;
 use compose_library::{Binding, Library, Scopes, Trace, UntypedRef, VariableAccessError};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct StackFrames<'a> {
     pub(crate) top: StackFrame<'a>,
     frames: Vec<StackFrame<'a>>,
     library: Option<&'a Library>,
+}
+
+impl Debug for StackFrames<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StackFrames")
+            .field("top", &self.top)
+            .field("frames", &self.frames)
+            .finish()
+    }
 }
 
 impl<'a> StackFrames<'a> {
@@ -68,7 +78,9 @@ pub struct TrackMarker(usize);
 
 impl<'a> StackFrame<'a> {
     pub fn track(&mut self, value: &impl Trace) {
-        value.visit_refs(&mut |key| self.tracked.push(key));
+        value.visit_refs(&mut |key| {
+            self.tracked.push(key)
+        });
     }
 
     pub fn marker(&self) -> TrackMarker {

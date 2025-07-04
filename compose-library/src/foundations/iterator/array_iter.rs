@@ -38,16 +38,22 @@ impl ArrayIter {
 }
 
 impl ValueIterator for ArrayIter {
-    fn next(&self, _: &mut dyn Vm) -> SourceResult<Option<Value>> {
+    fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
+        self.nth(vm, 0)
+    }
+
+    fn nth(&self, _: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
         let mut idx = self.index.lock().expect("Poisoned");
 
-        if *idx >= self.arr.len() {
+        let new_idx = *idx + n;
+
+        if new_idx >= self.arr.len() {
             return Ok(None);
         }
-        
-        let item = &self.arr[*idx];
 
-        *idx += 1;
+        let item = &self.arr[new_idx];
+
+        *idx = new_idx + 1; // +1 to set index at next item
 
         Ok(Some(item.clone()))
     }

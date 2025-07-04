@@ -10,6 +10,7 @@ impl Eval for ast::Statement<'_> {
             ast::Statement::Let(l) => l.eval(guard.vm),
             ast::Statement::Assign(a) => a.eval(guard.vm),
         };
+
         guard.vm.maybe_gc();
         result
     }

@@ -1,5 +1,5 @@
 use crate::expression::bindings::destructure_pattern;
-use crate::vm::FlowEvent;
+use crate::vm::{FlowEvent, Tracked};
 use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::{At, SourceResult};
 use compose_library::{BindingKind, IterValue, Value, ValueIterator};
@@ -39,19 +39,25 @@ impl Eval for ast::WhileLoop<'_> {
 impl Eval for ast::ForLoop<'_> {
     //noinspection RsUnnecessaryQualifications - False positive
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
+        let root_guard = vm.temp_root_guard();
         let mut output = Value::unit();
         let pattern = self.binding();
         let iterable_expr = self.iterable();
         let iterator = {
-            let value = iterable_expr.eval(vm)?;
-            IterValue::try_from_value(value.value, value.mutable, vm).at(iterable_expr.span())?
+            let value = iterable_expr
+                .eval(root_guard.vm)?
+                .track_tmp_root(root_guard.vm);
+            IterValue::try_from_value(value.value, value.mutable, root_guard.vm)
+                .at(iterable_expr.span())?
+                .track_tmp_root(root_guard.vm)
         };
+
         let body = self.body();
 
-        let flow = vm.flow.take();
+        let flow = root_guard.vm.flow.take();
 
-        while let Some(v) = iterator.next(vm)? {
-            vm.in_scope(|vm| {
+        while let Some(v) = iterator.next(root_guard.vm)? {
+            root_guard.vm.in_scope(|vm| {
                 destructure_pattern(
                     vm,
                     pattern,
@@ -63,20 +69,20 @@ impl Eval for ast::ForLoop<'_> {
 
                 SourceResult::Ok(())
             })?;
-            
-            match vm.flow {
+
+            match root_guard.vm.flow {
                 None => {}
                 Some(FlowEvent::Break(_)) => {
-                    vm.flow = None;
+                    root_guard.vm.flow = None;
                     break;
                 }
-                Some(FlowEvent::Continue(_)) => vm.flow = None,
+                Some(FlowEvent::Continue(_)) => root_guard.vm.flow = None,
                 Some(FlowEvent::Return(..)) => break,
             }
         }
 
         if let Some(flow) = flow {
-            vm.flow = Some(flow);
+            root_guard.vm.flow = Some(flow);
         }
 
         Ok(Evaluated::mutable(output))

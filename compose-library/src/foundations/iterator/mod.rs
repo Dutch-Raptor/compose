@@ -1,4 +1,4 @@
-use crate::{HeapRef, Trace};
+use crate::{ArrayValue, HeapRef, Trace};
 use crate::{UntypedRef, Value};
 use compose_library::Func;
 use compose_library::diag::{SourceResult, error};
@@ -15,8 +15,8 @@ mod string_iter;
 
 use crate::diag::{SourceDiagnostic, StrResult, UnSpanned};
 pub use array_iter::*;
-use compose_library::foundations::iterator::range_iter::RangeIter;
 pub use iter_combinators::*;
+pub use range_iter::*;
 pub use string_iter::*;
 
 #[ty(scope, cast, name = "Iterator")]
@@ -65,7 +65,7 @@ impl IterValue {
             )),
             Value::Range(range) => Ok(IterValue::new(
                 Iter::Range(
-                    RangeIter::new(range.inner().clone())
+                    RangeIter::new(range.inner())
                         .map_err(|e| SourceDiagnostic::error(Span::detached(), e))?,
                 ),
                 vm,
@@ -107,6 +107,7 @@ pub enum Iter {
     Map(MapIter),
     Skip(SkipIter),
     Range(RangeIter),
+    StepBy(StepByIter),
 }
 
 impl Trace for Iter {
@@ -119,6 +120,7 @@ impl Trace for Iter {
             Iter::Map(iter) => iter.visit_refs(f),
             Iter::Array(arr) => arr.visit_refs(f),
             Iter::Range(_) => {}
+            Iter::StepBy(iter) => iter.visit_refs(f),
         }
     }
 }
@@ -133,18 +135,43 @@ impl Iter {
             Iter::Skip(s) => s.next(vm),
             Iter::Array(a) => a.next(vm),
             Iter::Range(r) => r.next(vm),
+            Iter::StepBy(s) => s.next(vm),
+        }
+    }
+
+    pub fn nth(&self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
+        match self {
+            Iter::String(s) => ValueIterator::nth(s, vm, n),
+            Iter::Take(t) => t.nth(vm, n),
+            Iter::TakeWhile(t) => t.nth(vm, n),
+            Iter::Map(m) => m.nth(vm, n),
+            Iter::Skip(s) => s.nth(vm, n),
+            Iter::Array(a) => a.nth(vm, n),
+            Iter::Range(r) => r.nth(vm, n),
+            Iter::StepBy(s) => s.nth(vm, n),
         }
     }
 }
 
 impl ValueIterator for IterValue {
     fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
+        let iter = self.iter.get(vm.heap()).cloned().unwrap_or_else(|| {
+            panic!(
+                "expected to point to an iter value: {:#?}, {:?}",
+                vm.heap(),
+                self.iter.key()
+            )
+        });
+        iter.next(vm)
+    }
+
+    fn nth(&self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
         let iter = self
             .iter
             .get(vm.heap())
             .cloned()
             .expect("expected to point to an iter value");
-        iter.next(vm)
+        iter.nth(vm, n)
     }
 }
 
@@ -161,15 +188,20 @@ impl IterValue {
         iter.next(vm)
     }
 
+    #[func(name = "nth")]
+    fn nth_(&self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
+        let iter = self
+            .iter
+            .get(vm.heap())
+            .cloned()
+            .expect("expected to point to an iter value");
+
+        iter.nth(vm, n)
+    }
+
     #[func]
     fn take(self, vm: &mut dyn Vm, n: usize) -> Self {
-        IterValue::new(
-            Iter::Take(TakeIter {
-                inner: self,
-                take: Arc::new(Mutex::new(n)),
-            }),
-            vm,
-        )
+        IterValue::new(Iter::Take(TakeIter::new(self, n)), vm)
     }
 
     #[func]
@@ -204,8 +236,42 @@ impl IterValue {
             vm,
         )
     }
+
+    #[func]
+    fn step_by(self, vm: &mut dyn Vm, step: usize) -> StrResult<Self> {
+        Ok(IterValue::new(
+            Iter::StepBy(StepByIter::new(self, step)?),
+            vm,
+        ))
+    }
+
+    #[func]
+    fn to_array(self, vm: &mut dyn Vm) -> SourceResult<ArrayValue> {
+        let mut values = Vec::new();
+        while let Some(v) = self.next(vm)? {
+            values.push(v);
+        }
+
+        Ok(ArrayValue::from(vm.heap_mut(), values))
+    }
 }
 
 pub trait ValueIterator: Debug + Send + Sync {
     fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>>;
+
+    fn nth(&self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
+        if n == 0 {
+            return self.next(vm);
+        }
+
+        let iter = self;
+        for _ in 0..n {
+            match iter.next(vm)? {
+                Some(_) => {}
+                None => return Ok(None),
+            }
+        }
+
+        iter.next(vm)
+    }
 }

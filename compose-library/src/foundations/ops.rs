@@ -16,6 +16,13 @@ pub fn add(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     }
 }
 
+pub fn mod_(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    match (lhs, rhs) {
+        (Value::Int(left), Value::Int(right)) => Ok(Value::Int(left % right)),
+        (left, right) => type_error!("cannot mod {} by {}", left, right),
+    }
+}
+
 pub fn logical_and(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     match (lhs, rhs) {
         (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(*left && *right)),

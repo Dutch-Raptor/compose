@@ -1,7 +1,7 @@
 use crate::repr::Repr;
-use crate::{FromValue, Trace};
+use crate::{FromValue, Iter, Trace};
 use compose_library::diag::{StrResult, bail};
-use compose_library::{IntoValue, UntypedRef, Value, Vm};
+use compose_library::{IntoValue, IterValue, RangeIter, UntypedRef, Value, Vm};
 use compose_macros::{func, scope, ty};
 use ecow::{EcoString, eco_format};
 use std::sync::Arc;
@@ -61,7 +61,6 @@ impl Range {
 
         bail!("Cannot create range from types other than int")
     }
-    
 }
 
 impl Repr for RangeValue {
@@ -122,7 +121,7 @@ impl RangeValue {
             Range::Char(r) => r.end.map(|v| v.into_value()),
         }
     }
-    
+
     #[func]
     pub fn inclusive_end(&self) -> bool {
         match &self.0.as_ref() {
@@ -137,6 +136,14 @@ impl RangeValue {
             Range::Int(r) => Ok(in_bounds(value.cast()?, r.start, r.end, r.include_end)),
             Range::Char(r) => Ok(in_bounds(value.cast()?, r.start, r.end, r.include_end)),
         }
+    }
+
+    #[func]
+    pub fn iter(self, vm: &mut dyn Vm) -> StrResult<IterValue> {
+        Ok(IterValue::new(
+            Iter::Range(RangeIter::new(self.inner())?),
+            vm,
+        ))
     }
 }
 
