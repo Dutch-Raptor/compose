@@ -13,7 +13,10 @@ use std::io::{Read, Write};
 use std::sync::Mutex;
 use tap::pipe::Pipe;
 
+#[cfg(test)]
 mod snippets;
+#[cfg(test)]
+mod iterators;
 
 pub struct TestWorld {
     sources: Mutex<HashMap<FileId, Source>>,

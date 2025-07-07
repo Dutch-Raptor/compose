@@ -1,4 +1,3 @@
-#[cfg(test)]
 use {crate::test::assert_eval, compose_library::Value};
 
 #[test]

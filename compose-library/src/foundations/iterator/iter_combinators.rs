@@ -6,6 +6,7 @@ use compose_library::{Args, Func, Trace, UntypedRef, Value, ValueIterator};
 use std::iter;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
+use compose_library::support::eval_predicate;
 
 #[derive(Debug, Clone)]
 pub struct TakeIter {
@@ -150,6 +151,39 @@ impl ValueIterator for TakeWhileIter {
     }
 
     // nth method cannot be optimized here, so we just fall back to the default
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FilterIter {
+    pub(crate) inner: IterValue,
+    pub(crate) predicate: Arc<Func>,
+}
+
+impl Trace for FilterIter {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        self.inner.visit_refs(f);
+        self.predicate.visit_refs(f);
+    }
+}
+
+impl ValueIterator for FilterIter {
+    fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
+        loop {
+            let item = match self.inner.next(vm, ) {
+                Ok(Some(item)) => item,
+                Ok(None) => return Ok(None),
+                Err(err) => return Err(err),
+            };
+
+            if eval_predicate(vm, &self.predicate, item.clone(), "filter")? {
+                return Ok(Some(item));
+            }
+        }
+    }
+
+    // Filter is not nth optimizable because it needs to evaluate predicate for each item it examines
+    // both for potential side effects and for keeping track of which values it would have yielded.
+    // Fall back to the default implementation
 }
 
 #[derive(Debug, Clone, PartialEq)]

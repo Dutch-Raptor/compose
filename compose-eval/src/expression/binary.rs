@@ -17,6 +17,7 @@ impl Eval for ast::Binary<'_> {
             BinOp::Eq => apply_binary(self, vm, ops::eq),
             BinOp::Neq => apply_binary(self, vm, ops::neq),
             BinOp::And => apply_binary(self, vm, ops::logical_and),
+            BinOp::Or => apply_binary(self, vm, ops::logical_or),
             BinOp::Mod => apply_binary(self, vm, ops::mod_),
             other => bail!(
                 self.span(),
