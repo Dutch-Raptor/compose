@@ -123,4 +123,10 @@ impl ArrayValue {
         let iter = Iter::Array(ArrayIter::new(arr));
         Ok(IterValue::new(iter, vm))
     }
+
+    #[func]
+    pub fn contains(&self, vm: &mut dyn Vm, value: Value) -> StrResult<bool> {
+        let arr = self.0.try_get(vm.heap())?;
+        Ok(arr.contains(&value))
+    }
 }

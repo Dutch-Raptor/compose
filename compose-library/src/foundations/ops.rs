@@ -30,6 +30,13 @@ pub fn logical_and(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     }
 }
 
+pub fn logical_or(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    match (lhs, rhs) {
+        (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(*left || *right)),
+        (left, right) => type_error!("cannot `||` {} and {}", left, right),
+    }
+}
+
 pub fn sub(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     match (lhs, rhs) {
         (Value::Int(left), Value::Int(right)) => Ok(Value::Int(left - right)),

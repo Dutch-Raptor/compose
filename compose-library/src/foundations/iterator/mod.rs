@@ -15,6 +15,7 @@ mod string_iter;
 
 use crate::diag::{SourceDiagnostic, StrResult, UnSpanned};
 pub use array_iter::*;
+use compose_library::support::eval_predicate;
 pub use iter_combinators::*;
 pub use range_iter::*;
 pub use string_iter::*;
@@ -108,6 +109,7 @@ pub enum Iter {
     Skip(SkipIter),
     Range(RangeIter),
     StepBy(StepByIter),
+    Filter(FilterIter),
 }
 
 impl Trace for Iter {
@@ -121,6 +123,7 @@ impl Trace for Iter {
             Iter::Array(arr) => arr.visit_refs(f),
             Iter::Range(_) => {}
             Iter::StepBy(iter) => iter.visit_refs(f),
+            Iter::Filter(filter) => filter.visit_refs(f),
         }
     }
 }
@@ -136,6 +139,7 @@ impl Iter {
             Iter::Array(a) => a.next(vm),
             Iter::Range(r) => r.next(vm),
             Iter::StepBy(s) => s.next(vm),
+            Iter::Filter(f) => f.next(vm),
         }
     }
 
@@ -149,6 +153,7 @@ impl Iter {
             Iter::Array(a) => a.nth(vm, n),
             Iter::Range(r) => r.nth(vm, n),
             Iter::StepBy(s) => s.nth(vm, n),
+            Iter::Filter(f) => f.nth(vm, n),
         }
     }
 }
@@ -178,7 +183,7 @@ impl ValueIterator for IterValue {
 #[scope]
 impl IterValue {
     #[func(name = "next")]
-    fn next_(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
+    fn next_(&mut self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
         let iter = self
             .iter
             .get(vm.heap())
@@ -189,7 +194,7 @@ impl IterValue {
     }
 
     #[func(name = "nth")]
-    fn nth_(&self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
+    fn nth_(&mut self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
         let iter = self
             .iter
             .get(vm.heap())
@@ -243,6 +248,62 @@ impl IterValue {
             Iter::StepBy(StepByIter::new(self, step)?),
             vm,
         ))
+    }
+
+    #[func]
+    fn filter(self, vm: &mut dyn Vm, predicate: Func) -> Self {
+        IterValue::new(
+            Iter::Filter(FilterIter {
+                inner: self,
+                predicate: Arc::new(predicate),
+            }),
+            vm,
+        )
+    }
+
+    #[func]
+    fn find(&mut self, vm: &mut dyn Vm, predicate: Func) -> SourceResult<Option<Value>> {
+        while let Some(v) = self.next(vm)? {
+            if eval_predicate(vm, &predicate, v.clone(), "find")? {
+                return Ok(Some(v));
+            }
+        }
+
+        Ok(None)
+    }
+
+    #[func]
+    fn all(&mut self, vm: &mut dyn Vm, predicate: Func) -> SourceResult<bool> {
+        while let Some(v) = self.next(vm)? {
+            if !eval_predicate(vm, &predicate, v.clone(), "all")? {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
+    #[func]
+    fn any(&mut self, vm: &mut dyn Vm, predicate: Func) -> SourceResult<bool> {
+        while let Some(v) = self.next(vm)? {
+            if eval_predicate(vm, &predicate, v.clone(), "any")? {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
+    #[func]
+    fn position(&mut self, vm: &mut dyn Vm, predicate: Func) -> SourceResult<Option<usize>> {
+        let mut i = 0;
+        while let Some(v) = self.next(vm)? {
+            if eval_predicate(vm, &predicate, v.clone(), "position")? {
+                return Ok(Some(i));
+            }
+            i += 1;
+        }
+        Ok(None)
     }
 
     #[func]

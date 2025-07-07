@@ -96,9 +96,8 @@ impl Eval for ast::Closure<'_> {
             closure.resolve()?
         }
 
-        let param_span = self.params().span();
         Ok(Evaluated::mutable(
-            Value::Func(Func::from(closure)).spanned(param_span),
+            Value::Func(Func::from(closure)).spanned(self.span()),
         ))
     }
 }
