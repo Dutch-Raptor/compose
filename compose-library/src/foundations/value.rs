@@ -1,19 +1,19 @@
-use crate::{IntoValue, Vm};
 use crate::diag::{At, SourceResult, Spanned};
 use crate::foundations::boxed::Boxed;
 use crate::{CastInfo, Str, UnitValue};
 use crate::{FromValue, Func};
+use crate::{IntoValue, Vm};
 use crate::{NativeScope, Reflect};
 use crate::{Sink, Type};
-use compose_library::diag::{StrResult, bail, error};
+use compose_library::diag::{bail, error, StrResult};
+use compose_library::foundations::range::RangeValue;
 use compose_library::repr::Repr;
-use compose_library::{ArrayValue, IterValue};
+use compose_library::{ArrayValue, IterValue, MapValue};
 use compose_macros::func;
 use compose_macros::scope;
 use compose_syntax::Span;
-use ecow::{EcoString, eco_format};
+use ecow::{eco_format, EcoString};
 use std::fmt;
-use compose_library::foundations::range::RangeValue;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -27,6 +27,7 @@ pub enum Value {
     Box(Boxed),
     Array(ArrayValue),
     Range(RangeValue),
+    Map(MapValue)
 }
 
 #[scope]
@@ -45,10 +46,11 @@ impl Value {
             Value::Str(v) => Value::Str(v),
             Value::Func(v) => Value::Func(v),
             Value::Type(v) => Value::Type(v),
-            Value::Iterator(v) => Value::Iterator(v.shallow_clone(vm)?),
-            Value::Box(v) => Value::Box(v.shallow_clone(vm)?),
-            Value::Array(v) => Value::Array(v.shallow_clone(vm)?),
+            Value::Iterator(v) => Value::Iterator(v.shallow_clone(vm)),
+            Value::Box(v) => Value::Box(v.shallow_clone(vm)),
+            Value::Array(v) => Value::Array(v.shallow_clone(vm)),
             Value::Range(v) => Value::Range(v),
+            Value::Map(v) => Value::Map(v.shallow_clone(vm)),
         })
     }
 }
@@ -72,6 +74,7 @@ impl Value {
             Value::Box(_) => Type::of::<Boxed>(),
             Value::Array(_) => Type::of::<ArrayValue>(),
             Value::Range(_) => Type::of::<RangeValue>(),
+            Value::Map(_) => Type::of::<MapValue>(),
         }
     }
 
@@ -169,6 +172,7 @@ impl fmt::Display for Value {
             Value::Box(v) => write!(f, "{}", v),
             Value::Array(v) => write!(f, "{:?}", v),
             Value::Range(v) => write!(f, "{:?}", v),
+            Value::Map(v) => write!(f, "{:?}", v),
         }
     }
 }
@@ -186,6 +190,7 @@ impl Repr for Value {
             Value::Box(v) => eco_format!("{v}"),
             Value::Array(v) => v.repr(vm),
             Value::Range(r) => r.repr(vm),
+            Value::Map(m) => m.repr(vm),
         }
     }
 }
@@ -248,3 +253,4 @@ primitive!(IterValue: "iterator", Iterator);
 primitive!(Boxed: "box", Box);
 primitive!(ArrayValue: "array", Array);
 primitive!(RangeValue: "range", Range);
+primitive!(MapValue: "map", Map);

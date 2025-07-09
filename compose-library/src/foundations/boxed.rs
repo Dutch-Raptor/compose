@@ -6,7 +6,6 @@ use compose_library::Value;
 use compose_macros::func;
 use compose_macros::{scope, ty};
 use std::fmt::{Debug, Display, Formatter};
-use compose_library::diag::StrResult;
 
 #[ty(scope, cast, name = "box")]
 #[derive(Clone, Debug, PartialEq)]
@@ -34,10 +33,10 @@ impl Boxed {
     }
     
     #[func]
-    pub fn shallow_clone(&self, vm: &mut dyn Vm) -> StrResult<Self> {
-        let inner = self.0.try_get(vm.heap())?.clone();
+    pub fn shallow_clone(&self, vm: &mut dyn Vm) -> Self {
+        let inner = self.0.get_unwrap(vm.heap()).clone();
         
-        Ok(Self(vm.heap_mut().alloc(inner)))
+        Self(vm.heap_mut().alloc(inner))
     }
 }
 

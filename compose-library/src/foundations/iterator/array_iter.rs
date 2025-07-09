@@ -35,6 +35,16 @@ impl ArrayIter {
             index: Arc::new(Mutex::new(0)),
         }
     }
+    
+}
+
+impl From<EcoVec<Value>> for ArrayIter {
+    fn from(arr: EcoVec<Value>) -> Self {
+        Self {
+            arr,
+            index: Arc::new(Mutex::new(0)),
+        }
+    }
 }
 
 impl ValueIterator for ArrayIter {

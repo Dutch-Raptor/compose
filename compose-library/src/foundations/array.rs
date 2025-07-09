@@ -110,10 +110,10 @@ impl ArrayValue {
     }
 
     #[func]
-    pub fn shallow_clone(&self, vm: &mut dyn Vm) -> StrResult<Self> {
-        let clone = self.0.try_get(vm.heap())?.clone();
+    pub fn shallow_clone(&self, vm: &mut dyn Vm) -> Self {
+        let clone = self.0.get_unwrap(vm.heap()).clone();
 
-        Ok(Self(vm.heap_mut().alloc(clone)))
+        Self(vm.heap_mut().alloc(clone))
     }
 
     #[func]

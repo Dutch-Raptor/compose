@@ -105,6 +105,8 @@ pub enum SyntaxKind {
     WhileLoop,
     Array,
     Range,
+    MapLiteral,
+    MapEntry,
 }
 
 impl SyntaxKind {
@@ -187,6 +189,8 @@ impl SyntaxKind {
             SyntaxKind::Lt => "<",
             SyntaxKind::LtEq => "<=",
             SyntaxKind::LtLt => "<<",
+            SyntaxKind::MapEntry => "map entry",
+            SyntaxKind::MapLiteral => "map literal",
             SyntaxKind::Minus => "-",
             SyntaxKind::MinusEq => "-=",
             SyntaxKind::Mut => "mut",
