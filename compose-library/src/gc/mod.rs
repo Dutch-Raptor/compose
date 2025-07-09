@@ -4,7 +4,7 @@ mod trigger;
 use crate::gc::trigger::{GcTriggerPolicy, SimplePolicy};
 use crate::{Array, Value};
 use compose_library::gc::trigger::GcData;
-use compose_library::Iter;
+use compose_library::{Iter, Map};
 use slotmap::{new_key_type, SlotMap};
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -68,16 +68,22 @@ impl<T> HeapRef<T>
 where
     T: HeapObject,
 {
-    pub fn get(self, heap: &Heap) -> Option<&T> {
-        heap.get(self)
+    #[track_caller]
+    pub fn get_unwrap(self, heap: &Heap) -> &T {
+        heap.get(self).unwrap_or_else(|| {
+            panic!("Use after free. This is a bug. Key: {:?}", self.key)
+        })
     }
     
     pub fn try_get(self, heap: &Heap) -> StrResult<&T> {
         heap.get(self).ok_or_else(|| "Use after free. This is a bug.".into())
     }
 
-    pub fn get_mut(self, heap: &mut Heap) -> Option<&mut T> {
-        heap.get_mut(self)
+    #[track_caller]   
+    pub fn get_mut_unwrap(self, heap: &mut Heap) -> &mut T {
+        heap.get_mut(self).unwrap_or_else(|| {
+            panic!("Use after free. This is a bug. Key: {:?}", self.key)       
+        })
     }
     
     pub fn try_get_mut(self, heap: &mut Heap) -> StrResult<&mut T> {
@@ -181,6 +187,7 @@ impl Trace for Value {
             Value::Box(b) => f(b.key()),
             Value::Array(a) => a.visit_refs(f),
             Value::Range(r) => r.visit_refs(f),
+            Value::Map(m) => m.visit_refs(f),
         }
     }
 }
@@ -215,6 +222,7 @@ use crate::diag::StrResult;
 impl_heap_obj!(Value, Value);
 impl_heap_obj!(Iter, Iter);
 impl_heap_obj!(Array, Array);
+impl_heap_obj!(Map, Map);
 
 heap_enum! {
     #[derive(Debug, Clone, PartialEq)]
@@ -222,6 +230,7 @@ heap_enum! {
         Value(Value),
         Iter(Iter),
         Array(Array),
+        Map(Map)
     }
 }
 

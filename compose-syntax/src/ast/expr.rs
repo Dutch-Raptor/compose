@@ -1,11 +1,12 @@
-use crate::SyntaxNode;
 use crate::ast::atomics::Unit;
+use crate::ast::control_flow::Conditional;
+use crate::ast::map::MapLiteral;
+use crate::ast::range::Range;
 use crate::ast::unary::Unary;
 use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, Int, Parenthesized, WhileLoop};
 use crate::ast::{Bool, Closure, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
-use crate::ast::control_flow::Conditional;
-use crate::ast::range::Range;
 use crate::kind::SyntaxKind;
+use crate::SyntaxNode;
 
 /// An expression. The base of Compose. Any "statement" is an expression.
 ///
@@ -38,6 +39,7 @@ pub enum Expr<'a> {
     ForLoop(ForLoop<'a>),
     Array(Array<'a>),
     Range(Range<'a>),
+    Map(MapLiteral<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -62,6 +64,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::ForLoop => Some(Self::ForLoop(ForLoop::from_untyped(node)?)),       
             SyntaxKind::Array => Some(Self::Array(Array::from_untyped(node)?)),       
             SyntaxKind::Range => Some(Self::Range(Range::from_untyped(node)?)),       
+            SyntaxKind::MapLiteral => Some(Self::Map(MapLiteral::from_untyped(node)?)),       
             _ => None,
         }
     }
@@ -87,6 +90,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::ForLoop(for_loop) => for_loop.to_untyped(),       
             Self::Array(array) => array.to_untyped(),       
             Self::Range(range) => range.to_untyped(),       
+            Self::Map(map) => map.to_untyped(),       
         }
     }
 }

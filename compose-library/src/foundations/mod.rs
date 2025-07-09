@@ -16,6 +16,7 @@ mod boxed;
 mod array;
 mod range;
 pub mod support;
+mod map;
 
 pub use args::*;
 pub use boxed::*;
@@ -31,3 +32,4 @@ pub use unit::*;
 pub use value::*;
 pub use array::*;
 pub use range::*;
+pub use map::*;

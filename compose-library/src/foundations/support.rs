@@ -30,6 +30,10 @@ pub fn eval_predicate(
     }
 }
 
+pub fn eval_func(vm: &mut dyn Vm, func: &Func, args: impl IntoIterator<Item = Value>) -> SourceResult<Value> {
+    func.call(vm, Args::new(func.span, args))
+}
+
 fn predicate_hint(value: &Value) -> Option<&'static str> {
     match value {
         Value::Int(_) => Some("did you mean to write a comparison like `x == 1` or `x > 1`?"),

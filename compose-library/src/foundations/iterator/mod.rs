@@ -1,10 +1,11 @@
-use crate::{ArrayValue, HeapRef, Trace};
+use crate::{ArrayValue, HeapRef, MapValue, Trace};
 use crate::{UntypedRef, Value};
-use compose_library::Func;
-use compose_library::diag::{SourceResult, error};
+use compose_library::diag::{SourceResult, bail, error};
 use compose_library::vm::Vm;
+use compose_library::{Func, IntoValue, Str};
 use compose_macros::{func, scope, ty};
 use compose_syntax::Span;
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
@@ -14,6 +15,7 @@ mod range_iter;
 mod string_iter;
 
 use crate::diag::{SourceDiagnostic, StrResult, UnSpanned};
+use crate::support::eval_func;
 pub use array_iter::*;
 use compose_library::support::eval_predicate;
 pub use iter_combinators::*;
@@ -82,11 +84,12 @@ impl IterValue {
         }
     }
 
-    pub(crate) fn shallow_clone(&self, vm: &mut dyn Vm) -> StrResult<Self> {
-        let self_ = self.iter.try_get(vm.heap()).cloned()?;
-        Ok(Self {
+    pub(crate) fn shallow_clone(&self, vm: &mut dyn Vm) -> Self {
+        let self_ = self.iter.get_unwrap(vm.heap()).clone();
+
+        Self {
             iter: vm.heap_mut().alloc(self_),
-        })
+        }
     }
 }
 
@@ -160,22 +163,12 @@ impl Iter {
 
 impl ValueIterator for IterValue {
     fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
-        let iter = self.iter.get(vm.heap()).cloned().unwrap_or_else(|| {
-            panic!(
-                "expected to point to an iter value: {:#?}, {:?}",
-                vm.heap(),
-                self.iter.key()
-            )
-        });
+        let iter = self.iter.get_unwrap(vm.heap()).clone();
         iter.next(vm)
     }
 
     fn nth(&self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
-        let iter = self
-            .iter
-            .get(vm.heap())
-            .cloned()
-            .expect("expected to point to an iter value");
+        let iter = self.iter.get_unwrap(vm.heap()).clone();
         iter.nth(vm, n)
     }
 }
@@ -184,22 +177,14 @@ impl ValueIterator for IterValue {
 impl IterValue {
     #[func(name = "next")]
     fn next_(&mut self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
-        let iter = self
-            .iter
-            .get(vm.heap())
-            .cloned()
-            .expect("expected to point to an iter value");
+        let iter = self.iter.get_unwrap(vm.heap()).clone();
 
         iter.next(vm)
     }
 
     #[func(name = "nth")]
     fn nth_(&mut self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
-        let iter = self
-            .iter
-            .get(vm.heap())
-            .cloned()
-            .expect("expected to point to an iter value");
+        let iter = self.iter.get_unwrap(vm.heap()).clone();
 
         iter.nth(vm, n)
     }
@@ -315,6 +300,29 @@ impl IterValue {
 
         Ok(ArrayValue::from(vm.heap_mut(), values))
     }
+
+    #[func]
+    fn to_map(
+        self,
+        vm: &mut dyn Vm,
+        key_mapper: Func,
+        value_mapper: Func,
+    ) -> SourceResult<MapValue> {
+        let mut map = HashMap::new();
+        while let Some(v) = self.next(vm)? {
+            let k = eval_func(vm, &key_mapper, [v.clone()])?;
+
+            let Value::Str(Str(key)) = k else {
+                bail!(key_mapper.span, "key mapper must return a string");
+            };
+
+            let v = eval_func(vm, &value_mapper, [v.clone()])?;
+
+            map.insert(key, v);
+        }
+
+        Ok(MapValue::from(vm.heap_mut(), map))
+    }
 }
 
 pub trait ValueIterator: Debug + Send + Sync {
@@ -336,3 +344,29 @@ pub trait ValueIterator: Debug + Send + Sync {
         iter.next(vm)
     }
 }
+
+macro_rules! impl_into_iter {
+    (
+        $($iter:ident => $ty:ty),* $(,)?
+    ) => {
+        $(
+            impl Into<Iter> for $ty {
+                fn into(self) -> Iter {
+                    Iter::$iter(self)
+                }
+            }
+        )*
+    };
+}
+
+impl_into_iter!(
+    String => StringIterator,
+    Array => ArrayIter,
+    Take => TakeIter,
+    TakeWhile => TakeWhileIter,
+    Map => MapIter,
+    Skip => SkipIter,
+    Range => RangeIter,
+    StepBy => StepByIter,
+    Filter => FilterIter,
+);

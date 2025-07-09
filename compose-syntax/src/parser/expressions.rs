@@ -2,11 +2,11 @@ use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
 use crate::parser::funcs::closure;
-use crate::parser::{funcs, statements, ExprContext};
+use crate::parser::{ExprContext, funcs, statements};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{syntax_set, SyntaxSet, UNARY_OP};
-use crate::{ast, set, Label};
+use crate::set::{SyntaxSet, UNARY_OP, syntax_set};
+use crate::{Label, ast, set};
 use compose_error_codes::{
     E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT, E0008_EXPECTED_EXPRESSION,
 };
@@ -193,6 +193,7 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             }
             p.wrap(m, SyntaxKind::Range);
         }
+        SyntaxKind::Hash if p.peek() == SyntaxKind::LeftBrace => map(p),
         SyntaxKind::LeftBracket => array(p),
         SyntaxKind::If => conditional(p),
         SyntaxKind::While => while_loop(p),
@@ -217,6 +218,75 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
                 RightBracket
             )),
         ),
+    }
+}
+
+// TODO: Add MapEntry types for clearer AST and more predictable evaluation
+fn map(p: &mut Parser) {
+    let m = p.marker();
+
+    p.assert(SyntaxKind::Hash);
+    p.assert(SyntaxKind::LeftBrace);
+
+    while !p.current().is_terminator() {
+        let entry_marker = p.marker();
+        let key_type = map_key(p);
+
+        if !p.eat_if(SyntaxKind::Colon) {
+            if key_type != MapKeyType::Identifier {
+                p.insert_error_here("expected a colon after the map key")
+                    .with_label_message("insert a `:` here")
+                    .with_hint("if you meant to use a dynamic expression as a key, wrap it in square brackets")
+                    .with_hint("if you meant to use shorthand syntax for a map entry, only identifiers can be used as keys: `#{ x, y, z }` is equivalent to `#{ x: x, y: y, z: z }`");
+            }
+
+            // short-hand notation
+        } else {
+            code_expression(p);
+        }
+
+        p.wrap(entry_marker, SyntaxKind::MapEntry);
+
+        if !p.current().is_terminator() {
+            p.expect_or_recover(SyntaxKind::Comma, syntax_set!(RightBrace));
+        }
+    }
+
+    p.expect_closing_delimiter(m, SyntaxKind::RightBrace);
+
+    p.wrap(m, SyntaxKind::MapLiteral)
+}
+
+#[derive(PartialEq)]
+enum MapKeyType {
+    Computed,
+    String,
+    Identifier,
+}
+
+fn map_key(p: &mut Parser) -> MapKeyType {
+    let m = p.marker();
+
+    if p.eat_if(SyntaxKind::LeftBracket) {
+        // handle dynamic expression as key
+        code_expression(p);
+
+        p.expect_closing_delimiter(m, SyntaxKind::RightBracket);
+        MapKeyType::Computed
+    } else {
+        // string or identifier
+        code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
+
+        let kind = p[m].kind();
+        if !matches!(kind, SyntaxKind::Ident | SyntaxKind::Str) {
+            p.insert_error_here("map keys can be identifiers, strings or an expression evaluating to a string in square  brackets");
+        }
+
+        match kind {
+            SyntaxKind::Ident => MapKeyType::Identifier,
+            SyntaxKind::Str => MapKeyType::String,
+            _ => MapKeyType::Identifier, // fallback to Identifier to reduce cascading errors
+        }
     }
 }
 
@@ -1015,5 +1085,28 @@ mod tests {
                 ]
             ]
         );
+    }
+
+    #[test]
+    fn parse_map_literal() {
+        assert_parse_tree!(
+            "#{a: 1, b: 2}",
+            MapLiteral [
+                Hash("#")
+                LeftBrace("{")
+                MapEntry [
+                    Ident("a")
+                    Colon(":")
+                    Int("1")
+                ]
+                Comma(",")
+                MapEntry [
+                    Ident("b")
+                    Colon(":")
+                    Int("2")
+                ]
+                RightBrace("}")
+            ]
+        )
     }
 }
