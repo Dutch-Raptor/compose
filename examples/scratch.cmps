@@ -1,3 +1,1 @@
-for i in (0..).iter().take(100000000000).map(v => "value: " + v.repr()).step_by(10000000).take(10) {
-    println(i);
-}
+#{ : "number" }

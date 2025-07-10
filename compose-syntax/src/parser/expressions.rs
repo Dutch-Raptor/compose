@@ -2,11 +2,11 @@ use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
 use crate::parser::funcs::closure;
-use crate::parser::{ExprContext, funcs, statements};
+use crate::parser::{funcs, statements, ExprContext};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{SyntaxSet, UNARY_OP, syntax_set};
-use crate::{Label, ast, set};
+use crate::set::{syntax_set, SyntaxSet, UNARY_OP};
+use crate::{ast, set, Label};
 use compose_error_codes::{
     E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT, E0008_EXPECTED_EXPRESSION,
 };
@@ -221,7 +221,6 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
     }
 }
 
-// TODO: Add MapEntry types for clearer AST and more predictable evaluation
 fn map(p: &mut Parser) {
     let m = p.marker();
 
@@ -230,7 +229,8 @@ fn map(p: &mut Parser) {
 
     while !p.current().is_terminator() {
         let entry_marker = p.marker();
-        let key_type = map_key(p);
+        let key_type = map_key(p).unwrap_or(MapKeyType::Identifier);
+        // fallback to identifier as it is the most lenient
 
         if !p.eat_if(SyntaxKind::Colon) {
             if key_type != MapKeyType::Identifier {
@@ -264,28 +264,59 @@ enum MapKeyType {
     Identifier,
 }
 
-fn map_key(p: &mut Parser) -> MapKeyType {
+fn map_key(p: &mut Parser) -> Result<MapKeyType, ()> {
     let m = p.marker();
 
-    if p.eat_if(SyntaxKind::LeftBracket) {
-        // handle dynamic expression as key
-        code_expression(p);
+    match p.current() {
+        SyntaxKind::LeftBracket => {
+            p.assert(SyntaxKind::LeftBracket);
+            code_expression(p);
 
-        p.expect_closing_delimiter(m, SyntaxKind::RightBracket);
-        MapKeyType::Computed
-    } else {
-        // string or identifier
-        code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
-
-        let kind = p[m].kind();
-        if !matches!(kind, SyntaxKind::Ident | SyntaxKind::Str) {
-            p.insert_error_here("map keys can be identifiers, strings or an expression evaluating to a string in square  brackets");
+            p.expect_closing_delimiter(m, SyntaxKind::RightBracket);
+            Ok(MapKeyType::Computed)
         }
+        SyntaxKind::Ident => {
+            p.assert(SyntaxKind::Ident);
+            Ok(MapKeyType::Identifier)
+        }
+        SyntaxKind::Str => {
+            p.assert(SyntaxKind::Str);
+            Ok(MapKeyType::String)
+        }
+        _ if p.at_set(set::EXPR) => {
+            let err_marker = p.marker();
+            p.insert_error_here("expected a map key");
+            code_expression(p);
+            let last = p.last_node().expect("was just inserted");
+            let label_message = match last.kind() {
+                SyntaxKind::Int | SyntaxKind::Float => "numbers cannot be map keys",
+                SyntaxKind::Bool => "booleans cannot be map keys",
+                SyntaxKind::Unit => "`()` cannot be a map key",
+                SyntaxKind::Closure => "functions cannot be used as map keys",
+                SyntaxKind::CodeBlock => "blocks cannot be used as map keys",
+                _ => "this expression cannot be used as a map key",
+            };
 
-        match kind {
-            SyntaxKind::Ident => MapKeyType::Identifier,
-            SyntaxKind::Str => MapKeyType::String,
-            _ => MapKeyType::Identifier, // fallback to Identifier to reduce cascading errors
+            p[err_marker].error_mut().expect("was just inserted")
+                .with_note(r#"map keys must be `identifiers`, `"strings"` or dynamic expressions in `[brackets]` (e.g. `[expr]: value`)"#)
+                .with_label_message(label_message);
+
+            Err(())
+        }
+        SyntaxKind::Colon => {
+            p.insert_error_here("expected a map key")
+                .with_label_message("expected a key before this colon")
+                .with_note(r#"map keys must be `identifiers`, `"strings"` or dynamic expressions in `[brackets]` (e.g. `[expr]: value`)"#);
+
+            Err(())
+        }
+        _ => {
+            p.insert_error_here("expected a map key")
+                .with_label_message("expected a key here")
+            .with_note(r#"map keys must be `identifiers`, `"strings"` or dynamic expressions in `[brackets]` (e.g. `[expr]: value`)"#);
+
+            p.eat();
+            Err(())
         }
     }
 }

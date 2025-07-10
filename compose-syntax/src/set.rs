@@ -82,6 +82,7 @@ pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
     Float,
     Str,
     Bool,
+    Hash,
 ];
 
 pub const EXPR: SyntaxSet = ATOMIC_EXPR.union(UNARY_OP);
