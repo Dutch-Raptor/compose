@@ -46,6 +46,10 @@ pub trait AstNode<'a>: Sized {
     fn to_text(self) -> EcoString {
         self.to_untyped().to_text()
     }
+
+    fn cast<T: AstNode<'a>>(self) -> Option<T> {
+        self.to_untyped().cast()
+    }
 }
 
 

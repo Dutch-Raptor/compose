@@ -1,5 +1,5 @@
-use crate::ast::{Expr, Ident};
 use crate::ast::macros::node;
+use crate::ast::{Expr, Ident};
 
 node! {
     struct PathAccess
@@ -17,23 +17,21 @@ impl<'a> PathAccess<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::AstNode;
-    use crate::kind::SyntaxKind;
-    use crate::test_utils::test_parse;
     use super::*;
-    
+    use crate::assert_ast;
+
     #[test]
     fn test_path_access() {
-        let mut nodes = test_parse("foo::bar");
-        assert_eq!(nodes.len(), 1);
-        let node = nodes.pop().unwrap();
-        assert_eq!(node.kind(), SyntaxKind::PathAccess);
-        
-        let path_access: PathAccess = node.cast().unwrap();
-        
-        let target = path_access.target();
-        assert_eq!(target.to_untyped().text(), "foo");
-        let member = path_access.member();
-        assert_eq!(member.to_untyped().text(), "bar");
+        assert_ast! {
+            "foo::bar",
+            path as PathAccess {
+                with target: Ident = path.target() => {
+                    assert_eq!(target.get(), "foo");
+                }
+                with member: Ident = path.member() => {
+                    assert_eq!(member.get(), "bar");
+                }
+            }
+        }
     }
 }

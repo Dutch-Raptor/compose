@@ -101,6 +101,8 @@ pub const PATTERN: SyntaxSet = syntax_set![
     Ident,
 ];
 
+pub const STMT_TERMINATOR: SyntaxSet = syntax_set![RightBrace];
+
 pub const PARAM: SyntaxSet = PATTERN.union(syntax_set![Ref, Mut]);
 
 pub const CAPTURE: SyntaxSet = syntax_set![Ident, Ref, Mut];

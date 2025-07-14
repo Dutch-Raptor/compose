@@ -172,7 +172,7 @@ fn eval_initial_pass(vm: &mut Machine, world: &SystemWorld) {
     // Do not return early if there are any errors, as we want to print all diagnostics.
     for i in 0..source.nodes().len() {
         let Warned { value, warnings } =
-            compose::eval_range(&source, i..i + 1, vm, &EvalConfig::default());
+            compose_eval::eval_range(&source, i..i + 1, vm, &EvalConfig::default());
         crate::print_diagnostics(world, &[], &warnings).unwrap();
         if let Err(err) = value {
             crate::print_diagnostics(world, &err, &warnings).unwrap();
@@ -211,7 +211,7 @@ pub fn eval_repl_input(vm: &mut Machine, world: &SystemWorld, input: &str, args:
         crate::print_diagnostics(world, &[], &syntax_warnings).unwrap();
     }
 
-    let Warned { value, warnings } = compose::eval_range(
+    let Warned { value, warnings } = compose_eval::eval_range(
         &source,
         len_before_edit..len_after_edit,
         vm,

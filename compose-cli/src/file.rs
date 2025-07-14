@@ -24,7 +24,7 @@ pub fn file(args: FileArgs) -> Result<(), CliError> {
         crate::print_diagnostics(&world, &[], &warnings).unwrap();
     }
 
-    let Warned { value, warnings } = compose::eval(&source, &mut vm, &EvalConfig::default());
+    let Warned { value, warnings } = compose_eval::eval(&source, &mut vm, &EvalConfig::default());
 
     if let Err(err) = value {
         crate::print_diagnostics(&world, &err, &warnings).unwrap();

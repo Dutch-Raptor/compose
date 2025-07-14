@@ -1,7 +1,10 @@
 use crate::kind::SyntaxKind;
+use crate::parser::expressions::block;
+use crate::parser::statements::code;
 use crate::parser::{ExprContext, Parser};
 use crate::parser::{expressions, patterns};
 use crate::precedence::Precedence;
+use crate::scanner::Delimiter;
 use crate::set;
 use crate::set::{ARG_RECOVER, syntax_set};
 use compose_error_codes::E0009_ARGS_MISSING_COMMAS;
@@ -11,7 +14,8 @@ use std::collections::HashSet;
 pub fn args(p: &mut Parser) {
     trace_fn!("parse_args");
     let m = p.marker();
-    p.expect(SyntaxKind::LeftParen);
+
+    p.assert(SyntaxKind::LeftParen);
 
     while !p.current().is_terminator() {
         arg(p);
@@ -25,7 +29,99 @@ pub fn args(p: &mut Parser) {
 
     p.expect_closing_delimiter(m, SyntaxKind::RightParen);
 
+    if p.at(SyntaxKind::LeftBrace) {
+        // trailing lambda
+        lambda(p);
+    }
+
     p.wrap(m, SyntaxKind::Args);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BlockOrLambda {
+    Block,
+    Lambda,
+}
+
+fn lambda(p: &mut Parser) {
+    trace_fn!("parse_lambda");
+    let m = p.marker();
+
+    p.assert(SyntaxKind::LeftBrace);
+
+    if p.at(SyntaxKind::Pipe) {
+        captures(p);
+    }
+
+    let mut seen = HashSet::new();
+
+    let param_marker = p.marker();
+    while !p.at_set(syntax_set!(Arrow, End)) {
+        param(p, &mut seen);
+
+        if !p.at(SyntaxKind::Arrow) && !p.eat_if(SyntaxKind::Comma) {
+            p.insert_error_before("expected a comma between the function parameters")
+                .with_label_message("help: insert a comma here");
+
+            if p.at_set(set::PARAM) {
+                // assume missing comma, continue
+                continue;
+            }
+
+            // Skip over broken params and recover to the `=>` arrow or closing brace
+            if let Ok(Some(arrow)) = p.scanner().find_in_level(SyntaxKind::Arrow) {
+                // Fast path: skip directly to the arrow
+                p.recover_until_node(&arrow);
+            } else if let Ok(Some(closing)) =
+                p.scanner().with_entered_delim(Delimiter::LeftBrace).matching_closing_delim()
+            {
+                // Fallback: skip to the end of the lambda block
+                p.recover_until_node(&closing);
+                p.wrap(param_marker, SyntaxKind::Params);
+                p.wrap(m, SyntaxKind::Lambda);
+                return;
+            } else {
+                // Give up: consume one token to make progress
+                p.eat();
+            }
+        }
+    }
+
+    p.wrap(param_marker, SyntaxKind::Params);
+
+    p.expect(SyntaxKind::Arrow);
+
+    code(p, syntax_set!(RightBrace));
+
+    p.expect_closing_delimiter(m, SyntaxKind::RightBrace);
+
+    p.wrap(m, SyntaxKind::Lambda)
+}
+
+/// Parses a block or lambda
+///
+/// Block syntax: { $(stmt)* }
+/// Lambda syntax { $(|capture_list|)? $(param),* $(,)? => $(stmt)* }
+pub fn block_or_lambda(p: &mut Parser) -> Option<BlockOrLambda> {
+    trace_fn!("parse_block_or_lambda");
+    let mut scanner = p.scanner();
+    scanner.next(); // skip the opening `{`
+    scanner.enter(Delimiter::LeftBrace);
+
+    let contains_arrow = {
+        trace_fn!("parse_block_or_lambda_contains_arrow");
+        scanner
+            .level_contains_kind(SyntaxKind::Arrow)
+            .unwrap_or(false)
+    };
+
+    if contains_arrow {
+        lambda(p);
+        Some(BlockOrLambda::Lambda)
+    } else {
+        block(p);
+        Some(BlockOrLambda::Block)
+    }
 }
 
 fn arg(p: &mut Parser) {
@@ -51,35 +147,6 @@ fn arg(p: &mut Parser) {
         expressions::code_expression(p);
         p.wrap(m, SyntaxKind::Named)
     }
-}
-
-pub fn closure(p: &mut Parser) -> bool {
-    trace_fn!("parse_closure");
-    let mut okay = true;
-    let m = p.marker();
-
-    if p.at(SyntaxKind::Pipe) {
-        okay &= captures(p);
-    }
-
-    okay &= params(p);
-
-    okay &= p
-        .expect_or_recover_until(
-            SyntaxKind::Arrow,
-            "expected `=>` after closure parameters",
-            syntax_set!(Arrow, LeftBrace, NewLine),
-        )
-        .map(|e| {
-            e.with_label_message("help: you probably meant to write `=>` here");
-        })
-        .is_ok();
-
-    expressions::code_expression(p);
-
-    p.wrap(m, SyntaxKind::Closure);
-
-    okay
 }
 
 fn captures(p: &mut Parser) -> bool {
@@ -128,7 +195,7 @@ fn capture(p: &mut Parser) {
 }
 
 /// Parse closure parameters.
-pub fn params(p: &mut Parser) -> bool {
+pub fn closure_params(p: &mut Parser) -> bool {
     let m = p.marker();
     let mut okay = true;
     let wrapped_in_parens = p.eat_if(SyntaxKind::LeftParen);
@@ -197,27 +264,32 @@ fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
 mod tests {
     use super::*;
     use crate::assert_parse_tree;
-    use crate::test_utils::*;
     use compose_error_codes::E0001_UNCLOSED_DELIMITER;
 
     #[test]
-    fn test_parse_closure_multiple_params() {
+    fn test_parse_lambda_multiple_params() {
         assert_parse_tree!(
-            "(a, b, c) => {}",
-            Closure [
+            "{ a, b, c => a + b + c }",
+            Lambda [
+                LeftBrace("{")
                 Params [
-                    LeftParen("(")
                     Param [ Ident("a") ]
                     Comma(",")
                     Param [ Ident("b") ]
                     Comma(",")
                     Param [ Ident("c") ]
-                    RightParen(")")
                 ]
                 Arrow("=>")
-                CodeBlock [
-                    ...
+                Binary [
+                    Ident("a")
+                    Plus("+")
+                    Binary [
+                        Ident("b")
+                        Plus("+")
+                        Ident("c")
+                    ]
                 ]
+                RightBrace("}")
             ]
         );
     }
@@ -225,43 +297,31 @@ mod tests {
     #[test]
     fn test_parse_closure_single_param_parens() {
         assert_parse_tree!(
-            "(a) => {}",
-            Closure [
+            "{ a => a }",
+            Lambda [
+                LeftBrace("{")
                 Params [
-                    LeftParen("(")
                     Param [ Ident("a") ]
-                    RightParen(")")
                 ]
                 Arrow("=>")
-                CodeBlock [ ... ]
+                Ident("a")
+                RightBrace("}")
             ]
         );
     }
 
-    #[test]
-    fn test_parse_closure_single_param_no_parens() {
-        assert_parse_tree!(
-            "a => {}",
-            Closure [
-                Params [
-                    Param [ Ident("a") ]
-                ]
-                Arrow("=>")
-                CodeBlock [ ... ]
-            ]
-        );
-    }
 
     #[test]
     fn test_parse_closure_discard_param() {
         assert_parse_tree!(
-            "_ => {}",
-            Closure [
+            "{ _ => }",
+            Lambda [
+                LeftBrace("{")
                 Params [
                     Param [ Underscore("_") ]
                 ]
                 Arrow("=>")
-                CodeBlock [ ... ]
+                RightBrace("}")
             ]
         );
     }
@@ -269,17 +329,16 @@ mod tests {
     #[test]
     fn test_parse_closure_named_param() {
         assert_parse_tree!(
-            "(a = b) => {}",
-            Closure [
+            "{a = b => }",
+            Lambda [
+                LeftBrace("{")
                 Params [
-                    LeftParen("(")
                     Param [
                         Named [ Ident("a") Eq("=") Ident("b") ]
                     ]
-                    RightParen(")")
                 ]
                 Arrow("=>")
-                CodeBlock [ ... ]
+                RightBrace("}")
             ]
         );
     }
@@ -379,46 +438,44 @@ mod tests {
     #[test]
     fn test_parse_params_ref_mut_combinations() {
         assert_parse_tree!(
-            "(ref a) => {}",
-            Closure [
+            "{ ref a => }",
+            Lambda [
+                LeftBrace("{")
                 Params [
-                    LeftParen("(")
                     Param [
                         Ref("ref")
                         Ident("a")
                     ]
-                    RightParen(")")
                 ]
+                Arrow("=>")
                 ...
             ]
         );
-        
+
         assert_parse_tree!(
-            "(mut a) => {}",
-            Closure [
+            "{ mut a => }",
+            Lambda [
+                LeftBrace("{")
                 Params [
-                    LeftParen("(")
                     Param [
                         Mut("mut")
                         Ident("a")
                     ]
-                    RightParen(")")
                 ]
                 ...
             ]
         );
-        
+
         assert_parse_tree!(
-            "(ref mut a) => {}",
-            Closure [
+            "{ ref mut a => }",
+            Lambda [
+                LeftBrace("{")
                 Params [
-                    LeftParen("(")
                     Param [
                         Ref("ref")
                         Mut("mut")
                         Ident("a")
                     ]
-                    RightParen(")")
                 ]
                 ...
             ]
@@ -427,8 +484,9 @@ mod tests {
 
     #[test]
     fn test_parse_closure_with_capture_list() {
-        assert_parse_tree!("|a, ref b, mut c, ref mut d| (e) => {}",
-            Closure [
+        assert_parse_tree!("{ |a, ref b, mut c, ref mut d| e => }",
+            Lambda [
+                LeftBrace("{")
                 CaptureList [
                     Pipe("|")
                     Capture [ Ident("a") ]
@@ -441,12 +499,10 @@ mod tests {
                     Pipe("|")
                 ]
                 Params [
-                    LeftParen("(") 
                     Param [ Ident("e") ]
-                    RightParen(")")
                 ]
                 Arrow("=>")
-                CodeBlock [ ... ]
+                ...
             ]
         );
     }

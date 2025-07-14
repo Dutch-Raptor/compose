@@ -1,12 +1,12 @@
-use crate::ast::{AstNode, Expr, Ident, node};
+use crate::ast::{node, AstNode, Expr, Ident, Statement};
 use crate::kind::SyntaxKind;
 use crate::{Span, SyntaxNode};
 
 node! {
-    struct Closure
+    struct Lambda
 }
 
-impl<'a> Closure<'a> {
+impl<'a> Lambda<'a> {
     pub fn params(self) -> Params<'a> {
         self.0.cast_first()
     }
@@ -15,8 +15,11 @@ impl<'a> Closure<'a> {
         self.0.cast_first()
     }
 
-    pub fn body(self) -> Expr<'a> {
-        self.0.cast_last()
+    pub fn statements(self) -> impl Iterator<Item=Statement<'a>> {
+        self.0
+            .children()
+            .skip_while(|n| n.kind() != SyntaxKind::Arrow)
+            .filter_map(SyntaxNode::cast)
     }
 }
 
@@ -25,7 +28,7 @@ node! {
 }
 
 impl<'a> CaptureList<'a> {
-    pub fn children(self) -> impl DoubleEndedIterator<Item = Capture<'a>> {
+    pub fn children(self) -> impl DoubleEndedIterator<Item=Capture<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }
 }
@@ -67,7 +70,7 @@ node! {
 }
 
 impl<'a> Params<'a> {
-    pub fn children(self) -> impl DoubleEndedIterator<Item = Param<'a>> {
+    pub fn children(self) -> impl DoubleEndedIterator<Item=Param<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }
 }
@@ -202,7 +205,7 @@ node! {
 }
 
 impl<'a> Destructuring<'a> {
-    pub fn items(self) -> impl DoubleEndedIterator<Item = DestructuringItem<'a>> {
+    pub fn items(self) -> impl DoubleEndedIterator<Item=DestructuringItem<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }
 
@@ -240,95 +243,48 @@ impl<'a> AstNode<'a> for DestructuringItem<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_ast;
     use crate::ast::binary::{BinOp, Binary};
-    use crate::test_utils::test_parse;
+    use crate::ast::FuncCall;
 
     #[test]
-    fn parse_single_param_closure() {
-        let nodes = test_parse("a => a");
-        assert_eq!(nodes.len(), 1);
-        assert_eq!(nodes[0].kind(), SyntaxKind::Closure);
-        let closure: Closure = nodes[0].cast().unwrap();
+    fn trailing_lambda() {
+        assert_ast!(
+            r#"
+            foo() { a => a + b; }
+            "#,
+            call as FuncCall {
+                with callee: Ident = call.callee() => {
+                    assert_eq!(callee.get(), "foo");
+                }
+                call.args().items() => [
+                    trailing_lambda as Lambda {
+                        with params: Params = trailing_lambda.params() => {
+                            params.children() => [
+                                param as Param {
+                                    with pat: Pattern = param.kind() => {
+                                        with ident: Ident = pat => {
+                                            assert_eq!(ident.get(), "a");
+                                        }
+                                    }
+                                }
+                            ]
+                        }
 
-        assert_eq!(closure.params().children().count(), 1);
-        let first_param = closure.params().children().next().unwrap();
-        let pat = match first_param.kind() {
-            ParamKind::Pos(p) => p,
-            ParamKind::Named(n) => panic!("Expected positional param, got named param {n:?}"),
-        };
-
-        let expr = match pat {
-            Pattern::Single(e) => e,
-            other => panic!("Expected single pattern, got {other:?}"),
-        };
-
-        let ident = match expr {
-            Expr::Ident(i) => i,
-            other => panic!("Expected ident, got {other:?}"),
-        };
-
-        assert_eq!(ident.get(), "a");
-    }
-
-    #[test]
-    fn parse_multiple_param_closure() {
-        let nodes = test_parse("(a, b) => a - b");
-        assert_eq!(nodes.len(), 1);
-        assert_eq!(nodes[0].kind(), SyntaxKind::Closure);
-        let closure: Closure = nodes[0].cast().unwrap();
-
-        let params = closure.params();
-        assert_eq!(params.children().count(), 2);
-
-        let first = params.children().next().unwrap();
-        match first.kind() {
-            ParamKind::Pos(p) => {
-                let pat = match p {
-                    Pattern::Single(e) => e,
-                    other => panic!("Expected single pattern, got {other:?}"),
-                };
-
-                let expr = match pat {
-                    Expr::Ident(i) => i,
-                    other => panic!("Expected ident, got {other:?}"),
-                };
-
-                assert_eq!(expr.get(), "a");
+                        trailing_lambda.statements() => [
+                            binary as Binary {
+                                with lhs: Ident = binary.lhs() => {
+                                    assert_eq!(lhs.get(), "a");
+                                }
+                                with rhs: Ident = binary.rhs() => {
+                                    assert_eq!(rhs.get(), "b");
+                                }
+                                assert_eq!(binary.op(), BinOp::Add);
+                            }
+                        ]
+                    }
+                ]
             }
-            other => {
-                panic!("Expected positional param, got {other:?}");
-            }
-        }
-
-        let second = params.children().nth(1).unwrap();
-        match second.kind() {
-            ParamKind::Pos(p) => {
-                let pat = match p {
-                    Pattern::Single(e) => e,
-                    other => panic!("Expected single pattern, got {other:?}"),
-                };
-
-                let expr = match pat {
-                    Expr::Ident(i) => i,
-                    other => panic!("Expected ident, got {other:?}"),
-                };
-
-                assert_eq!(expr.get(), "b");
-            }
-            other => {
-                panic!("Expected positional param, got {other:?}");
-            }
-        }
-
-        let body = closure.body();
-
-        let as_bin_op: Binary = body.to_untyped().cast().unwrap();
-        assert_eq!(as_bin_op.op(), BinOp::Sub);
-
-        assert_eq!(as_bin_op.lhs().to_untyped().kind(), SyntaxKind::Ident);
-        assert_eq!(as_bin_op.lhs().to_untyped().text(), "a");
-
-        assert_eq!(as_bin_op.rhs().to_untyped().kind(), SyntaxKind::Ident);
-        assert_eq!(as_bin_op.rhs().to_untyped().text(), "b");
+        )
     }
 }

@@ -1,5 +1,5 @@
-use crate::ast::{node, AstNode, Expr, Ident};
 use crate::ast::func::Pattern;
+use crate::ast::{node, AstNode, Expr, Ident};
 use crate::kind::SyntaxKind;
 use crate::{Span, SyntaxNode};
 
@@ -45,20 +45,24 @@ impl<'a> LetBinding<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::AstNode;
-    use crate::test_utils::test_parse;
     use super::*;
-    
+    use crate::assert_ast;
+    use crate::ast::Int;
+
     #[test]
     fn test_let_binding() {
-        let node = test_parse("let x = 1").pop().unwrap();
-        let binding: LetBinding = node.cast().unwrap();
-        
-        let init = binding.initial_value().unwrap();
-        assert_eq!(init.to_untyped().text(), "1");
-        
-        let bindings = binding.bindings();
-        assert_eq!(bindings.len(), 1);
-        assert_eq!(bindings[0].to_untyped().text(), "x");
+        assert_ast!(
+            "let x = 1",
+            binding as LetBinding {
+                binding.bindings().into_iter() => [
+                    ident as Ident {
+                        assert_eq!(ident.get(), "x");
+                    }
+                ]
+                with init: Int = binding.initial_value().unwrap() => {
+                    assert_eq!(init.get(), 1);
+                }
+            }
+        )
     }
 }

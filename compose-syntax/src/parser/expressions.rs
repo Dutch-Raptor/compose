@@ -1,7 +1,7 @@
 use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
-use crate::parser::funcs::closure;
+use crate::parser::funcs::block_or_lambda;
 use crate::parser::{funcs, statements, ExprContext};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
@@ -10,7 +10,7 @@ use crate::{ast, set, Label};
 use compose_error_codes::{
     E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT, E0008_EXPECTED_EXPRESSION,
 };
-use compose_utils::{trace_fn, trace_log};
+use compose_utils::trace_fn;
 use ecow::eco_format;
 
 pub fn code_expression(p: &mut Parser) {
@@ -19,13 +19,6 @@ pub fn code_expression(p: &mut Parser) {
 
 pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
     trace_fn!("parse_code_expr_prec", "{ctx:?} {}", p.current_end());
-
-    // handle infinite loops
-    if p.current_end() == p.last_pos {
-        p.eat();
-        return;
-    }
-    p.last_pos = p.current_end();
 
     let m = p.marker();
     if !ctx.is_atomic() && p.at_set(UNARY_OP) {
@@ -166,11 +159,6 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
     trace_fn!("parse_primary_expr");
     let m = p.marker();
     match p.current() {
-        // handle an ident that is not a closure
-        SyntaxKind::Ident if ctx.is_atomic() || p.peek() != SyntaxKind::Arrow => {
-            trace_fn!("parse_primary_expr: ident");
-            p.eat();
-        }
         // `_ = something`
         SyntaxKind::Underscore if !ctx.is_atomic() && p.peek() == SyntaxKind::Eq => {
             p.assert(SyntaxKind::Underscore);
@@ -178,13 +166,7 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             code_expression(p);
             p.wrap(m, SyntaxKind::DestructureAssignment);
         }
-        SyntaxKind::LeftBrace => block(p),
-        SyntaxKind::LeftParen if at_unit_literal(p) => {
-            trace_fn!("parse_primary_expr: unit literal");
-            p.assert(SyntaxKind::LeftParen);
-            p.assert(SyntaxKind::RightParen);
-            p.wrap(m, SyntaxKind::Unit)
-        }
+        SyntaxKind::LeftBrace => { block_or_lambda(p); },
         SyntaxKind::DotsEq | SyntaxKind::Dots => {
             p.eat();
             // for ..= an expression on the rhs is required
@@ -198,16 +180,14 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
         SyntaxKind::If => conditional(p),
         SyntaxKind::While => while_loop(p),
         SyntaxKind::For => for_loop(p),
-        SyntaxKind::LeftParen => expr_with_parens(p, ctx),
-        // Already fully handled in the lexer
-        SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str => p.eat(),
-        SyntaxKind::Ref
-        | SyntaxKind::Mut
-        | SyntaxKind::Ident
-        | SyntaxKind::Underscore
-        | SyntaxKind::Pipe => {
-            closure(p);
+        SyntaxKind::LeftParen if p.peek_at(SyntaxKind::RightParen) => {
+            p.assert(SyntaxKind::LeftParen);
+            p.assert(SyntaxKind::RightParen);
+            p.wrap(m, SyntaxKind::Unit)
         }
+        SyntaxKind::LeftParen => { parenthesized(p); },
+        // Already fully handled in the lexer
+        SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str | SyntaxKind::Ident => p.eat(),
         _ => err_expected_expression(
             p,
             Some(syntax_set!(
@@ -292,7 +272,7 @@ fn map_key(p: &mut Parser) -> Result<MapKeyType, ()> {
                 SyntaxKind::Int | SyntaxKind::Float => "numbers cannot be map keys",
                 SyntaxKind::Bool => "booleans cannot be map keys",
                 SyntaxKind::Unit => "`()` cannot be a map key",
-                SyntaxKind::Closure => "functions cannot be used as map keys",
+                SyntaxKind::Lambda => "functions cannot be used as map keys",
                 SyntaxKind::CodeBlock => "blocks cannot be used as map keys",
                 _ => "this expression cannot be used as a map key",
             };
@@ -344,7 +324,7 @@ fn array(p: &mut Parser) {
     p.wrap(m, SyntaxKind::Array)
 }
 
-fn block(p: &mut Parser) {
+pub fn block(p: &mut Parser) {
     trace_fn!("parse_block");
     let m = p.marker();
     p.assert(SyntaxKind::LeftBrace);
@@ -363,46 +343,6 @@ fn err_expected_expression(p: &mut Parser, recover_set: Option<SyntaxSet>) {
         .with_code(&E0008_EXPECTED_EXPRESSION)
         .with_label_message("expected an expression here")
         .with_hint("expressions can be values, operations, function calls, blocks, etc.");
-}
-
-fn expr_with_parens(p: &mut Parser, ctx: ExprContext) {
-    trace_fn!("parse_expr_with_parens");
-    if ctx.is_atomic() {
-        // If atomic, we don't parse any of the more complicated expressions
-        parenthesized(p);
-        return;
-    }
-
-    // Since expressions with parens all look alike at the start of the expression, we will have to
-    // guess and backtrack if we guess incorrectly.
-    let Some((memo_key, checkpoint)) = p.restore_memo_or_checkpoint() else {
-        trace_log!("parse_expr_with_parens: restored from memo");
-        return;
-    };
-
-    let prev_len = checkpoint.nodes_len;
-
-    // The most common and simple expr with parens is the parenthesized expression, so we try that first.
-    if !parenthesized(p) || p.at(SyntaxKind::Arrow) {
-        // if not, retry as a closure
-        trace_fn!("parse_expr_with_parens: found closure");
-        // It looks like it was a closure instead! Let's rewind and parse as a closure instead
-        p.restore(checkpoint);
-        closure(p);
-    }
-
-    p.memoize_parsed_nodes(memo_key, prev_len)
-}
-
-fn at_unit_literal(p: &Parser) -> bool {
-    let mut peeker = p.peeker();
-    let cur = p.current();
-    let next = peeker.next().unwrap_or(SyntaxKind::End);
-    let next_next = peeker.next().unwrap_or(SyntaxKind::End);
-
-    matches!(cur, SyntaxKind::LeftParen)
-        && matches!(next, SyntaxKind::RightParen)
-        && !matches!(next_next, SyntaxKind::Arrow)
 }
 
 fn parenthesized(p: &mut Parser) -> bool {
@@ -488,134 +428,7 @@ mod tests {
                 Binary [
                     Int("1")
                     Plus("+")
-                    Int("1")
-                ]
-                RightParen(")")
-            ]
-        );
-    }
-
-    #[test]
-    fn test_parse_nested_parenthesized_and_closures() {
-        assert_parse_tree!(r#"
-            ((a) => (a = (1 + 2), b = (c, d) => (c + d)) => a(b))
-            "#,
-            Parenthesized [
-                LeftParen("(")
-                Closure [
-                    Params [
-                        LeftParen("(")
-                        Param [ Ident("a") ]
-                        RightParen(")")
-                    ]
-                    Arrow("=>")
-                    Closure [
-                        Params [
-                            LeftParen("(")
-                            Param [
-                                Named [
-                                    Ident("a") Eq("=")
-                                    Parenthesized [
-                                        LeftParen("(")
-                                        Binary [ Int("1") Plus("+") Int("2") ]
-                                        RightParen(")")
-                                    ]
-                                ]
-                            ]
-                            Comma(",")
-                            Param [
-                                Named [
-                                    Ident("b") Eq("=")
-                                    Closure [
-                                        Params [ LeftParen("(")
-                                            Param [Ident("c")] Comma(",") Param [Ident("d")]
-                                            RightParen(")")
-                                        ]
-                                        Arrow("=>") Parenthesized [
-                                            LeftParen("(")
-                                            Binary [ Ident("c") Plus("+") Ident("d") ]
-                                            RightParen(")")
-                                        ]
-                                    ]
-                                ]
-                            ]
-                            RightParen(")")
-                        ]
-                        Arrow("=>")
-                        FuncCall [
-                            Ident("a")
-                            Args [ LeftParen("(") Ident("b") RightParen(")") ]
-                        ]
-                    ]
-                ]
-                RightParen(")")
-            ]
-        );
-    }
-
-    #[test]
-    fn test_more_parse_nested_parenthesized_and_closures() {
-        assert_parse_tree!(r#"(() => (a = v => println(v), c = (b = () => () => {}) => {}) => a(c))"#,
-            Parenthesized [
-                LeftParen("(")
-                Closure [
-                    Params [
-                        LeftParen("(")
-                        RightParen(")")
-                    ]
-                    Arrow("=>")
-                    Closure [
-                        Params [
-                            LeftParen("(")
-                            Param [
-                                Named [
-                                    Ident("a") Eq("=")
-                                    Closure [
-                                        Params [ Param [ Ident("v") ] ]
-                                        Arrow("=>")
-                                        FuncCall [
-                                            Ident("println")
-                                            Args [ LeftParen("(") Ident("v") RightParen(")") ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                            Comma(",")
-                            Param [
-                                Named [
-                                    Ident("c") Eq("=")
-                                    Closure [
-                                        Params [
-                                            LeftParen("(")
-                                            Param [
-                                                Named [
-                                                    Ident("b") Eq("=")
-                                                    Closure [
-                                                        Params [ LeftParen("(") RightParen(")") ]
-                                                        Arrow("=>")
-                                                        Closure [
-                                                            Params [ LeftParen("(") RightParen(")") ]
-                                                            Arrow("=>")
-                                                            CodeBlock [ LeftBrace("{") RightBrace("}") ]
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                            RightParen(")")
-                                        ]
-                                        Arrow("=>")
-                                        CodeBlock [ LeftBrace("{") RightBrace("}") ]
-                                    ]
-                                ]
-                            ]
-                            RightParen(")")
-                        ]
-                        Arrow("=>")
-                        FuncCall [
-                            Ident("a")
-                            Args [ LeftParen("(") Ident("c") RightParen(")") ]
-                        ]
-                    ]
+                    Int("2")
                 ]
                 RightParen(")")
             ]
@@ -676,22 +489,16 @@ mod tests {
     #[test]
     fn test_parse_assignment_in_expression_context() {
         assert_parse_tree!(
-            "let inc = v => v += 1;",
-            LetBinding [
-                Let("let")
-                Ident("inc")
-                Eq("=")
-                Closure [
-                    Params [
-                        Param [
-                            Ident("v")
-                        ]
-                    ]
-                    Arrow("=>")
+            "foo(v = 1);",
+            FuncCall [
+                Ident("foo")
+                Args [
+                    LeftParen("(")
                     Ident("v")
                     Error(E0002_INVALID_ASSIGNMENT)
-                    PlusEq("+=")
+                    Eq("=")
                     Int("1")
+                    RightParen(")")
                 ]
             ]
         );
@@ -1135,6 +942,66 @@ mod tests {
                     Ident("b")
                     Colon(":")
                     Int("2")
+                ]
+                RightBrace("}")
+            ]
+        )
+    }
+
+    #[test]
+    fn parse_map_literal_with_trailing_comma() {
+        assert_parse_tree!(
+            "#{a: 1, b: 2,}",
+            MapLiteral [
+                Hash("#")
+                LeftBrace("{")
+                MapEntry [ ... ]
+                Comma(",")
+                MapEntry [ ... ]
+                Comma(",")
+                RightBrace("}")
+
+            ]
+        )
+    }
+
+    #[test]
+    fn parse_map_literal_string_keys() {
+        assert_parse_tree!(
+            r#"#{"a": 1, "b": 2,}"#,
+            MapLiteral [
+                Hash("#")
+                LeftBrace("{")
+                MapEntry [
+                    Str("\"a\"")
+                    Colon(":")
+                    Int("1")
+                ]
+                Comma(",")
+                MapEntry [
+                    Str("\"b\"")
+                    Colon(":")
+                    Int("2")
+                ]
+                Comma(",")
+                RightBrace("}")
+            ]
+        )
+    }
+
+    #[test]
+    fn parse_map_literal_shorthand() {
+        assert_parse_tree!(
+            "#{a, b}",
+            MapLiteral [
+                Hash("#")
+                LeftBrace("{")
+                MapEntry [
+                    Ident("a")
+                ]
+                Comma(",")
+                MapEntry [
+                    Ident("b")
                 ]
                 RightBrace("}")
             ]

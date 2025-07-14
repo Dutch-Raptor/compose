@@ -1,7 +1,7 @@
 mod stack;
 
 //noinspection RsUnusedImport - false positive, actually used
-use crate::expression::eval_closure;
+use crate::expression::eval_lambda;
 use crate::vm::stack::{StackFrames, TrackMarker};
 use compose_library::diag::{At, SourceDiagnostic, SourceResult, error};
 use compose_library::{
@@ -44,7 +44,7 @@ impl<'a> Vm<'a> for Machine<'a> {
     fn call_func(&mut self, func: &Func, args: Args) -> SourceResult<Value> {
         match &func.kind {
             FuncKind::Native(native) => native.call(self, args),
-            FuncKind::Closure(closure) => eval_closure(closure, self, args),
+            FuncKind::Closure(closure) => eval_lambda(closure, self, args),
         }
     }
 }
@@ -80,7 +80,7 @@ impl Debug for Machine<'_> {
 #[derive(Debug, Clone)]
 pub enum FlowEvent {
     Continue(Span),
-    Break(Span),
+    Break(Span, Option<Value>),
     Return(Span, Option<Value>),
 }
 
@@ -88,7 +88,8 @@ impl Trace for FlowEvent {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
         match self {
             FlowEvent::Continue(_) => {}
-            FlowEvent::Break(_) => {}
+            FlowEvent::Break(_, Some(value)) => value.visit_refs(f),
+            FlowEvent::Break(_, None) => {}
             FlowEvent::Return(_, Some(value)) => value.visit_refs(f),
             FlowEvent::Return(_, None) => {}
         }
@@ -98,7 +99,7 @@ impl Trace for FlowEvent {
 impl FlowEvent {
     pub(crate) fn forbidden(&self) -> SourceDiagnostic {
         match *self {
-            Self::Break(span) => {
+            Self::Break(span, _) => {
                 error!(span, "cannot break outside of a loop")
             }
             Self::Return(span, _) => {

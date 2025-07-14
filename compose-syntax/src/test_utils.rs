@@ -11,6 +11,132 @@ pub const fn test_file_id() -> FileId {
     FileId::from_raw(NonZeroU16::new(1).unwrap())
 }
 
+pub struct AstTester {
+    pub nodes: Vec<SyntaxNode>,
+    pub pos: usize,
+}
+
+impl AstTester {
+    #[track_caller]
+    pub fn new(code: &str) -> Self {
+        let p = assert_parse(code);
+        Self {
+            nodes: p.nodes,
+            pos: 0,
+        }
+    }
+}
+
+
+
+#[macro_export]
+macro_rules! assert_ast {
+    // Entry point: Parse then pass along to inner calls
+    ($code:expr, $($tt:tt)*) => {{
+        let mut p = $crate::test_utils::AstTester::new($code);
+        $crate::test_utils::assert_ast!(@top p, $($tt)*);
+    }};
+
+    // Top level binding: Type as var { ... }
+    (@top $tester:ident, $var:ident as $ty:ty { $($inner:tt)* } $($rest:tt)*) => {
+        #[allow(unused)]
+        use $crate::ast::AstNode;
+        let idx = $tester.pos;
+        $tester.pos += 1 ;
+        let node = &$tester.nodes[idx];
+        let $var = node
+            .cast::<$ty>()
+            .expect(&format!("failed to cast to {} at {idx}, got: {:?}", stringify!($ty), node.kind()));
+
+        $crate::assert_ast!(@seq &idx.to_string(), $($inner)*);
+
+        $crate::assert_ast!(@top $tester, $($rest)*);
+    };
+
+    // discard the rest of the top level nodes
+    (@top $tester:ident, ...) => {
+        $tester.pos = $tester.nodes.len();
+    };
+
+    // End of top level
+    (@top $tester:ident, ) => {
+        assert_eq!($tester.pos, $tester.nodes.len(), "Not all nodes were consumed: {:#?}", &$tester.nodes[$tester.pos..]);
+    };
+
+    // Sequence: iterable expression => [ ... ]
+    (@seq $path:expr, $expr:expr => [ $($inner:tt)* ] $($rest:tt)*) => {
+        let mut iter = $expr.enumerate();
+        $crate::assert_ast!(@loop $path, iter, $($inner)*);
+        $crate::assert_ast!(@seq $path, $($rest)*);
+    };
+
+    // Sequence: with new casted variable binding: with var: Type => { ... }
+    (@seq $path:expr, with $inner_var:ident: $ty:ty = $expr:expr => { $($inner:tt)* } $($rest:tt)*) => {
+        {
+        let $inner_var = $expr;
+        let $inner_var = $inner_var.cast::<$ty>().expect(&format!("failed to cast to {} at {}", stringify!($ty), $path));
+        let _sub_path = format!("{}.{}", $path, stringify!($inner_var));
+        $crate::assert_ast!(@seq &_sub_path, $($inner)*);
+        }
+        $crate::assert_ast!(@seq $path, $($rest)*);
+    };
+
+    // Expression within a node
+    (@seq $path:expr, $expr:expr; $($rest:tt)*) => {{
+        $expr;
+        $crate::assert_ast!(@seq $path, $($rest)*);
+    }};
+
+    // Statement within a node
+    (@seq $path:expr, $stmt:stmt; $($rest:tt)*) => {{
+        $stmt
+        $crate::assert_ast!(@seq $path, $($rest)*);
+    }};
+
+    // End of sequence
+    (@seq $path:expr,) => {};
+
+    // Loop element (within an iterable expression): Type as var { ... }
+    (@loop $path:expr, $iter:ident, $var:ident as $ty:ty { $($inner:tt)* } $($rest:tt)*) => {
+        {
+            let _item = $iter.next().expect("failed to get next value");
+            let idx = _item.0;
+            let _sub_path = format!("{}.{}", $path, idx);
+            let $var = _item.1.cast::<$ty>().expect(&format!("failed to cast to {}", stringify!($ty)));
+            $crate::assert_ast!(@seq &_sub_path, $($inner)*);
+        }
+
+        $crate::assert_ast!(@loop $path, $iter, $($rest)*);
+    };
+
+    // discard rest of the items
+    (@loop $path:expr, $iter:ident, ...) => {
+        // drain the iter
+        while let Some(_) = $iter.next() { }
+    };
+
+    // end loop
+    (@loop $path:expr, $iter:ident,) => {
+        assert_eq!($iter.next().is_none(), true, "Not all values were consumed at {}", $path);
+    };
+
+
+    // --------------
+    // error handlers
+    // --------------
+
+    (@seq $path:expr, with $(rest:tt)*) => {
+        compile_error!("with usage: with <var_name>: <type> = <expr> => { ... }")
+    };
+
+    (@loop, $path:expr, $iter:ident, $(rest:tt)*) => {
+        compile_error!("loop usage: <type> as <var> { ... }")
+    };
+}
+
+pub use assert_ast;
+
+
 pub fn test_parse(code: &str) -> Vec<SyntaxNode> {
     let file_id = FileId::new("main.comp");
     let nodes = crate::parse(code, file_id);
@@ -361,16 +487,15 @@ impl NodesTester {
 ///
 /// ```rust
 /// compose_syntax::test_utils::assert_parse_tree!(
-///     "(ref mut a) => {}",
-///     Closure [
+///     "{ ref mut a => a }",
+///     Lambda [
+///         LeftBrace("{")
 ///         Params [
-///             LeftParen("(")
 ///             Param [
 ///                 Ref("ref")
 ///                 Mut("mut")
 ///                 Ident("a")
 ///             ]
-///             RightParen(")")
 ///         ]
 ///         ...
 ///     ]

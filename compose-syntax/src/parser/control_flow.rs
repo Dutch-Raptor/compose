@@ -1,15 +1,11 @@
 use crate::kind::SyntaxKind;
-use crate::node::SyntaxErrorSeverity;
-use crate::parser::Parser;
 use crate::parser::expressions::code_expression;
 use crate::parser::patterns::pattern;
 use crate::parser::statements::code;
+use crate::parser::Parser;
 use crate::set::syntax_set;
-use crate::{Label, Span, SyntaxError, SyntaxNode, set};
-use compose_error_codes::{
-    E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES, W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION,
-    W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION,
-};
+use crate::set;
+use compose_error_codes::E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES;
 use compose_utils::trace_fn;
 use std::collections::HashSet;
 
@@ -68,45 +64,24 @@ pub fn for_loop(p: &mut Parser) {
     let m = p.marker();
     p.assert(SyntaxKind::For);
 
-    let mut wrapped = false;
     let left_paren_marker = p.marker();
-    if p.at(SyntaxKind::LeftParen) {
-        let checkpoint = p.checkpoint();
 
-        // Attempt to parse as pattern (the pattern may start with `(`)
-        pattern(p, true, &mut HashSet::new(), None);
+    let wrapped = p.eat_if(SyntaxKind::LeftParen);
 
-        if !p.at(SyntaxKind::In) {
-            // Turns out it was not just a pattern. Maybe the entire loop expression is wrapped in parens?
-            p.restore(checkpoint);
-            wrapped = true;
-            p.assert(SyntaxKind::LeftParen);
-            pattern(p, false, &mut HashSet::new(), None);
-        }
-    } else {
-        pattern(p, false, &mut HashSet::new(), None);
+    if !wrapped {
+        p.insert_error_here("for loop patterns require parentheses")
+            .with_label_message("Expected an opening `(` after the `for` keyword");
     }
+
+    pattern(p, true, &mut HashSet::new(), None);
 
     p.expect(SyntaxKind::In);
 
     // parse the iterable
     code_expression(p);
 
-    // if an unnecessary open paren, we expect a closing one, then if it was there, warn that it was unnecessary
-    if wrapped && p.expect_closing_delimiter(left_paren_marker, SyntaxKind::RightParen) {
-        let open = p[left_paren_marker].span();
-        let close = p
-            .last_node()
-            .map(SyntaxNode::span)
-            .unwrap_or(Span::detached());
-
-        p.insert_error(SyntaxError::new(
-            "unnecessary parentheses in `for` expression",
-            open,
-        ))
-            .with_severity(SyntaxErrorSeverity::Warning)
-            .with_code(&W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION)
-            .with_label(Label::primary(close, "help: remove these parentheses"));
+    if wrapped {
+        p.expect_closing_delimiter(left_paren_marker, SyntaxKind::RightParen);
     }
 
     parse_control_flow_block(p, ControlFlow::For);
@@ -116,19 +91,26 @@ pub fn for_loop(p: &mut Parser) {
 
 fn condition(p: &mut Parser) {
     trace_fn!("parse_condition");
-    let cond_marker = p.marker();
-    code_expression(p);
-    let last_node = p.last_node().unwrap();
-    if last_node.kind() == SyntaxKind::Parenthesized {
-        p.insert_error(SyntaxError::new(
-            "unnecessary parentheses around condition",
-            last_node.span(),
-        ))
-            .with_severity(SyntaxErrorSeverity::Warning)
-            .with_code(&W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION)
-            .with_label_message("help: remove these parentheses");
+    let m = p.marker();
+
+    let wrapped = p.eat_if(SyntaxKind::LeftParen);
+    if !wrapped {
+        p.insert_error_here("condition expressions require parentheses")
+            .with_label_message("Expected an opening `(` before the condition");
+
+        p.recover_until(syntax_set!(LeftBrace));
+
+        // error is not recoverable within the condition, try to recover until after and abort
+        return;
     }
-    p.wrap(cond_marker, SyntaxKind::Condition);
+
+    code_expression(p);
+
+    if wrapped {
+        p.expect_closing_delimiter(m, SyntaxKind::RightParen);
+    }
+
+    p.wrap(m, SyntaxKind::Condition);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -209,13 +191,17 @@ mod tests {
     fn test_parse_while() {
         assert_parse_tree!(
             r#"
-            while true {
+            while (true) {
                 do_thing();
             }
             "#,
             WhileLoop [
                 While("while")
-                Condition [ Bool("true") ]
+                Condition [
+                    LeftParen("(")
+                    Bool("true")
+                    RightParen(")")
+                ]
                 CodeBlock [
                     LeftBrace("{")
                     FuncCall [
@@ -229,35 +215,20 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_while_warns_for_parens() {
-        assert_parse_tree!(
-            r#"
-            while (true) {
-                do_thing();
-            }
-            "#,
-            WhileLoop [
-                While("while")
-                Condition [
-                    Parenthesized [...]
-                    Warn(W0002_UNNECESSARY_PARENTHESES_AROUND_CONDITION)
-                ]
-                CodeBlock [...]
-            ]
-        );
-    }
-
-    #[test]
     fn test_parse_if() {
         assert_parse_tree!(
             r#"
-            if true {
+            if (true) {
                 do_thing();
             }
             "#,
             Conditional [
                 If("if")
-                Condition [ Bool("true") ]
+                Condition [
+                    LeftParen("(")
+                    Bool("true")
+                    RightParen(")")
+                ]
                 CodeBlock [...]
             ]
         );
@@ -266,12 +237,12 @@ mod tests {
     #[test]
     fn test_if_missing_braces_reports_error() {
         assert_parse_tree!(r#"
-            if true
+            if (true)
                 do_thing();
             "#,
             Conditional [
                 If("if")
-                Condition [ Bool("true") ]
+                Condition [ ... ]
                 CodeBlock [
                     Error(E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES)
                     FuncCall [
@@ -286,9 +257,9 @@ mod tests {
     #[test]
     fn test_if_else_if_else_chain() {
         assert_parse_tree!(r#"
-            if cond1 {
+            if (cond1) {
                 do_one();
-            } else if cond2 {
+            } else if (cond2) {
                 do_two();
             } else {
                 do_fallback();
@@ -296,38 +267,26 @@ mod tests {
             "#,
             Conditional [
                 If("if")
-                Condition [ Ident("cond1") ] 
+                Condition [
+                    LeftParen("(")
+                    Ident("cond1")
+                    RightParen(")")
+                ]
                 CodeBlock [...]
                 ConditionalAlternate [
                     Else("else")
                     If("if")
-                    Condition [ Ident("cond2") ] 
+                    Condition [
+                        LeftParen("(")
+                        Ident("cond2")
+                        RightParen(")")
+                    ]
                     CodeBlock [...]
                 ]
                 ConditionalElse [
-                    Else("else") 
+                    Else("else")
                     CodeBlock [...]
                 ]
-            ]
-        );
-    }
-
-    #[test]
-    fn test_for_with_wrapped_pattern_warns() {
-        assert_parse_tree!(r#"
-            for (x in items) {
-                do_thing(x);
-            };
-            "#,
-            ForLoop [
-                For("for")
-                LeftParen("(")
-                Ident("x")
-                In("in")
-                Ident("items")
-                RightParen(")")
-                Warn(W0003_UNNECESSARY_PARENTHESES_IN_FOR_EXPRESSION)
-                CodeBlock [...]
             ]
         );
     }

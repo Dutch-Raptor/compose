@@ -1,5 +1,5 @@
-use crate::ast::Expr;
 use crate::ast::macros::node;
+use crate::ast::Expr;
 use crate::{SyntaxKind, SyntaxNode};
 
 node! {
@@ -33,18 +33,25 @@ impl<'a> Range<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::AstNode;
     use super::*;
+    use crate::assert_ast;
+    use crate::ast::{AstNode, FieldAccess, FuncCall, Int, Parenthesized};
     use crate::test_utils::test_parse;
 
     #[test]
     fn test_range_exclusive() {
-        let nodes = test_parse("1..5");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert_eq!(range.start().unwrap().to_text(), "1");
-        assert_eq!(range.end().unwrap().to_text(), "5");
-        assert!(!range.is_inclusive());
+        assert_ast!(
+            "1..5",
+            range as Range {
+                with start: Int = range.start().unwrap() => {
+                    assert_eq!(start.get(), 1);
+                }
+                with end: Int = range.end().unwrap() => {
+                    assert_eq!(end.get(), 5);
+                }
+                assert_eq!(range.is_inclusive(), false);
+            }
+        )
     }
 
     #[test]
@@ -55,86 +62,133 @@ mod tests {
         assert_eq!(range.start().unwrap().to_text(), "1");
         assert_eq!(range.end().unwrap().to_text(), "5");
         assert!(range.is_inclusive());
+
+        assert_ast!(
+            "1..=5",
+            range as Range {
+                with start: Int = range.start().unwrap() => {
+                    assert_eq!(start.get(), 1);
+                }
+                with end: Int = range.end().unwrap() => {
+                    assert_eq!(end.get(), 5);
+                }
+                assert_eq!(range.is_inclusive(), true);
+            }
+        )
     }
 
     #[test]
     fn test_range_from() {
-        let nodes = test_parse("1..");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert_eq!(range.start().unwrap().to_text(), "1");
-        assert!(range.end().is_none());
-        assert!(!range.is_inclusive());
+        assert_ast!(
+            "1..",
+            range as Range {
+                with start: Int = range.start().unwrap() => {
+                    assert_eq!(start.get(), 1);
+                }
+                assert_eq!(range.end().is_none(), true);
+                assert_eq!(range.is_inclusive(), false);
+            }
+        )
     }
 
     #[test]
     fn test_range_from_inclusive() {
-        let nodes = test_parse("1..=");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert_eq!(range.start().unwrap().to_text(), "1");
-        assert!(range.end().is_none());
-        assert!(range.is_inclusive());
+        assert_ast!(
+            "1..=",
+            range as Range {
+                with start: Int = range.start().unwrap() => {
+                    assert_eq!(start.get(), 1);
+                }
+                assert_eq!(range.end().is_none(), true);
+                assert_eq!(range.is_inclusive(), true);
+            }
+        )
     }
 
     #[test]
     fn test_range_to_exclusive() {
-        let nodes = test_parse("..5");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert!(range.start().is_none());
-        assert_eq!(range.end().unwrap().to_text(), "5");
-        assert!(!range.is_inclusive());
+        assert_ast!(
+            "..5",
+            range as Range {
+                assert_eq!(range.start().is_none(), true);
+                with end: Int = range.end().unwrap() => {
+                    assert_eq!(end.get(), 5);
+                }
+                assert_eq!(range.is_inclusive(), false);
+            }
+        )
     }
 
     #[test]
     fn test_range_to_inclusive() {
-        let nodes = test_parse("..=5");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert!(range.start().is_none());
-        assert_eq!(range.end().unwrap().to_text(), "5");
-        assert!(range.is_inclusive());
+        assert_ast!(
+            "..=5",
+            range as Range {
+                assert_eq!(range.start().is_none(), true);
+                with end: Int = range.end().unwrap() => {
+                    assert_eq!(end.get(), 5);
+                }
+                assert_eq!(range.is_inclusive(), true);
+            }
+        )
     }
 
     #[test]
     fn test_range_full() {
-        let nodes = test_parse("..");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert!(range.start().is_none());
-        assert!(range.end().is_none());
-        assert!(!range.is_inclusive());
+        assert_ast!(
+            "..",
+            range as Range {
+                assert_eq!(range.start().is_none(), true);
+                assert_eq!(range.end().is_none(), true);
+                assert_eq!(range.is_inclusive(), false);
+            }
+        )
     }
 
     #[test]
     fn test_range_with_expressions() {
-        let nodes = test_parse("(1 + 2)..(3 * 4)");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert_eq!(range.start().unwrap().to_text(), "(1+2)");
-        assert_eq!(range.end().unwrap().to_text(), "(3*4)");
-        assert!(!range.is_inclusive());
+        assert_ast!(
+            "(1 + 2)..(3 * 4)",
+            range as Range {
+                with start: Parenthesized = range.start().unwrap() => {
+                    assert_eq!(start.to_text(), "(1+2)");
+                }
+                with end: Parenthesized = range.end().unwrap() => {
+                    assert_eq!(end.to_text(), "(3*4)");
+                }
+                assert_eq!(range.is_inclusive(), false);
+            }
+        )
     }
 
     #[test]
     fn test_range_with_method_calls() {
-        let nodes = test_parse("x.min()..=y.max()");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert_eq!(range.start().unwrap().to_text(), "x.min()");
-        assert_eq!(range.end().unwrap().to_text(), "y.max()");
-        assert!(range.is_inclusive());
+        assert_ast!(
+            "x.min()..=y.max()",
+            range as Range {
+                with start: FuncCall = range.start().unwrap() => {
+                    assert_eq!(start.to_text(), "x.min()");
+                }
+                with end: FuncCall = range.end().unwrap() => {
+                    assert_eq!(end.to_text(), "y.max()");
+                }
+            }
+        )
     }
 
     #[test]
     fn test_range_with_field_access() {
-        let nodes = test_parse("point.x..point.y");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert_eq!(range.start().unwrap().to_text(), "point.x");
-        assert_eq!(range.end().unwrap().to_text(), "point.y");
-        assert!(!range.is_inclusive());
+        assert_ast!(
+            "point.x..point.y",
+            range as Range {
+                with start: FieldAccess = range.start().unwrap() => {
+                    assert_eq!(start.to_text(), "point.x");
+                }
+                with end: FieldAccess = range.end().unwrap() => {
+                    assert_eq!(end.to_text(), "point.y");
+                }
+            }
+        )
     }
 
     #[test]
@@ -145,5 +199,26 @@ mod tests {
         assert_eq!(range.start().unwrap().to_text(), "(0..10)");
         assert_eq!(range.end().unwrap().to_text(), "20");
         assert!(!range.is_inclusive());
+
+        assert_ast!(
+            "(0..10)..20",
+            range as Range {
+                with start: Parenthesized = range.start().unwrap() => {
+                    with inner_range: Range = start.expr() => {
+                        with inner_start: Int = inner_range.start().unwrap() => {
+                            assert_eq!(inner_start.get(), 0);
+                        }
+                        with inner_end: Int = inner_range.end().unwrap() => {
+                            assert_eq!(inner_end.get(), 10);
+                        }
+                        assert_eq!(inner_range.is_inclusive(), false);
+                    }
+                }
+                with end: Int = range.end().unwrap() => {
+                    assert_eq!(end.get(), 20);
+                }
+                assert_eq!(range.is_inclusive(), false);
+            }
+        )
     }
 }

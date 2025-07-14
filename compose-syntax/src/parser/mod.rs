@@ -7,10 +7,11 @@ mod statements;
 use crate::file::FileId;
 use crate::kind::SyntaxKind;
 use crate::node::SyntaxNode;
-use crate::set::{syntax_set, SyntaxSet};
+use crate::scanner::Scanner;
+use crate::set::{SyntaxSet, syntax_set};
 use crate::{Lexer, Span, SyntaxError};
 use compose_utils::trace_log;
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use expressions::err_unclosed_delim;
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut, Range};
@@ -420,6 +421,16 @@ impl<'s> Parser<'s> {
         }
     }
 
+    /// skips tokens until the given node, based on its span
+    pub(crate) fn recover_until_node(&mut self, node: &SyntaxNode) {
+        while !self.end() {
+            if self.token.node.span() == node.span() {
+                break;
+            }
+            self.eat();
+        }
+    }
+
     /// Tries to consume a closing delimiter like `}` or `)` or reports a matching open delimiter as unclosed.
     ///
     /// This is used for detecting unbalanced groupings.
@@ -450,7 +461,6 @@ struct MemoArena {
 
 impl<'s> Parser<'s> {
     pub(crate) fn new(text: &'s str, offset: usize, file_id: FileId) -> Self {
-        
         let mut lexer = Lexer::new(text, file_id);
         lexer.jump(offset);
 
@@ -465,6 +475,10 @@ impl<'s> Parser<'s> {
             last_pos: 0,
             memo: Default::default(),
         }
+    }
+
+    pub fn scanner(&self) -> Scanner<'s> {
+        Scanner::new(self.lexer.clone()).with_offset(self.token.start)
     }
 
     pub(crate) fn finish(self) -> Vec<SyntaxNode> {

@@ -1,4 +1,4 @@
-use crate::ast::{Expr, node};
+use crate::ast::{node, Expr};
 use crate::kind::SyntaxKind;
 use crate::precedence::{Precedence, PrecedenceTrait};
 
@@ -132,8 +132,8 @@ impl<'a> Binary<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{AstNode, Int};
-    use crate::test_utils::test_parse;
+    use crate::assert_ast;
+    use crate::ast::{Int};
 
     #[test]
     fn test_binop() {
@@ -143,62 +143,61 @@ mod tests {
 
     #[test]
     fn test_precedence_equal() {
-        let node = test_parse("1 + 2 + 3").pop().unwrap();
-
-        let outer_bin: Binary = node.cast().unwrap();
-
-        assert_eq!(outer_bin.op(), BinOp::Add);
-
-        let lhs_int: Int = outer_bin.lhs().to_untyped().cast().unwrap();
-        assert_eq!(lhs_int.get(), 1);
-
-        let rhs_bin: Binary = outer_bin.rhs().to_untyped().cast().unwrap();
-        assert_eq!(rhs_bin.op(), BinOp::Add);
-
-        let rhs_bin_lhs: Int = rhs_bin.lhs().to_untyped().cast().unwrap();
-        assert_eq!(rhs_bin_lhs.get(), 2);
-        let rhs_bin_rhs: Int = rhs_bin.rhs().to_untyped().cast().unwrap();
-        assert_eq!(rhs_bin_rhs.get(), 3);
+        assert_ast!("1 + 2 + 3",
+            bin as Binary {
+                assert_eq!(bin.op(), BinOp::Add);
+                with lhs: Int = bin.lhs() => {
+                    assert_eq!(lhs.get(), 1);
+                }
+                with rhs: Binary = bin.rhs() => {
+                    assert_eq!(rhs.op(), BinOp::Add);
+                    with inner_lhs: Int = rhs.lhs() => {
+                        assert_eq!(inner_lhs.get(), 2);
+                    }
+                    with inner_rhs: Int = rhs.rhs() => {
+                        assert_eq!(inner_rhs.get(), 3);
+                    }
+                }
+            }
+        );
     }
 
     #[test]
     fn test_precedence_higher() {
-        {
-            let node = test_parse("1 + 2 * 3").pop().unwrap();
-
-            let outer_bin: Binary = node.cast().unwrap();
-
-            assert_eq!(outer_bin.op(), BinOp::Add);
-
-            let lhs_int: Int = outer_bin.lhs().to_untyped().cast().unwrap();
-            assert_eq!(lhs_int.get(), 1);
-
-            let rhs_bin: Binary = outer_bin.rhs().to_untyped().cast().unwrap();
-            assert_eq!(rhs_bin.op(), BinOp::Mul);
-
-            let rhs_bin_lhs: Int = rhs_bin.lhs().to_untyped().cast().unwrap();
-            assert_eq!(rhs_bin_lhs.get(), 2);
-            let rhs_bin_rhs: Int = rhs_bin.rhs().to_untyped().cast().unwrap();
-            assert_eq!(rhs_bin_rhs.get(), 3);
-        }
-
-        {
-            let node = test_parse("2 * 3 + 1").pop().unwrap();
-
-            let outer_bin: Binary = node.cast().unwrap();
-
-            assert_eq!(outer_bin.op(), BinOp::Add);
-
-            let lhs_bin: Binary = outer_bin.lhs().to_untyped().cast().unwrap();
-            assert_eq!(lhs_bin.op(), BinOp::Mul);
-
-            let lhs_bin_lhs: Int = lhs_bin.lhs().to_untyped().cast().unwrap();
-            assert_eq!(lhs_bin_lhs.get(), 2);
-            let lhs_bin_rhs: Int = lhs_bin.rhs().to_untyped().cast().unwrap();
-            assert_eq!(lhs_bin_rhs.get(), 3);
-
-            let rhs_int: Int = outer_bin.rhs().to_untyped().cast().unwrap();
-            assert_eq!(rhs_int.get(), 1);
-        }
+        assert_ast!("1 + 2 * 3",
+            bin as Binary {
+                assert_eq!(bin.op(), BinOp::Add);
+                with lhs: Int = bin.lhs() => {
+                    assert_eq!(lhs.get(), 1);
+                }
+                with rhs: Binary = bin.rhs() => {
+                    assert_eq!(rhs.op(), BinOp::Mul);
+                    with inner_lhs: Int = rhs.lhs() => {
+                        assert_eq!(inner_lhs.get(), 2);
+                    }
+                    with inner_rhs: Int = rhs.rhs() => {
+                        assert_eq!(inner_rhs.get(), 3);
+                    }
+                }
+            }
+        );
+        assert_ast!(
+            "1 * 2 + 3",
+            bin as Binary {
+                assert_eq!(bin.op(), BinOp::Add);
+                with lhs: Binary = bin.lhs() => {
+                    assert_eq!(lhs.op(), BinOp::Mul);
+                    with inner_lhs: Int = lhs.lhs() => {
+                        assert_eq!(inner_lhs.get(), 1);
+                    }
+                    with inner_rhs: Int = lhs.rhs() => {
+                        assert_eq!(inner_rhs.get(), 2);
+                    }
+                }
+                with rhs: Int = bin.rhs() => {
+                    assert_eq!(rhs.get(), 3);
+                }
+            }
+        );
     }
 }

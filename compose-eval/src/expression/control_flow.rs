@@ -28,11 +28,30 @@ impl Eval for ast::Conditional<'_> {
 
 impl Eval for ast::WhileLoop<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
-        let mut value = Value::unit();
+        let mut output = Value::unit();
+        let flow = vm.flow.take();
         while eval_condition(self.condition(), vm)? {
-            value = self.body().eval(vm)?.value;
+            output = self.body().eval(vm)?.value;
+
+            match &vm.flow {
+                None => {}
+                Some(FlowEvent::Break(_, value)) => {
+                    if let Some(value) = value {
+                        output = value.clone();
+                    }
+                    vm.flow = None;
+                    break;
+                }
+                Some(FlowEvent::Continue(_)) => vm.flow = None,
+                Some(FlowEvent::Return(..)) => break,
+            }
         }
-        Ok(Evaluated::mutable(value))
+
+        if let Some(flow) = flow {
+            vm.flow = Some(flow);
+        }
+
+        Ok(Evaluated::mutable(output))
     }
 }
 
@@ -70,9 +89,12 @@ impl Eval for ast::ForLoop<'_> {
                 SourceResult::Ok(())
             })?;
 
-            match root_guard.vm.flow {
+            match &root_guard.vm.flow {
                 None => {}
-                Some(FlowEvent::Break(_)) => {
+                Some(FlowEvent::Break(_, value)) => {
+                    if let Some(value) = value {
+                        output = value.clone();
+                    }
                     root_guard.vm.flow = None;
                     break;
                 }

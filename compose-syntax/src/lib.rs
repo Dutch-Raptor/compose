@@ -10,6 +10,7 @@ mod parser;
 mod set;
 pub mod ast;
 mod precedence;
+mod scanner;
 
 pub use lexer::Lexer;
 pub use node::SyntaxNode;

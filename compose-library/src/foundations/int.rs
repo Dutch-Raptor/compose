@@ -4,7 +4,7 @@ use compose_library::Value;
 use compose_macros::{cast, func};
 use compose_macros::{scope, ty};
 
-#[ty(scope, cast, name = "int")]
+#[ty(scope, cast, name = "Int")]
 type i64;
 
 #[scope]

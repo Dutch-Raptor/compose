@@ -7,7 +7,7 @@ fn fibonacci() {
         let mut b = 0;
         let mut i = 1;
 
-        while i < 92 {
+        while (i < 92) {
             a += b;
             b = a - b;
             i += 1;
@@ -24,7 +24,7 @@ fn shared_state() {
     let input = r#"
         let mut i = box::new(0);
         
-        let inc = (ref mut v) => { *v += 1; };
+        let inc = { ref mut v => *v += 1; };
         
         inc(i);
         
@@ -42,8 +42,8 @@ fn shared_state() {
 fn closure_recursion() {
     let input = r#"
         // Recursively clamps a value to <= 0;
-        let no_pos = (v) => {
-            if v > 0 {
+        let no_pos = { v =>
+            if (v > 0) {
                 no_pos(v - 1);
             } else {
                 v;
@@ -60,13 +60,13 @@ fn closure_recursion() {
 #[test]
 fn closure_recursion_2() {
     let input = r#"
-        let fact = (n) => {
-            if n == 0 {
+        let fact = { n  =>
+            if (n == 0) {
                 1;
             } else {
                 n * fact(n - 1);
             };
-        } ;
+        };
         
         assert::eq(fact(5), 120);
     "#;
@@ -77,9 +77,9 @@ fn closure_recursion_2() {
 #[test]
 fn closure_capturing() {
     let input = r#"
-        let create_counter = (from = 0) => {
+        let create_counter = { from = 0 =>
             let mut cur = box::new(from);
-            |ref mut cur| () => {
+            { |ref mut cur| =>
                 let ret = *cur;
                 *cur += 1;
                 ret;

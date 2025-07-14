@@ -12,8 +12,6 @@ use compose_library::diag::{write_diagnostics, SourceDiagnostic};
 use compose_library::World;
 use std::path::PathBuf;
 
-pub use compose;
-
 mod error;
 mod explain;
 mod file;

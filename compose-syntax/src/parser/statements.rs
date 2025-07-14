@@ -21,6 +21,20 @@ pub(super) fn statement(p: &mut Parser) {
         return;
     }
 
+    if p.at(SyntaxKind::Break) {
+        break_statement(p);
+        return;
+    }
+
+    if p.eat_if(SyntaxKind::Continue) {
+        return
+    }
+
+    if p.at(SyntaxKind::Return) {
+        return_statement(p);
+        return;
+    }
+
     let m = p.marker();
 
     code_expr_prec(p, ExprContext::Statement, Precedence::Lowest);
@@ -34,6 +48,30 @@ pub(super) fn statement(p: &mut Parser) {
         p.wrap(m, SyntaxKind::Assignment)
     }
 }
+
+pub fn return_statement(p: &mut Parser) {
+    let m = p.marker();
+    p.assert(SyntaxKind::Return);
+
+    if p.at_set(set::EXPR) {
+        code_expression(p);
+    }
+
+    p.wrap(m, SyntaxKind::ReturnStatement)
+}
+
+
+pub fn break_statement(p: &mut Parser) {
+    let m = p.marker();
+    p.assert(SyntaxKind::Break);
+
+    if p.at_set(set::EXPR) {
+        code_expression(p);
+    }
+
+    p.wrap(m, SyntaxKind::BreakStatement)
+}
+
 
 pub fn let_binding(p: &mut Parser) {
     trace_fn!("parse_let_binding");
@@ -89,11 +127,15 @@ pub fn let_binding(p: &mut Parser) {
 pub fn code(p: &mut Parser, end_set: SyntaxSet) {
     let mut pos = p.current_end();
     while !p.end() && !p.at_set(end_set) {
+        if p.eat_if(SyntaxKind::Semicolon) {
+            continue;
+        }
+
         trace_fn!("code", "loop pos= {}", pos);
         statement(p);
 
         // Expect the end of an expression. Either a semicolon or a newline.
-        if !p.end() && !p.skip_if(SyntaxKind::Semicolon) {
+        if !p.end() && !p.skip_if(SyntaxKind::Semicolon) && !p.at_set(set::STMT_TERMINATOR) {
             p.insert_error_before("expected a semicolon after a statement")
                 .with_code(&E0006_UNTERMINATED_STATEMENT)
                 .with_label_message("help: insert a semicolon here");

@@ -127,16 +127,81 @@ impl<'a> Array<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kind::SyntaxKind;
-    use crate::test_utils::test_parse;
+    use crate::assert_ast;
 
     #[test]
     fn parse_ident() {
-        let parsed = test_parse("abc");
-        assert_eq!(parsed.len(), 1);
-        let first = &parsed[0];
-        assert_eq!(first.kind(), SyntaxKind::Ident);
-        let ident: Ident = first.cast().unwrap();
-        assert_eq!(ident.get(), "abc");
+        assert_ast!(
+            "foo",
+            ident as Ident {
+                assert_eq!(ident.get(), "foo");
+            }
+        )
+    }
+
+    #[test]
+    fn parse_bool() {
+        assert_ast!(
+            "true",
+            bool as Bool {
+                assert_eq!(bool.get(), true);
+            }
+        )
+    }
+
+    #[test]
+    fn parse_int() {
+        assert_ast!(
+            "123",
+            int as Int {
+                assert_eq!(int.get(), 123);
+            }
+        )
+    }
+
+    #[test]
+    fn parse_str() {
+        assert_ast!(
+            "\"foo\"",
+            str as Str {
+                assert_eq!(str.get(), "foo");
+            }
+        )
+    }
+
+    #[test]
+    fn parse_array() {
+        assert_ast!(
+            "[1, 2, 3]",
+            array as Array {
+                array.elements() => [
+                    int as Int { assert_eq!(int.get(), 1); }
+                    int as Int { assert_eq!(int.get(), 2); }
+                    int as Int { assert_eq!(int.get(), 3); }
+                ]
+            }
+        )
+    }
+
+    #[test]
+    fn parse_code_block() {
+        assert_ast!(
+            "{ 1; 2; 3; }",
+            code_block as CodeBlock {
+                code_block.statements() => [
+                    int as Int { assert_eq!(int.get(), 1); }
+                    int as Int { assert_eq!(int.get(), 2); }
+                    int as Int { assert_eq!(int.get(), 3); }
+                ]
+            }
+        )
+    }
+
+    #[test]
+    fn parse_unit() {
+        assert_ast!(
+            "()",
+            _unit as Unit {}
+        )
     }
 }

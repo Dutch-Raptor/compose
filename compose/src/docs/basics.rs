@@ -46,7 +46,7 @@ compose_doc!(
 
     ```compose
     let x;
-    if true {
+    if (true) {
         x = 1;
     } else {
         x = 2;
@@ -56,7 +56,7 @@ compose_doc!(
 
     > However, in this instance we might use the fact that `if` is an expression to assign the intended value to x directly.
     > ```compose
-    > let x = if true { 1; } else { 2; };
+    > let x = if (true) { 1; } else { 2; };
     > assert::eq(x, 1);
     > ```
 
@@ -141,7 +141,7 @@ compose_doc!(
     Function calls in Compose use parentheses to pass arguments, just like most languages:
 
     ```compose
-    # let add = (x, y) => x + y;
+    # let add = { x, y => x + y; };
     print("Hello!");
     add(1, 2);
     ```
@@ -162,14 +162,14 @@ compose_doc!(
     Basic syntax:
 
     ```compose
-    let double = (x) => x * 2;
+    let double = { x => x * 2; };
     assert::eq(double(5), 10);
     ```
 
     Closures can take any number of arguments and produce a value:
 
     ```compose
-    let greet = (name) => "Hi, " + name + "!";
+    let greet = { name => "Hi, " + name + "!"; };
     assert::eq(greet("Pieter"), "Hi, Pieter!");
     ```
 
@@ -189,7 +189,7 @@ compose_doc!(
     ```compose
     let mut b = box::new(10);
 
-    let get = |ref b| () => *b;
+    let get = { |ref b| => *b; };
     assert::eq(get(), 10);
 
     *b = 20;
@@ -205,7 +205,7 @@ compose_doc!(
     ```compose
     let mut b = box::new(1);
 
-    let inc = |ref mut b| () => { *b = *b + 1; };
+    let inc = { |ref mut b| => *b = *b + 1; };
 
     inc();
     assert::eq(*b, 2);
@@ -219,7 +219,7 @@ compose_doc!(
 
     ```compose
     let a = 42;
-    let closure = |a| () => a + 1;
+    let closure = { |a| => a + 1; };
     assert::eq(closure(), 43);
     ```
 
@@ -232,7 +232,7 @@ compose_doc!(
     Closures can be returned from functions or passed to other functions:
 
     ```compose
-    let make_adder = (base) => |base| (x) => x + base;
+    let make_adder = { base => { |base| x => x + base; }; };
 
     let add_five = make_adder(5);
     assert::eq(add_five(3), 8);
