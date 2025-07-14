@@ -5,7 +5,7 @@ use crate::kind::SyntaxKind;
 use crate::parser::{expressions, ExprContext};
 use crate::parser::Parser;
 use crate::precedence::Precedence;
-use crate::set;
+use crate::{set, SyntaxError};
 
 /// Parses a binding or reassignment pattern.
 pub fn pattern<'s>(
@@ -34,7 +34,7 @@ fn pattern_leaf<'s>(
         p.eat();
         return;
     } else if !p.at_set(set::PATTERN_LEAF) {
-        p.expected("pattern");
+        p.insert_error_here("expected a pattern");
         return;
     }
 
@@ -49,7 +49,8 @@ fn pattern_leaf<'s>(
     if !reassignment {
         let node = &mut p[m];
         if node.kind() != SyntaxKind::Ident {
-            node.expected("pattern");
+            let span = node.span();
+            p.insert_error(SyntaxError::new("expected a pattern", span));
             return;
         }
         if !seen.insert(text) {

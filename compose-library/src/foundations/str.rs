@@ -10,7 +10,7 @@ use std::fmt;
 use std::ops::Add;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[ty(scope, cast, name = "string")]
+#[ty(scope, cast, name = "String")]
 pub struct Str(pub EcoString);
 
 impl Add for &Str {

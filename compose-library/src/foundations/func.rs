@@ -6,7 +6,7 @@ use compose_error_codes::E0010_UNCAPTURED_VARIABLE;
 use compose_library::diag::{Spanned, error};
 use compose_library::{Scope, UntypedRef};
 use compose_macros::{cast, ty};
-use compose_syntax::ast::AstNode;
+use compose_syntax::ast::{AstNode};
 use compose_syntax::{Label, Span, SyntaxNode, ast};
 use compose_utils::Static;
 use ecow::{EcoString, eco_format, eco_vec};
@@ -194,8 +194,8 @@ impl Closure {
 
             let params = self
                 .node
-                .cast::<ast::Closure>()
-                .expect("Closure contains non closure node")
+                .cast::<ast::Lambda>()
+                .expect("Closure contains non lambda node")
                 .params()
                 .children()
                 .map(|p| p.to_untyped().to_text())
@@ -225,7 +225,7 @@ impl Closure {
 
 impl fmt::Display for Closure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let closure: ast::Closure = self.node.cast().expect("closure");
+        let closure: ast::Lambda = self.node.cast().expect("closure");
         let params = closure.params().to_untyped().to_text();
 
         write!(f, "{} => ...", params)

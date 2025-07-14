@@ -90,7 +90,7 @@ fn test_skip_iter() {
 fn test_map_iter() {
     assert_eval(
         r#"
-        let mut r = (0..3).iter().map(x => x * 2);
+        let mut r = (0..3).iter().map() { x => x * 2 };
 
         assert::eq(r.next(), 0);
         assert::eq(r.next(), 2);
@@ -104,7 +104,7 @@ fn test_map_iter() {
 fn test_take_while_iter() {
     assert_eval(
         r#"
-        let mut r = (0..10).iter().take_while(x => x % 2 == 0 || x < 3);
+        let mut r = (0..10).iter().take_while() { x => x % 2 == 0 || x < 3 };
         assert::eq(r.next(), 0);
         assert::eq(r.next(), 1);
         assert::eq(r.next(), 2);

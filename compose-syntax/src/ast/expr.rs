@@ -1,12 +1,12 @@
+use crate::SyntaxNode;
 use crate::ast::atomics::Unit;
 use crate::ast::control_flow::Conditional;
 use crate::ast::map::MapLiteral;
 use crate::ast::range::Range;
 use crate::ast::unary::Unary;
-use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, Int, Parenthesized, WhileLoop};
-use crate::ast::{Bool, Closure, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
+use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, Int, Lambda, Parenthesized, WhileLoop};
+use crate::ast::{Bool, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
 use crate::kind::SyntaxKind;
-use crate::SyntaxNode;
 
 /// An expression. The base of Compose. Any "statement" is an expression.
 ///
@@ -32,7 +32,6 @@ pub enum Expr<'a> {
     FuncCall(FuncCall<'a>),
     FieldAccess(FieldAccess<'a>),
     PathAccess(PathAccess<'a>),
-    Closure(Closure<'a>),
     Parenthesized(Parenthesized<'a>),
     Conditional(Conditional<'a>),
     WhileLoop(WhileLoop<'a>),
@@ -40,6 +39,7 @@ pub enum Expr<'a> {
     Array(Array<'a>),
     Range(Range<'a>),
     Map(MapLiteral<'a>),
+    Lambda(Lambda<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -57,14 +57,16 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::FuncCall => Some(Self::FuncCall(FuncCall::from_untyped(node)?)),
             SyntaxKind::FieldAccess => Some(Self::FieldAccess(FieldAccess::from_untyped(node)?)),
             SyntaxKind::PathAccess => Some(Self::PathAccess(PathAccess::from_untyped(node)?)),
-            SyntaxKind::Closure => Some(Self::Closure(Closure::from_untyped(node)?)),
-            SyntaxKind::Parenthesized => Some(Self::Parenthesized(Parenthesized::from_untyped(node)?)),
+            SyntaxKind::Parenthesized => {
+                Some(Self::Parenthesized(Parenthesized::from_untyped(node)?))
+            }
             SyntaxKind::Conditional => Some(Self::Conditional(Conditional::from_untyped(node)?)),
-            SyntaxKind::WhileLoop => Some(Self::WhileLoop(WhileLoop::from_untyped(node)?)),       
-            SyntaxKind::ForLoop => Some(Self::ForLoop(ForLoop::from_untyped(node)?)),       
-            SyntaxKind::Array => Some(Self::Array(Array::from_untyped(node)?)),       
-            SyntaxKind::Range => Some(Self::Range(Range::from_untyped(node)?)),       
-            SyntaxKind::MapLiteral => Some(Self::Map(MapLiteral::from_untyped(node)?)),       
+            SyntaxKind::WhileLoop => Some(Self::WhileLoop(WhileLoop::from_untyped(node)?)),
+            SyntaxKind::ForLoop => Some(Self::ForLoop(ForLoop::from_untyped(node)?)),
+            SyntaxKind::Array => Some(Self::Array(Array::from_untyped(node)?)),
+            SyntaxKind::Range => Some(Self::Range(Range::from_untyped(node)?)),
+            SyntaxKind::MapLiteral => Some(Self::Map(MapLiteral::from_untyped(node)?)),
+            SyntaxKind::Lambda => Some(Self::Lambda(Lambda::from_untyped(node)?)),
             _ => None,
         }
     }
@@ -83,14 +85,14 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::FuncCall(func_call) => func_call.to_untyped(),
             Self::FieldAccess(field_access) => field_access.to_untyped(),
             Self::PathAccess(path_access) => path_access.to_untyped(),
-            Self::Closure(closure) => closure.to_untyped(),
-            Self::Parenthesized(parenthesized) => parenthesized.to_untyped(),       
-            Self::Conditional(conditional) => conditional.to_untyped(),       
-            Self::WhileLoop(while_loop) => while_loop.to_untyped(),       
-            Self::ForLoop(for_loop) => for_loop.to_untyped(),       
-            Self::Array(array) => array.to_untyped(),       
-            Self::Range(range) => range.to_untyped(),       
-            Self::Map(map) => map.to_untyped(),       
+            Self::Parenthesized(parenthesized) => parenthesized.to_untyped(),
+            Self::Conditional(conditional) => conditional.to_untyped(),
+            Self::WhileLoop(while_loop) => while_loop.to_untyped(),
+            Self::ForLoop(for_loop) => for_loop.to_untyped(),
+            Self::Array(array) => array.to_untyped(),
+            Self::Range(range) => range.to_untyped(),
+            Self::Map(map) => map.to_untyped(),
+            Self::Lambda(lambda) => lambda.to_untyped(),
         }
     }
 }

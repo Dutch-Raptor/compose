@@ -7,7 +7,7 @@ pub fn explain_command(args: ExplainArgs) -> Result<(), CliError> {
 }
 
 pub(crate) fn explain(code: &str) -> Result<(), CliError> {
-    match compose::error_codes::lookup(code) {
+    match compose_error_codes::lookup(code) {
         None => {
             eprintln!("No error code found for {}", code);
             Err(CliError::Execution)

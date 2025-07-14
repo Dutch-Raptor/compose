@@ -19,7 +19,7 @@ mod array;
 mod range;
 mod map;
 
-pub use closure::eval_closure;
+pub use closure::eval_lambda;
 
 impl Eval for Expr<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -37,7 +37,6 @@ impl Eval for Expr<'_> {
             Expr::FuncCall(f) => f.eval(vm),
             Expr::FieldAccess(f) => f.eval(vm),
             Expr::PathAccess(p) => p.eval(vm),
-            Expr::Closure(c) => c.eval(vm),
             Expr::Parenthesized(p) => p.eval(vm),
             Expr::Conditional(c) => c.eval(vm),
             Expr::WhileLoop(w) => w.eval(vm),
@@ -45,6 +44,7 @@ impl Eval for Expr<'_> {
             Expr::Array(a) => a.eval(vm),
             Expr::Range(r) => r.eval(vm),
             Expr::Map(m) => m.eval(vm),
+            Expr::Lambda(l) => l.eval(vm),
         }?
         .spanned(span)
         .track_tmp_root(vm);

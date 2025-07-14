@@ -225,9 +225,9 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "codespan-reporting",
- "compose",
  "compose-doc",
  "compose-editor",
+ "compose-error-codes",
  "compose-eval",
  "compose-library",
  "compose-syntax",

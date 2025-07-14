@@ -1,1 +1,5 @@
-#{ : "number" }
+let x = 2;
+let y = 3;
+let z = 4;
+
+let f = { x = x, y = y, z = z => f(); }

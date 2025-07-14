@@ -168,7 +168,6 @@ impl Lexer<'_> {
             '#' => SyntaxKind::Hash,
             '@' => SyntaxKind::At,
             '^' => SyntaxKind::Hat,
-            '_' => SyntaxKind::Underscore,
             '`' => SyntaxKind::Backtick,
             '\'' => SyntaxKind::Apostrophe,
             '!' => SyntaxKind::Bang,

@@ -44,3 +44,35 @@ impl AssignOp {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::assert_ast;
+    use crate::ast::{Ident, Int};
+    use super::*;
+
+    #[test]
+    fn test_assign_op() {
+        assert_eq!(AssignOp::from_kind(SyntaxKind::Eq), Some(AssignOp::Assign));
+        assert_eq!(AssignOp::from_kind(SyntaxKind::PlusEq), Some(AssignOp::AddAssign));
+        assert_eq!(AssignOp::from_kind(SyntaxKind::MinusEq), Some(AssignOp::SubAssign));
+        assert_eq!(AssignOp::from_kind(SyntaxKind::StarEq), Some(AssignOp::MulAssign));
+        assert_eq!(AssignOp::from_kind(SyntaxKind::SlashEq), Some(AssignOp::DivAssign));
+        assert_eq!(AssignOp::from_kind(SyntaxKind::AmpersandEq), Some(AssignOp::ModAssign));
+    }
+
+    #[test]
+    fn assignment() {
+        assert_ast!(
+            "a = 23",
+            assignment as Assignment {
+                with lhs: Ident = assignment.lhs() => {
+                    assert_eq!(lhs.get(), "a");
+                }
+                with rhs: Int = assignment.rhs() => {
+                    assert_eq!(rhs.get(), 23);
+                }
+            }
+        )
+    }
+}

@@ -8,12 +8,12 @@ use crate::{Sink, Type};
 use compose_library::diag::{bail, error, StrResult};
 use compose_library::foundations::range::RangeValue;
 use compose_library::repr::Repr;
-use compose_library::{ArrayValue, IterValue, MapValue};
+use compose_library::{Args, ArrayValue, IterValue, MapValue};
 use compose_macros::func;
 use compose_macros::scope;
 use compose_syntax::Span;
 use ecow::{eco_format, EcoString};
-use std::fmt;
+use std::{fmt, iter};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -32,8 +32,8 @@ pub enum Value {
 
 #[scope]
 impl Value {
-    #[func(name = "repr")]
-    pub fn repr_(self, vm: &dyn Vm) -> EcoString {
+    #[func(name = "to_string")]
+    pub fn to_string(self, vm: &dyn Vm) -> EcoString {
         self.repr(vm)
     }
 
@@ -52,6 +52,17 @@ impl Value {
             Value::Range(v) => Value::Range(v),
             Value::Map(v) => Value::Map(v.shallow_clone(vm)),
         })
+    }
+
+    #[func]
+    pub fn tap(self, vm: &mut dyn Vm, side_effect: Func) -> SourceResult<Self> {
+        vm.call_func(&side_effect, Args::new(side_effect.span, iter::once(self.clone())))?;
+        Ok(self)
+    }
+
+    #[func]
+    pub fn pipe(self, vm: &mut dyn Vm, transform: Func) -> SourceResult<Self> {
+        vm.call_func(&transform, Args::new(transform.span, iter::once(self)))
     }
 }
 

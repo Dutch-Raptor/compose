@@ -141,7 +141,7 @@ compose_doc! {
     Functions and closures are called like this:
 
     ```compose
-    # let add = (x, y) => x + y;
+    # let add = { x, y => x + y; };
     print("hi");
     add(1, 2);
     ```
@@ -176,17 +176,13 @@ compose_doc! {
 
     ```compose
     let a = 15;
-    let x = if a > 10 {
+    let x = if (a > 10) {
         "big";
     } else {
         "small";
     };
     assert::eq(x, "big");
     ```
-
-    Each branch must return a value of the same type, unless a branch ends in `break`, `return`, or an error.
-
-    ---
 
     ### 6️⃣ Loops as Expressions
 
@@ -214,7 +210,7 @@ compose_doc! {
     Closures are expressions too. You can assign them, pass them, or immediately call them:
 
     ```compose
-    let double = (x) => x * 2;
+    let double = { x => x * 2; };
     let result = double(5);     // 10
     assert::eq(result, 10);
     ```
@@ -223,7 +219,7 @@ compose_doc! {
 
     ```compose
     let mut b = box::new(3);
-    let get = |ref b| () => *b;            // captures `b` by reference
+    let get = { |ref b| => *b; };            // captures `b` by reference
     assert::eq(get(), 3);
     *b = 6;
     assert::eq(get(), 6); // get() returns the updated value of `b`

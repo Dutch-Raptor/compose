@@ -9,7 +9,7 @@ use compose_syntax::{Label, Span, SyntaxNode, ast};
 use ecow::{EcoString, EcoVec};
 use std::collections::HashMap;
 
-impl Eval for ast::Closure<'_> {
+impl Eval for ast::Lambda<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let guard = vm.temp_root_guard();
 
@@ -75,7 +75,7 @@ impl Eval for ast::Closure<'_> {
                 Some(guard.vm.engine.world.library()),
                 &captured,
             );
-            visitor.visit_closure(self);
+            visitor.visit_lambda(self);
             visitor.finish()
         };
 
@@ -166,14 +166,14 @@ fn define(
 }
 
 //noinspection RsUnnecessaryQualifications - False Positive
-pub fn eval_closure(closure: &Closure, vm: &mut Machine, args: Args) -> SourceResult<Value> {
+pub fn eval_lambda(closure: &Closure, vm: &mut Machine, args: Args) -> SourceResult<Value> {
     let guard = vm.temp_root_guard();
     let ast_closure = closure
         .node
-        .cast::<ast::Closure>()
+        .cast::<ast::Lambda>()
         .expect("closure is not an ast closure");
     let params = ast_closure.params();
-    let body = ast_closure.body();
+    let statements = ast_closure.statements();
 
     // Make sure a gc round is aware that the args are reachable
     guard.vm.track_tmp_root(&args);
@@ -216,13 +216,24 @@ pub fn eval_closure(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRe
             // Ensure all args have been used
             args.finish()?;
 
-            let output = body.eval(vm)?.value;
-            match &vm.flow {
-                None => {}
-                Some(FlowEvent::Return(_, Some(explicit))) => return Ok(explicit.clone()),
-                Some(FlowEvent::Return(_, None)) => {}
-                Some(other) => bail!(other.forbidden()),
+            let mut output = Value::unit();
+            for statement in statements {
+                output = statement.eval(vm)?.value;
+                match &vm.flow {
+                    None => {}
+                    Some(FlowEvent::Return(_, Some(explicit))) => {
+                        let explicit = explicit.clone();
+                        vm.flow = None;
+                        return Ok(explicit)
+                    },
+                    Some(FlowEvent::Return(_, None)) => {
+                        vm.flow = None;
+                        return Ok(Value::unit())
+                    }
+                    Some(other) => bail!(other.forbidden()),
+                }
             }
+
             SourceResult::Ok(output)
         })
         .track_tmp_root(guard.vm);
@@ -257,7 +268,7 @@ impl<'a> CapturesVisitor<'a> {
 
         inst
     }
-    pub(crate) fn visit_closure(&mut self, closure: ast::Closure<'a>) {
+    pub(crate) fn visit_lambda(&mut self, closure: ast::Lambda<'a>) {
         for param in closure.params().children() {
             match param.kind() {
                 ParamKind::Pos(pat) => {
@@ -274,8 +285,10 @@ impl<'a> CapturesVisitor<'a> {
         for capture in closure.captures().children() {
             self.visit(capture.to_untyped());
         }
-        
-        self.visit(closure.body().to_untyped());
+
+        for statement in closure.statements() {
+            self.visit(statement.to_untyped());
+        }
     }
 
     pub fn visit(&mut self, node: &'a SyntaxNode) {
@@ -315,7 +328,7 @@ impl<'a> CapturesVisitor<'a> {
             Expr::FieldAccess(access) => {
                 self.visit(access.target().to_untyped());
             }
-            Expr::Closure(closure) => {
+            Expr::Lambda(closure) => {
                 for param in closure.params().children() {
                     if let ast::ParamKind::Named(named) = param.kind() {
                         self.visit(named.expr().to_untyped());
@@ -393,7 +406,7 @@ mod tests {
         assert_eval(
             r#"
             let a = 10;
-            let f = |a| () => a + 1;
+            let f = { |a| => a + 1 };
             assert::eq(f(), 11);
         "#,
         );
@@ -401,7 +414,7 @@ mod tests {
         assert_eval(
             r#"
             let mut a = box::new(5);
-            let f = |ref mut a| () => {
+            let f = { |ref mut a| =>
                 *a += 1;
                 *a;
             };
@@ -413,7 +426,7 @@ mod tests {
             r#"
             let a = 2;
             let b = 3;
-            let f = |a, b| () => a * b;
+            let f = { |a, b| => a * b };
             assert::eq(f(), 6);
         "#,
         );
@@ -422,8 +435,8 @@ mod tests {
             r#"
             let mut name = box::new("Alice");
             let age = 30;
-            let show = |ref name, age| () => {
-                "Name: " + *name + ", Age: " + age.repr();
+            let show = { |ref name, age| =>
+                "Name: " + *name + ", Age: " + age.to_string();
             };
             assert::eq(show(), "Name: Alice, Age: 30");
             *name = "Bob";
@@ -462,7 +475,7 @@ mod tests {
         existing.define("c", 0i64);
         let e = &existing;
 
-        test(s, e, "x => x * 2;", &[]);
+        test(s, e, "{ x => x * 2; }", &[]);
 
         // let binding
         test(s, e, "let t = x;", &["x"]);
@@ -477,23 +490,23 @@ mod tests {
 
         // closure definition
         // Closure bodies are ignored
-        test(s, e, "let f = () => x + y;", &[]);
+        test(s, e, "let f = { => x + y; }", &[]);
         // with capture
-        test(s, e, "let f = |x| () => x + y;", &["x"]);
-        test(s, e, "let f = |x| () => f();", &["x"]);
+        test(s, e, "let f = { |x| => x + y; }", &["x"]);
+        test(s, e, "let f = { |x| => f(); }", &["x"]);
         // with params
-        test(s, e, "let f = (x, y, z) => f();", &[]);
+        test(s, e, "let f = { x, y, z => f(); }", &[]);
         // named params
         test(
             s,
             e,
-            "let f = (x = x, y = y, z = z) => f();",
+            "let f = { x = x, y = y, z = z => f(); }",
             &["x", "y", "z"],
         );
 
         // for loop
-        test(s, e, "for x in y { x + z; };", &["y", "z"]);
-        test(s, e, "for x in y { x; }; x", &["x", "y"]);
+        test(s, e, "for (x in y) { x + z; };", &["y", "z"]);
+        test(s, e, "for (x in y) { x; }; x", &["x", "y"]);
 
         // block
         test(s, e, "{ x; };", &["x"]);
@@ -505,6 +518,6 @@ mod tests {
 
         // parenthesized
         test(s, e, "(x + z);", &["x", "z"]);
-        test(s, e, "(((x) => x + y) + y);", &["y"]);
+        test(s, e, "(({ x => x + y }) + y);", &["y"]);
     }
 }
