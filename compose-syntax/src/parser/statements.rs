@@ -1,10 +1,11 @@
+use crate::fix::FixBuilder;
 use crate::kind::SyntaxKind;
-use crate::parser::Parser;
 use crate::parser::expressions::{code_expr_prec, code_expression};
-use crate::parser::{ExprContext, patterns};
+use crate::parser::Parser;
+use crate::parser::{patterns, ExprContext};
 use crate::precedence::Precedence;
-use crate::set;
-use crate::set::{ASSIGN_OP, SyntaxSet, syntax_set};
+use crate::set::{syntax_set, SyntaxSet, ASSIGN_OP};
+use crate::{set, PatchEngine, SyntaxNode};
 use compose_error_codes::{
     E0003_EXPECTED_BINDING_AFTER_LET, E0006_UNTERMINATED_STATEMENT,
     E0007_MISSING_EQUALS_AFTER_LET_BINDING,
@@ -15,8 +16,6 @@ use std::collections::HashSet;
 
 pub(super) fn statement(p: &mut Parser) {
     trace_fn!("parse_statement");
-
-
 
     if p.at(SyntaxKind::Let) || (p.at(SyntaxKind::Pub) && p.peek_at(SyntaxKind::Let)) {
         let_binding(p);
@@ -29,7 +28,7 @@ pub(super) fn statement(p: &mut Parser) {
     }
 
     if p.eat_if(SyntaxKind::Continue) {
-        return
+        return;
     }
 
     if p.at(SyntaxKind::Return) {
@@ -62,7 +61,6 @@ pub fn return_statement(p: &mut Parser) {
     p.wrap(m, SyntaxKind::ReturnStatement)
 }
 
-
 pub fn break_statement(p: &mut Parser) {
     let m = p.marker();
     p.assert(SyntaxKind::Break);
@@ -73,7 +71,6 @@ pub fn break_statement(p: &mut Parser) {
 
     p.wrap(m, SyntaxKind::BreakStatement)
 }
-
 
 pub fn let_binding(p: &mut Parser) {
     trace_fn!("parse_let_binding");
@@ -139,8 +136,23 @@ pub fn code(p: &mut Parser, end_set: SyntaxSet) {
 
         // Expect the end of an expression. Either a semicolon or a newline.
         if !p.end() && !p.skip_if(SyntaxKind::Semicolon) && !p.at_set(set::STMT_TERMINATOR) {
-            p.insert_error_before("expected a semicolon after a statement")
+            let mut engine = PatchEngine::new();
+            let stmt_span = p
+                .last_node()
+                .map(SyntaxNode::span)
+                .expect("a node was just added");
+            engine
+                .insert_after(&stmt_span, ";")
+                .expect("only one patch will be added, so no conflicts");
+
+            p
+                .insert_error_before("expected a semicolon after a statement")
                 .with_code(&E0006_UNTERMINATED_STATEMENT)
+                .with_fix(
+                    FixBuilder::new("write a semicolon to terminate this statement", stmt_span)
+                        .insert_after(&stmt_span, ";")
+                        .build(),
+                )
                 .with_label_message("help: insert a semicolon here");
         }
 

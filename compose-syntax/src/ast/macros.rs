@@ -26,7 +26,7 @@ macro_rules! node {
             }
 
             #[inline]
-            fn to_untyped(self) -> &'a $crate::SyntaxNode {
+            fn to_untyped(&self) -> &'a $crate::SyntaxNode {
                 self.0
             }
         }

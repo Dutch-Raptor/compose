@@ -129,4 +129,10 @@ impl ArrayValue {
         let arr = self.0.try_get(vm.heap())?;
         Ok(arr.contains(&value))
     }
+    
+    #[func]
+    pub fn get(&self, vm: &mut dyn Vm, index: usize) -> StrResult<Option<Value>> {
+        let arr = self.0.try_get(vm.heap())?;
+        Ok(arr.get(index).cloned())
+    }
 }

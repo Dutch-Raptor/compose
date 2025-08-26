@@ -4,7 +4,10 @@ mod stack;
 use crate::expression::eval_lambda;
 use crate::vm::stack::{StackFrames, TrackMarker};
 use compose_library::diag::{At, SourceDiagnostic, SourceResult, error};
-use compose_library::{Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink, Trace, UntypedRef, Value, VariableAccessError, Visibility, Vm, World};
+use compose_library::{
+    Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink,
+    SyntaxContext, Trace, UntypedRef, Value, VariableAccessError, Visibility, Vm, World,
+};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{Span, ast};
 use ecow::EcoString;
@@ -60,6 +63,15 @@ impl<'a> Machine<'a> {
 
     pub fn world(&self) -> &dyn World {
         self.engine.world
+    }
+
+    pub fn syntax_ctx<'w>(&self) -> SyntaxContext<'w>
+    where
+        'a: 'w,
+    {
+        SyntaxContext {
+            world: self.engine.world,
+        }
     }
 }
 
@@ -166,10 +178,9 @@ impl<'a> Machine<'a> {
     // TODO: remove
     pub fn debug_tracked(&self, from: &str) {
         let mut tracked = Vec::new();
-        self
-            .frames
+        self.frames
             .visit_refs(&mut |k| tracked.push((k, self.heap.get_untyped(k))));
-        
+
         dbg!(from, &tracked);
     }
 
@@ -197,11 +208,13 @@ impl<'a> Machine<'a> {
         var: ast::Ident,
         value: impl IntoValue,
         binding_kind: BindingKind,
-        visibility: Visibility
+        visibility: Visibility,
     ) -> SourceResult<&mut Binding> {
         self.try_bind(
             var.get().clone(),
-            Binding::new(value, var.span()).with_kind(binding_kind).with_visibility(visibility),
+            Binding::new(value, var.span())
+                .with_kind(binding_kind)
+                .with_visibility(visibility),
         )
     }
 

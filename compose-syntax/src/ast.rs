@@ -18,7 +18,7 @@ mod module;
 
 use ecow::EcoString;
 use crate::node::SyntaxNode;
-use crate::span::Span;
+use crate::span::{HasSpan, Span};
 
 pub use expr::*;
 use macros::*;
@@ -40,17 +40,23 @@ pub use module::*;
 
 pub trait AstNode<'a>: Sized {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self>;
-    fn to_untyped(self) -> &'a SyntaxNode;
-    fn span(self) -> Span {
+    fn to_untyped(&self) -> &'a SyntaxNode;
+    fn span(&self) -> Span {
         self.to_untyped().span()
     }
     
-    fn to_text(self) -> EcoString {
+    fn to_text(&self) -> EcoString {
         self.to_untyped().to_text()
     }
 
-    fn cast<T: AstNode<'a>>(self) -> Option<T> {
+    fn cast<T: AstNode<'a>>(&self) -> Option<T> {
         self.to_untyped().cast()
+    }
+}
+
+impl<'a, T> HasSpan for T where T: AstNode<'a> {
+    fn span(&self) -> Span {
+        AstNode::span(self.clone())
     }
 }
 

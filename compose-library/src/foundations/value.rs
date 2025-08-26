@@ -1,6 +1,6 @@
 use crate::diag::{At, SourceResult, Spanned};
 use crate::foundations::boxed::Boxed;
-use crate::{CastInfo, Str, UnitValue};
+use crate::{CastInfo, Str, SyntaxContext, UnitValue, World};
 use crate::{FromValue, Func};
 use crate::{IntoValue, Vm};
 use crate::{NativeScope, Reflect};
@@ -30,6 +30,7 @@ pub enum Value {
     Map(MapValue),
     Module(Module)
 }
+
 
 #[scope]
 impl Value {
@@ -159,11 +160,11 @@ impl Value {
     }
 
     /// Access an associated value of this value by path syntax `a::b`
-    pub fn path(&self, path: &str, access_span: Span, sink: &mut Sink) -> SourceResult<Value> {
+    pub fn path(&self, path: &str, access_span: Span, sink: &mut Sink, ctx: &SyntaxContext) -> SourceResult<Value> {
         match self {
             Self::Type(ty) => ty.path(path, access_span, sink).cloned().at(access_span),
             Self::Func(func) => func.path(path, access_span, sink).cloned().at(access_span),
-            Self::Module(module) => module.path(path, access_span, sink).cloned().at(access_span),
+            Self::Module(module) => module.path(path, access_span, sink, ctx).cloned(),
             _ => bail!(
                 access_span,
                 "no associated field or method named `{}` on `{}`",

@@ -495,7 +495,7 @@ impl<'s> Parser<'s> {
         self.token.kind
     }
 
-    pub(crate) fn last_text(&self) -> &str {
+    pub(crate) fn last_text(&self) -> &'s str {
         let Some(last) = self.nodes.last() else {
             return "";
         };
@@ -510,7 +510,7 @@ impl<'s> Parser<'s> {
         self.nodes.last()
     }
 
-    pub(crate) fn get_text(&self, range: Range<usize>) -> Option<&str> {
+    pub(crate) fn get_text(&self, range: Range<usize>) -> Option<&'s str> {
         self.text.get(range)
     }
 

@@ -129,7 +129,7 @@ impl<'a> AstNode<'a> for ParamKind<'a> {
         }
     }
 
-    fn to_untyped(self) -> &'a SyntaxNode {
+    fn to_untyped(&self) -> &'a SyntaxNode {
         match self {
             Self::Named(n) => n.to_untyped(),
             Self::Pos(p) => p.to_untyped(),
@@ -163,7 +163,7 @@ impl<'a> AstNode<'a> for Pattern<'a> {
         }
     }
 
-    fn to_untyped(self) -> &'a SyntaxNode {
+    fn to_untyped(&self) -> &'a SyntaxNode {
         match self {
             Self::Single(e) => e.to_untyped(),
             Self::PlaceHolder(u) => u.to_untyped(),
@@ -232,7 +232,7 @@ impl<'a> AstNode<'a> for DestructuringItem<'a> {
         }
     }
 
-    fn to_untyped(self) -> &'a SyntaxNode {
+    fn to_untyped(&self) -> &'a SyntaxNode {
         match self {
             Self::Named(n) => n.to_untyped(),
             Self::Pattern(p) => p.to_untyped(),

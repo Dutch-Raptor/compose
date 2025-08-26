@@ -1,10 +1,13 @@
 use crate::ast::AstNode;
+use crate::fix::Fix;
 use crate::kind::SyntaxKind;
+use crate::set::SyntaxSet;
 use crate::span::Span;
 use compose_error_codes::ErrorCode;
 use compose_utils::trace_log;
-use ecow::{EcoString, EcoVec, eco_vec};
+use ecow::{eco_vec, EcoString, EcoVec};
 use std::fmt::{Debug, Formatter};
+use std::ops::Range;
 use std::sync::Arc;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -380,9 +383,11 @@ impl Debug for ErrorNode {
             "{} {:?}: {:?} ({})",
             match self.error.severity {
                 SyntaxErrorSeverity::Error => "error",
-                SyntaxErrorSeverity::Warning => "warning",           
+                SyntaxErrorSeverity::Warning => "warning",
             },
-            self.error.span, self.text, self.error.message
+            self.error.span,
+            self.text,
+            self.error.message
         )
     }
 }
@@ -406,6 +411,8 @@ pub struct SyntaxError {
     /// Related labels that provide additional information.
     pub labels: EcoVec<Label>,
     pub code: Option<&'static ErrorCode>,
+
+    pub fixes: EcoVec<Fix>,
 
     pub severity: SyntaxErrorSeverity,
 }
@@ -452,7 +459,7 @@ impl SyntaxError {
         self.message = message.into();
         self
     }
-    
+
     pub fn with_note(&mut self, note: impl Into<EcoString>) -> &mut Self {
         self.notes.push(note.into());
         self
@@ -482,6 +489,11 @@ impl SyntaxError {
         self.severity = severity;
         self
     }
+
+    pub fn with_fix(&mut self, fix: Fix) -> &mut Self {
+        self.fixes.push(fix);
+        self
+    }
 }
 
 impl SyntaxError {
@@ -495,6 +507,184 @@ impl SyntaxError {
             notes: eco_vec![],
             code: None,
             severity: SyntaxErrorSeverity::Error,
+            fixes: eco_vec![],
         }
     }
 }
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct LinkedNode<'a> {
+    node: &'a SyntaxNode,
+    parent: Option<Arc<LinkedNode<'a>>>,
+    /// The index of the node in the parent's children.
+    index: usize,
+    /// The byte offset of the node in the source.
+    byte_offset: usize,
+}
+
+impl<'a> LinkedNode<'a> {
+    pub fn new(node: &'a SyntaxNode) -> Self {
+        Self {
+            node,
+            parent: None,
+            index: 0,
+            byte_offset: node.span().range().map(|r| r.start).unwrap_or(0),
+        }
+    }
+
+    /// The node.
+    pub fn node(&self) -> &'a SyntaxNode {
+        self.node
+    }
+
+    /// The index of the node in the parent's children.
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    /// The byte offset of the node in the source.
+    pub fn byte_offset(&self) -> usize {
+        self.byte_offset
+    }
+
+    pub fn span(&self) -> Span {
+        self.node.span()
+    }
+
+    pub fn range(&self) -> Range<usize> {
+        self.byte_offset..(self.byte_offset + self.node.len())
+    }
+
+    pub fn find(&self, span: Span) -> Option<LinkedNode<'a>> {
+        let self_span = self.span();
+        if self_span == span {
+            return Some(self.clone());
+        }
+
+        let span_range = span.range()?;
+
+        if let Some(self_range) = self_span.range() {
+            // If this node's span is entirely after the span, it won't be in its children.
+            if self_range.start > span_range.end {
+                return None;
+            }
+
+            // if this node's span is entirely before the span, it won't be in its children.
+            if self_range.end < span_range.start {
+                return None;
+            }
+        }
+
+        for child in self.children() {
+            if let Some(found) = child.find(span) {
+                return Some(found);
+            }
+        }
+
+        None
+    }
+}
+
+impl<'a> LinkedNode<'a> {
+    pub fn children(&self) -> LinkedChildren<'a> {
+        LinkedChildren {
+            parent: Arc::new(self.clone()),
+            iter: self.node.children().enumerate(),
+            front: self.byte_offset,
+            back: self.byte_offset + self.node.len(),
+        }
+    }
+
+    pub fn parent(&self) -> Option<&LinkedNode<'a>> {
+        self.parent.as_deref()
+    }
+
+    pub fn closest_parent(&self, kind: SyntaxKind) -> Option<&LinkedNode<'a>> {
+        let mut node = self;
+        while let Some(parent) = node.parent() {
+            if parent.node().kind() == kind {
+                return Some(parent);
+            }
+            node = parent;
+        }
+        None
+    }
+
+    pub fn closest_parent_any_of(&self, kind_set: SyntaxSet) -> Option<&LinkedNode<'a>> {
+        let mut node = self;
+        while let Some(parent) = node.parent() {
+            if kind_set.contains(parent.node().kind()) {
+                return Some(parent);
+            }
+            node = parent;
+        }
+        None
+    }
+
+    pub fn closest_parent_as<T: AstNode<'a>>(&self) -> Option<T> {
+        let mut node = self;
+        while let Some(parent) = node.parent() {
+            if let Some(val) = T::from_untyped(parent.node()) {
+                return Some(val);
+            }
+            node = parent;
+        }
+
+        None
+    }
+
+    pub fn first_child_of_kind(&self, kind: SyntaxKind) -> Option<LinkedNode<'a>> {
+        self.children().find(|child| child.node().kind() == kind)
+    }
+
+    pub fn last_child_of_kind(&self, kind: SyntaxKind) -> Option<LinkedNode<'a>> {
+        self.children()
+            .rev()
+            .find(|child| child.node().kind() == kind)
+    }
+}
+
+/// An iterator over the children of a linked node.
+pub struct LinkedChildren<'a> {
+    parent: Arc<LinkedNode<'a>>,
+    iter: std::iter::Enumerate<std::slice::Iter<'a, SyntaxNode>>,
+    front: usize,
+    back: usize,
+}
+
+impl<'a> Iterator for LinkedChildren<'a> {
+    type Item = LinkedNode<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(index, node)| {
+            let offset = self.front;
+            self.front += node.len();
+            LinkedNode {
+                node,
+                parent: Some(self.parent.clone()),
+                index,
+                byte_offset: offset,
+            }
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+impl DoubleEndedIterator for LinkedChildren<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter.next_back().map(|(index, node)| {
+            self.back -= node.len();
+            LinkedNode {
+                node,
+                parent: Some(self.parent.clone()),
+                index,
+                byte_offset: self.back,
+            }
+        })
+    }
+}
+
+impl ExactSizeIterator for LinkedChildren<'_> {}

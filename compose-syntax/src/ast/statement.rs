@@ -30,7 +30,7 @@ impl<'a> AstNode<'a> for Statement<'a> {
         }
     }
 
-    fn to_untyped(self) -> &'a SyntaxNode {
+    fn to_untyped(&self) -> &'a SyntaxNode {
         match self {
             Statement::Expr(expr) => expr.to_untyped(),
             Statement::Let(let_binding) => let_binding.to_untyped(),

@@ -9,6 +9,9 @@ macro_rules! bail {
             format!("compose: {}", format!($($tts)*))
         ))
     };
+
+
+
     ($item:expr, $($tts:tt)*) => {
         return Err(syn::Error::new_spanned(
             &$item,

@@ -1,6 +1,7 @@
 use crate::file::FileId;
+use crate::node::LinkedNode;
 use crate::parser::parse_with_offset;
-use crate::{parse, SyntaxError, SyntaxNode};
+use crate::{parse, Span, SyntaxError, SyntaxNode};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -13,18 +14,18 @@ struct Repr {
     text: String,
     nodes: Vec<SyntaxNode>,
     /// The byte indexes of the start of each line
-    line_starts: Vec<usize>
+    line_starts: Vec<usize>,
 }
 
 impl Source {
     pub fn from_file(path: impl Into<PathBuf>, text: String) -> Self {
-        Self::new(FileId::new(path), text)   
+        Self::new(FileId::new(path), text)
     }
 
     pub fn from_string(name: &str, text: String) -> Self {
         Self::new(FileId::fake(name), text)
     }
-    
+
     pub fn new(file_id: FileId, text: String) -> Self {
         let line_starts = line_starts(&text, 0).collect();
         let nodes = parse(&text, file_id);
@@ -32,18 +33,26 @@ impl Source {
             line_starts,
             id: file_id,
             text,
-            nodes
+            nodes,
         }))
     }
-    
+
     pub fn id(&self) -> FileId {
         self.0.id
     }
-    
+
     pub fn text(&self) -> &str {
         &self.0.text
     }
     
+    pub fn span_text(&self, span: Span) -> Option<&str> {
+        if self.0.id != span.id()? {
+            return None;
+        }
+        
+        self.0.text.get(span.range()?)
+    }
+
     pub fn nodes(&self) -> &[SyntaxNode] {
         &self.0.nodes
     }
@@ -59,15 +68,28 @@ impl Source {
 
         let inner = Arc::make_mut(&mut self.0);
 
-
         // parse the newly added text
-        inner.nodes.extend(parse_with_offset(&new_text, id, current_len));
+        inner
+            .nodes
+            .extend(parse_with_offset(&new_text, id, current_len));
         inner.line_starts = line_starts(&new_text, 0).collect();
         inner.text = new_text;
     }
-    
+
     pub fn warnings(&self) -> Vec<SyntaxError> {
         self.nodes().iter().flat_map(SyntaxNode::warnings).collect()
+    }
+
+    pub fn find(&self, span: Span) -> Option<LinkedNode> {
+        for node in self.nodes() {
+            let linked_node = LinkedNode::new(node);
+            match linked_node.find(span) {
+                Some(node) => return Some(node),
+                None => continue,
+            }
+        }
+
+        None
     }
 }
 

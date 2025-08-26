@@ -3,6 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::num::{NonZeroU16, NonZeroU64};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use crate::SyntaxNode;
 
 /// Defines a range in a source file.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -56,7 +57,7 @@ impl Span {
 
         let range_start = Self::min(range.start, max) as u64;
         let range_end = Self::min(range.end, max) as u64;
-        
+
         (range_start << Self::RANGE_PART_BITS) | range_end
     }
 
@@ -94,21 +95,23 @@ impl Span {
         Some(start..end)
     }
     
+    pub fn len(self) -> Option<usize> {
+        self.range().map(|r| r.len())   
+    }
+
     pub fn join(left: Span, right: Span) -> Span {
         if left.id() != right.id() {
             return left.or(right);
         }
-        
+
         let id = left.or(right).id().unwrap();
-        
-        let (start, end) =  match (left.range(), right.range()) {
+
+        let (start, end) = match (left.range(), right.range()) {
             (None, _) => return right,
             (_, None) => return left,
-            (Some(l), Some(r)) => {
-                (l.start.min(r.start), r.end.max(l.end))
-            }
+            (Some(l), Some(r)) => (l.start.min(r.start), r.end.max(l.end)),
         };
-        
+
         Span::new(id, start..end)
     }
 
@@ -120,28 +123,31 @@ impl Span {
         let path = if relative_path.is_absolute() {
             relative_path.to_path_buf()
         } else {
-            PathBuf::from(base).join(relative_path)
+            PathBuf::from(&base)
+                .canonicalize()
+                .unwrap_or(PathBuf::from(&base))
+                .join(relative_path)
         };
 
         Some(VirtualPath::new(path))
     }
-    
+
     pub fn or(self, other: Span) -> Span {
         if self.is_detached() {
             return other;
         }
         self
     }
-    
+
     pub fn after(self) -> Self {
         if self.is_detached() {
             return self;
         }
-        
+
         let range = self.range().unwrap();
         let end = range.end;
         let at = end;
-        
+
         Span::new(self.id().unwrap(), at..at + 1)
     }
 }
@@ -169,6 +175,22 @@ impl Debug for Span {
         };
 
         write!(f, "{}{}", id, range)
+    }
+}
+
+pub trait HasSpan {
+    fn span(&self) -> Span;
+}
+
+impl HasSpan for Span {
+    fn span(&self) -> Span {
+        *self
+    }
+}
+
+impl HasSpan for SyntaxNode {
+    fn span(&self) -> Span {
+        self.span()
     }
 }
 

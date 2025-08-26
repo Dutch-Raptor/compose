@@ -40,7 +40,7 @@ impl<'a> AstNode<'a> for Arg<'a> {
         }
     }
 
-    fn to_untyped(self) -> &'a SyntaxNode {
+    fn to_untyped(&self) -> &'a SyntaxNode {
         match self {
             Arg::Pos(p) => p.to_untyped(),
             Arg::Named(n) => n.to_untyped()

@@ -1,7 +1,9 @@
 pub use codespan_reporting;
 use codespan_reporting::term::termcolor::WriteColor;
 use codespan_reporting::{diagnostic, term};
-use compose_syntax::{FileId, Label, LabelType, Span, SyntaxError, SyntaxErrorSeverity};
+use compose_syntax::{
+    FileId, Fix, FixDisplay, Label, LabelType, PatchEngine, Span, SyntaxError, SyntaxErrorSeverity,
+};
 use ecow::{EcoVec, eco_vec};
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
@@ -18,18 +20,55 @@ pub fn write_diagnostics(
     config: &term::Config,
 ) -> Result<(), codespan_reporting::files::Error> {
     for diag in warnings.iter().chain(errors) {
+        dbg!(diag);
         let mut diagnostic = match diag.severity {
             Severity::Error => diagnostic::Diagnostic::error(),
             Severity::Warning => diagnostic::Diagnostic::warning(),
         }
         .with_message(diag.message.clone())
-        .with_notes(diag.notes.iter().map(|n| format!("note: {n}")).collect())
-        .with_notes(diag.hints.iter().map(|h| format!("help: {h}")).collect())
         .with_labels_iter(
             diag_label(diag)
                 .into_iter()
                 .chain(diag.labels.iter().flat_map(create_label)),
         );
+
+        for fix in &diag.fixes {
+            let Some(file_id) = fix.span.id() else {
+                continue;
+            };
+            let mut engine = PatchEngine::new();
+            let Ok(source) = world.source(file_id) else {
+                continue;
+            };
+            let Some(snippet) = source.span_text(fix.span) else {
+                continue;
+            };
+            let Some(offset) = fix.span.range().map(|r| r.start) else {
+                continue;
+            };
+
+            engine.add_patches(fix.patches.iter().cloned());
+            let Ok(patched) = engine.apply_all_with_offset(snippet, offset) else {
+                continue;
+            };
+
+            let message = format!("suggested fix: {}:\n`{}`", fix.message.trim_end_matches(':'), patched);
+            match fix.display {
+                FixDisplay::Inline { span } => diagnostic
+                    .labels
+                    .extend(create_label(&Label::secondary(span, message))),
+                FixDisplay::Footer => {
+                    diagnostic.notes.push(message);
+                }
+            }
+        }
+
+        diagnostic
+            .notes
+            .extend(diag.hints.iter().map(|h| format!("help: {h}")));
+        diagnostic
+            .notes
+            .extend(diag.notes.iter().map(|n| format!("note: {n}")));
 
         if let Some(code) = &diag.code {
             diagnostic = diagnostic.with_code(code.code).with_note(eco_format!(
@@ -56,15 +95,23 @@ fn diag_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId>> {
     Some(label)
 }
 
-fn create_label(label: &Label) -> Option<diagnostic::Label<FileId>> {
-    let id = label.span.id()?;
-    let range = label.span.range()?;
+fn create_label(label: &Label) -> Vec<diagnostic::Label<FileId>> {
+    let Some(id) = label.span.id() else {
+        return vec![];
+    };
+    let Some(range) = label.span.range() else {
+        return vec![];
+    };
     let style = match label.ty {
         LabelType::Primary => diagnostic::LabelStyle::Primary,
         LabelType::Secondary => diagnostic::LabelStyle::Secondary,
     };
 
-    Some(diagnostic::Label::new(style, id, range).with_message(label.message.clone()))
+    label
+        .message
+        .lines()
+        .map(|l| diagnostic::Label::new(style, id, range.clone()).with_message(l))
+        .collect()
 }
 
 /// Early-return with a [`StrResult`] or [`SourceResult`].
@@ -148,6 +195,7 @@ macro_rules! __error {
         $span:expr, $fmt:literal $(, $arg:expr)*
         $(; label_message: $label_message:literal $(, $label_message_arg:expr)*)?
         $(; label: $label:expr)*
+        $(; fix: $fix:expr)*
         $(; note: $note:literal $(, $note_arg:expr)*)*
         $(; hint: $hint:literal $(, $hint_arg:expr)*)*
         $(; code: $code:expr)?
@@ -161,6 +209,7 @@ macro_rules! __error {
         $(.with_label_message($crate::diag::eco_format!($label_message, $($label_message_arg),*)))*
         $(.with_note($crate::diag::eco_format!($note, $($note_arg),*)))*
         $(.with_label($label))*
+        $(.with_fix($fix))*
         $(.with_code($code))*
 
     };
@@ -232,6 +281,7 @@ pub struct SourceDiagnostic {
     pub labels: EcoVec<Label>,
     pub notes: EcoVec<EcoString>,
     pub code: Option<&'static ErrorCode>,
+    pub fixes: EcoVec<Fix>,
 }
 
 impl SourceDiagnostic {
@@ -249,6 +299,7 @@ impl SourceDiagnostic {
             labels: eco_vec!(),
             notes: eco_vec!(),
             code: None,
+            fixes: eco_vec!(),
         }
     }
 
@@ -263,6 +314,7 @@ impl SourceDiagnostic {
             labels: eco_vec!(),
             notes: eco_vec!(),
             code: None,
+            fixes: eco_vec!(),
         }
     }
 
@@ -302,6 +354,15 @@ impl SourceDiagnostic {
         self.labels.push(label);
         self
     }
+
+    pub fn add_fix(&mut self, fix: Fix) {
+        self.fixes.push(fix);
+    }
+
+    pub fn with_fix(mut self, fix: Fix) -> Self {
+        self.add_fix(fix);
+        self
+    }
 }
 
 impl From<SyntaxError> for SourceDiagnostic {
@@ -316,6 +377,7 @@ impl From<SyntaxError> for SourceDiagnostic {
             labels: error.labels,
             notes: error.notes,
             code: error.code,
+            fixes: error.fixes,
         }
     }
 }
@@ -497,7 +559,6 @@ impl<T> At<T> for Result<T, UnSpanned<SourceDiagnostic>> {
 pub trait At<T> {
     fn at(self, span: Span) -> SourceResult<T>;
 }
-
 
 impl<T, E> At<T> for Result<T, E>
 where

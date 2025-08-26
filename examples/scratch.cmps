@@ -1,4 +1,6 @@
-import "import_me.cmps" as math;
+let add = { a, b => a + b };
+
+import "./subpath/import_me.cmps" as math
 
 assert::eq(math::add(2, 3), 5);
 

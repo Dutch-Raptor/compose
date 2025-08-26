@@ -71,7 +71,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
         }
     }
 
-    fn to_untyped(self) -> &'a SyntaxNode {
+    fn to_untyped(&self) -> &'a SyntaxNode {
         match self {
             Self::Unary(unary) => unary.to_untyped(),
             Self::Unit(unit) => unit.to_untyped(),

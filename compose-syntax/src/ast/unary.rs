@@ -15,7 +15,6 @@ impl<'a> Unary<'a> {
             .unwrap_or(UnOp::Plus)
     }
 
-
     pub fn expr(self) -> Expr<'a> { self.0.cast_last() }
 }
 

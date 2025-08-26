@@ -41,14 +41,15 @@ where
     T: Into<PathBuf>,
 {
     fn from(value: T) -> Self {
-        Self(value.into())
+        VirtualPath::new(value)   
     }
 }
 
 impl VirtualPath {
     /// Create a new virtual path.
     pub fn new(path: impl Into<PathBuf>) -> Self {
-        Self(path.into())
+        let path = path.into();
+        Self(path.clone().canonicalize().unwrap_or(path))
     }
 
     pub fn display(&self) -> String {

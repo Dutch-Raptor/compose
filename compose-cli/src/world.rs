@@ -37,7 +37,9 @@ impl SystemWorld {
     /// assumes the folder containing the file is the root
     pub fn from_file(path: impl AsRef<Path>) -> FileResult<Self> {
         let path = path.as_ref();
-        let root = path.parent().unwrap().to_path_buf();
+        let root = path.parent().unwrap().to_path_buf()
+            .canonicalize()
+            .map_err(|e| FileError::from_io(e, path))?;
 
         // create a source from the file
         let entrypoint = FileId::new(path);

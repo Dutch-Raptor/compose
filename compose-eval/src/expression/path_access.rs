@@ -9,11 +9,13 @@ impl Eval for ast::PathAccess<'_> {
         let member = self.member();
 
         let target = target_expr.eval(vm)?;
+        
+        let ctx = vm.syntax_ctx();
 
         let span = member.span();
         target
             .value
-            .path(&member, span, vm.sink_mut())
+            .path(&member, span, &mut vm.engine.sink, &ctx)
             .map(|v| target.with_value(v))
     }
 }
