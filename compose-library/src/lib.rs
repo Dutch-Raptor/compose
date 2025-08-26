@@ -8,6 +8,7 @@ pub mod repr;
 mod engine;
 mod gc;
 mod vm;
+mod modules;
 
 pub use engine::*;
 pub use foundations::*;
@@ -53,6 +54,8 @@ pub fn library() -> Library {
     global.define_type::<Boxed>();
     global.define_type::<ArrayValue>();
     global.define_type::<RangeValue>();
+
+    global.define("std", Module::new("std", global.clone()));
     
     Library {
         global: Module::new("global", global),

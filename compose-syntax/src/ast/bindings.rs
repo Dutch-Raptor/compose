@@ -40,6 +40,14 @@ impl<'a> LetBinding<'a> {
     pub fn initial_value_span(self) -> Option<Span> {
         self.initial_value().map(|e| e.span())
     }
+
+    pub fn is_public(self) -> bool {
+        self.0.children().any(|n| n.kind() == SyntaxKind::Pub)
+    }
+
+    pub fn pub_span(self) -> Option<Span> {
+        self.0.children().find(|&n| n.kind() == SyntaxKind::Pub).map(|n| n.span())
+    }
 }
 
 

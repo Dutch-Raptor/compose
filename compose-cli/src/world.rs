@@ -1,5 +1,5 @@
-use compose_library::diag::{FileError, FileResult, eco_format};
-use compose_library::{Library, World, library};
+use compose_library::diag::{FileError, FileResult};
+use compose_library::{library, Library, World};
 use compose_syntax::{FileId, Source};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -79,6 +79,20 @@ impl SystemWorld {
     pub fn entry_point_source(&self) -> FileResult<Source> {
         self.source(self.entrypoint)
     }
+
+    pub fn get_or_read_from_disk(&self, file_id: FileId) -> FileResult<Source> {
+        let mut sources = self.sources.lock().unwrap();
+        if let Some(source) = sources.get(&file_id) {
+            return Ok(source.clone());
+        }
+
+        // try to read from disk
+        let path = file_id.path().0.clone();
+        let text = std::fs::read_to_string(&path).map_err(|e| FileError::from_io(e, &path))?;
+        let source = Source::new(file_id, text);
+        sources.insert(source.id(), source.clone());
+        Ok(source)
+    }
 }
 
 impl World for SystemWorld {
@@ -87,14 +101,7 @@ impl World for SystemWorld {
     }
 
     fn source(&self, file_id: FileId) -> FileResult<Source> {
-        let sources = self
-            .sources
-            .lock()
-            .map_err(|e| FileError::Other(Some(eco_format!("{e}"))))?;
-        match sources.get(&file_id) {
-            Some(s) => Ok(s.clone()),
-            None => Err(FileError::NotFound(file_id.path().0.clone())),
-        }
+        self.get_or_read_from_disk(file_id)
     }
 
     fn library(&self) -> &Library {

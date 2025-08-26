@@ -1,10 +1,11 @@
 use crate::vm::{ErrorMode, Machine};
 use crate::{Eval, Evaluated};
 use compose_library::diag::{At, SourceResult, Spanned};
-use compose_library::{BindingKind, Value, diag};
+use compose_library::{BindingKind, Value, Visibility, diag};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, Expr, Pattern};
 use ecow::eco_vec;
+use tap::Tap;
 
 impl<'a> Eval for ast::Ident<'a> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -33,6 +34,12 @@ impl<'a> Eval for ast::LetBinding<'a> {
             (false, false) => BindingKind::Uninitialized,
         };
 
+        let visibility = if self.is_public() {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+
         let value = match init {
             Some(expr) => {
                 vm.with_closure_capture_errors_mode(ErrorMode::Deferred, |vm| expr.eval(vm))?
@@ -45,7 +52,7 @@ impl<'a> Eval for ast::LetBinding<'a> {
             return Ok(Evaluated::unit());
         }
 
-        destructure_pattern(vm, self.pattern(), value.value, binding_kind)?;
+        destructure_pattern(vm, self.pattern(), value.value, binding_kind, visibility)?;
 
         Ok(Evaluated::unit())
     }
@@ -56,6 +63,7 @@ pub fn destructure_pattern(
     pattern: Pattern,
     value: Value,
     binding_kind: BindingKind,
+    visibility: Visibility,
 ) -> SourceResult<()> {
     destructure_impl(vm, pattern, value, &mut |vm, expr, value| match expr {
         Expr::Ident(ident) => {
@@ -65,7 +73,7 @@ pub fn destructure_pattern(
                 // Now that the names have been added, make sure any deferred errors are resolved
                 .resolved()?;
 
-            vm.define(ident, spanned, binding_kind)?;
+            vm.define(ident, spanned, binding_kind, visibility)?;
 
             Ok(())
         }

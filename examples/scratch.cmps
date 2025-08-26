@@ -1,5 +1,5 @@
-let x = 2;
-let y = 3;
-let z = 4;
+import "import_me.cmps" as math;
 
-let f = { x = x, y = y, z = z => f(); }
+assert::eq(math::add(2, 3), 5);
+
+println(math::add(2, 7))

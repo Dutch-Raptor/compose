@@ -1,5 +1,6 @@
 use crate::ast::{Assignment, AstNode, Expr, LetBinding};
 use crate::ast::macros::node;
+use crate::ast::module::ModuleImport;
 use crate::kind::SyntaxKind;
 use crate::SyntaxNode;
 
@@ -11,6 +12,7 @@ pub enum Statement<'a> {
     Break(BreakStatement<'a>),
     Return(ReturnStatement<'a>),
     Continue(Continue<'a>),
+    ModuleImport(ModuleImport<'a>)
 }
 
 impl<'a> AstNode<'a> for Statement<'a> {
@@ -23,6 +25,7 @@ impl<'a> AstNode<'a> for Statement<'a> {
             SyntaxKind::BreakStatement => Some(Statement::Break(BreakStatement::from_untyped(node)?)),
             SyntaxKind::ReturnStatement => Some(Statement::Return(ReturnStatement::from_untyped(node)?)),
             SyntaxKind::Continue => Some(Statement::Continue(Continue::from_untyped(node)?)),
+            SyntaxKind::ModuleImport => Some(Statement::ModuleImport(ModuleImport::from_untyped(node)?)),
             _ => Expr::from_untyped(node).map(Statement::Expr),
         }
     }
@@ -35,6 +38,7 @@ impl<'a> AstNode<'a> for Statement<'a> {
             Statement::Break(break_statement) => break_statement.to_untyped(),
             Statement::Return(return_statement) => return_statement.to_untyped(),
             Statement::Continue(continue_statement) => continue_statement.to_untyped(),
+            Statement::ModuleImport(import) => import.to_untyped(),
         }
     }
 }

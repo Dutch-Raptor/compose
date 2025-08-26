@@ -558,7 +558,7 @@ impl Display for FileError {
             }
             Self::AccessDenied => f.pad("failed to load file (access denied)"),
             Self::IsDirectory => f.pad("failed to load file (is a directory)"),
-            Self::NotSource => f.pad("not a typst source file"),
+            Self::NotSource => f.pad("not a compose source file"),
             Self::InvalidUtf8 => f.pad("file is not valid utf-8"),
             Self::Other(Some(err)) => write!(f, "failed to load file ({err})"),
             Self::Other(None) => f.pad("failed to load file"),

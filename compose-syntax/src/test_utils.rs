@@ -256,16 +256,15 @@ impl NodesTester {
         assert_eq!(
             node.kind(),
             kind,
-            "expected: {:?}, got: {:?} at {:?} ({})",
+            "expected: {:?}, got: {:?} at {:?} ({node:?})",
             kind,
             node.kind(),
             self.path,
-            node.to_text(),
         );
         assert_eq!(
             node.text(),
             text,
-            "expected: {:?}, got: {:?} at {:?}",
+            "expected: {:?}, got: {:?} at {:?} ({node:?})",
             text,
             node.text(),
             self.path

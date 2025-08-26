@@ -1,9 +1,7 @@
 use crate::vm::{FlowEvent, TrackedContainer};
 use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::{IntoSourceDiagnostic, SourceResult, Spanned, bail, error};
-use compose_library::{
-    Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError,
-};
+use compose_library::{Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError, Visibility};
 use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind};
 use compose_syntax::{Label, Span, SyntaxNode, ast};
 use ecow::{EcoString, EcoVec};
@@ -160,7 +158,7 @@ fn define(
     } else {
         BindingKind::Param
     };
-    vm.define(ident, value, kind)?;
+    vm.define(ident, value, kind, Visibility::Private)?;
 
     Ok(())
 }

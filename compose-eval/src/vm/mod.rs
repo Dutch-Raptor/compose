@@ -4,10 +4,7 @@ mod stack;
 use crate::expression::eval_lambda;
 use crate::vm::stack::{StackFrames, TrackMarker};
 use compose_library::diag::{At, SourceDiagnostic, SourceResult, error};
-use compose_library::{
-    Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink,
-    Trace, UntypedRef, Value, VariableAccessError, Vm, World,
-};
+use compose_library::{Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink, Trace, UntypedRef, Value, VariableAccessError, Visibility, Vm, World};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{Span, ast};
 use ecow::EcoString;
@@ -200,12 +197,12 @@ impl<'a> Machine<'a> {
         var: ast::Ident,
         value: impl IntoValue,
         binding_kind: BindingKind,
-    ) -> SourceResult<()> {
+        visibility: Visibility
+    ) -> SourceResult<&mut Binding> {
         self.try_bind(
             var.get().clone(),
-            Binding::new(value, var.span()).with_kind(binding_kind),
-        )?;
-        Ok(())
+            Binding::new(value, var.span()).with_kind(binding_kind).with_visibility(visibility),
+        )
     }
 
     pub fn try_bind(&mut self, name: EcoString, binding: Binding) -> SourceResult<&mut Binding> {

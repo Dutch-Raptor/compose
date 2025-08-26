@@ -16,7 +16,9 @@ use std::collections::HashSet;
 pub(super) fn statement(p: &mut Parser) {
     trace_fn!("parse_statement");
 
-    if p.at(SyntaxKind::Let) {
+
+
+    if p.at(SyntaxKind::Let) || (p.at(SyntaxKind::Pub) && p.peek_at(SyntaxKind::Let)) {
         let_binding(p);
         return;
     }
@@ -76,6 +78,7 @@ pub fn break_statement(p: &mut Parser) {
 pub fn let_binding(p: &mut Parser) {
     trace_fn!("parse_let_binding");
     let m = p.marker();
+    p.eat_if(SyntaxKind::Pub);
     p.assert(SyntaxKind::Let);
 
     let was_mut = p.eat_if(SyntaxKind::Mut);

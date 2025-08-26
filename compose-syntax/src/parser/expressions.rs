@@ -186,6 +186,7 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             p.wrap(m, SyntaxKind::Unit)
         }
         SyntaxKind::LeftParen => { parenthesized(p); },
+        SyntaxKind::Import => import(p),
         // Already fully handled in the lexer
         SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str | SyntaxKind::Ident => p.eat(),
         _ => err_expected_expression(
@@ -199,6 +200,53 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             )),
         ),
     }
+}
+
+fn import(p: &mut Parser) {
+    let m = p.marker();
+    p.assert(SyntaxKind::Import);
+
+    if !p.at(SyntaxKind::Str) {
+        p.insert_error_here("expected a string literal after `import`");
+    }
+    code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
+
+    if p.eat_if(SyntaxKind::As) {
+       if !p.eat_if(SyntaxKind::Ident) {
+           p.insert_error_here("expected an identifier after `as`");
+       }
+    }
+
+    if p.at(SyntaxKind::LeftBrace) {
+        let items_marker = p.marker();
+        p.assert(SyntaxKind::LeftBrace);
+        while !p.current().is_terminator() {
+            import_item(p);
+
+            if !p.current().is_terminator() && !p.eat_if(SyntaxKind::Comma) {
+                p.insert_error_before("expected a comma between import items")
+                    .with_label_message("help: insert a comma here");
+            }
+        }
+
+        p.expect_closing_delimiter(items_marker, SyntaxKind::RightBrace);
+    }
+
+    p.wrap(m, SyntaxKind::ModuleImport);
+}
+
+fn import_item(p: &mut Parser) {
+    let m = p.marker();
+
+    code_expression(p);
+
+    if p.eat_if(SyntaxKind::As) {
+        if !p.eat_if(SyntaxKind::Ident) {
+            p.insert_error_here("expected an identifier after `as` in import item");
+        }
+    }
+
+    p.wrap(m, SyntaxKind::ImportItem)
 }
 
 fn map(p: &mut Parser) {
@@ -419,6 +467,56 @@ mod tests {
     use super::*;
     use crate::assert_parse_tree;
     use crate::test_utils::*;
+
+    #[test]
+    fn test_parse_import() {
+        assert_parse_tree!(
+            "import \"foo.bar\"",
+            ModuleImport [
+                Import("import")
+                Str("\"foo.bar\"")
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_import_with_as() {
+        assert_parse_tree!(
+            "import \"foo.bar\" as bar",
+            ModuleImport [
+                Import("import")
+                Str("\"foo.bar\"")
+                As("as")
+                Ident("bar")
+            ]
+        )
+    }
+
+    #[test]
+    fn test_parse_import_with_as_and_items() {
+        assert_parse_tree!(
+            "import \"foo.bar\" as bar { x, y, z }",
+            ModuleImport [
+                Import("import")
+                Str("\"foo.bar\"")
+                As("as")
+                Ident("bar")
+                LeftBrace("{")
+                ImportItem [
+                    Ident("x")
+                ]
+                Comma(",")
+                ImportItem [
+                    Ident("y")
+                ]
+                Comma(",")
+                ImportItem [
+                    Ident("z")
+                ]
+                RightBrace("}")
+            ]
+        )
+    }
 
     #[test]
     fn test_parse_parenthesized() {

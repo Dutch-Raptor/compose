@@ -109,6 +109,8 @@ pub enum SyntaxKind {
     BreakStatement,
     ReturnStatement,
     Lambda,
+    ImportItem,
+    ModuleImport,
 }
 
 impl SyntaxKind {
@@ -195,6 +197,8 @@ impl SyntaxKind {
             SyntaxKind::MapLiteral => "map literal",
             SyntaxKind::Minus => "-",
             SyntaxKind::MinusEq => "-=",
+            SyntaxKind::ModuleImport => "module import",
+            SyntaxKind::ImportItem => "import item",
             SyntaxKind::Mut => "mut",
             SyntaxKind::Named => "named binding",
             SyntaxKind::NewLine => "newline",

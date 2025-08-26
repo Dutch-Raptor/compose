@@ -1,7 +1,8 @@
-use crate::file::FileId;
+use crate::file::{FileId, VirtualPath};
 use std::fmt::{Debug, Formatter};
 use std::num::{NonZeroU16, NonZeroU64};
 use std::ops::Range;
+use std::path::{Path, PathBuf};
 
 /// Defines a range in a source file.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -109,6 +110,20 @@ impl Span {
         };
         
         Span::new(id, start..end)
+    }
+
+    pub fn resolve_path(self, relative_path: impl AsRef<Path>) -> Option<VirtualPath> {
+        let id = self.id()?;
+        let base = id.path().0.clone().parent()?.to_path_buf();
+
+        let relative_path = relative_path.as_ref();
+        let path = if relative_path.is_absolute() {
+            relative_path.to_path_buf()
+        } else {
+            PathBuf::from(base).join(relative_path)
+        };
+
+        Some(VirtualPath::new(path))
     }
     
     pub fn or(self, other: Span) -> Span {

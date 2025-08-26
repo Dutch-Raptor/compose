@@ -8,7 +8,7 @@ use crate::{Sink, Type};
 use compose_library::diag::{bail, error, StrResult};
 use compose_library::foundations::range::RangeValue;
 use compose_library::repr::Repr;
-use compose_library::{Args, ArrayValue, IterValue, MapValue};
+use compose_library::{Args, ArrayValue, IterValue, MapValue, Module};
 use compose_macros::func;
 use compose_macros::scope;
 use compose_syntax::Span;
@@ -27,7 +27,8 @@ pub enum Value {
     Box(Boxed),
     Array(ArrayValue),
     Range(RangeValue),
-    Map(MapValue)
+    Map(MapValue),
+    Module(Module)
 }
 
 #[scope]
@@ -51,6 +52,7 @@ impl Value {
             Value::Array(v) => Value::Array(v.shallow_clone(vm)),
             Value::Range(v) => Value::Range(v),
             Value::Map(v) => Value::Map(v.shallow_clone(vm)),
+            Value::Module(v) => Value::Module(v.clone()),
         })
     }
 
@@ -86,6 +88,7 @@ impl Value {
             Value::Array(_) => Type::of::<ArrayValue>(),
             Value::Range(_) => Type::of::<RangeValue>(),
             Value::Map(_) => Type::of::<MapValue>(),
+            Value::Module(_) => Type::of::<Module>(),
         }
     }
 
@@ -160,6 +163,7 @@ impl Value {
         match self {
             Self::Type(ty) => ty.path(path, access_span, sink).cloned().at(access_span),
             Self::Func(func) => func.path(path, access_span, sink).cloned().at(access_span),
+            Self::Module(module) => module.path(path, access_span, sink).cloned().at(access_span),
             _ => bail!(
                 access_span,
                 "no associated field or method named `{}` on `{}`",
@@ -184,6 +188,7 @@ impl fmt::Display for Value {
             Value::Array(v) => write!(f, "{:?}", v),
             Value::Range(v) => write!(f, "{:?}", v),
             Value::Map(v) => write!(f, "{:?}", v),
+            Value::Module(v) => write!(f, "{}", v.name()),
         }
     }
 }
@@ -202,6 +207,7 @@ impl Repr for Value {
             Value::Array(v) => v.repr(vm),
             Value::Range(r) => r.repr(vm),
             Value::Map(m) => m.repr(vm),
+            Value::Module(m) => m.name().clone(),
         }
     }
 }
@@ -254,14 +260,15 @@ macro_rules! primitive {
     (@$other:ident) => { Value::$other };
 }
 
-primitive!(i64: "int", Int);
-primitive!(bool: "bool", Bool);
-primitive!(Str: "str", Str);
-primitive!(Func: "func", Func);
-primitive!(Type: "type", Type);
-primitive!(UnitValue: "unit", Unit);
-primitive!(IterValue: "iterator", Iterator);
-primitive!(Boxed: "box", Box);
-primitive!(ArrayValue: "array", Array);
-primitive!(RangeValue: "range", Range);
-primitive!(MapValue: "map", Map);
+primitive!(i64: "Int", Int);
+primitive!(bool: "Bool", Bool);
+primitive!(Str: "Str", Str);
+primitive!(Func: "Func", Func);
+primitive!(Type: "Type", Type);
+primitive!(UnitValue: "Unit", Unit);
+primitive!(IterValue: "Iterator", Iterator);
+primitive!(Boxed: "Box", Box);
+primitive!(ArrayValue: "Array", Array);
+primitive!(RangeValue: "Range", Range);
+primitive!(MapValue: "Map", Map);
+primitive!(Module: "Module", Module);

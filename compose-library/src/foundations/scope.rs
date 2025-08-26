@@ -1,13 +1,15 @@
-use crate::diag::{error, warning, At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult};
+use crate::diag::{At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult, error, warning};
 use crate::{IntoValue, Trace};
 use crate::{Library, NativeFuncData, NativeType, Sink, Type, Value};
-use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, E0011_UNBOUND_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
-use compose_library::diag::{bail, StrResult};
+use compose_error_codes::{
+    E0004_MUTATE_IMMUTABLE_VARIABLE, E0011_UNBOUND_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE,
+};
+use compose_library::diag::{StrResult, bail};
 use compose_library::{Func, NativeFunc, UntypedRef};
 use compose_syntax::{Label, Span};
-use ecow::{eco_format, eco_vec, EcoString};
-use indexmap::map::Entry;
+use ecow::{EcoString, eco_format, eco_vec};
 use indexmap::IndexMap;
+use indexmap::map::Entry;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -37,7 +39,7 @@ impl Debug for Scopes<'_> {
             .field("top", &self.top)
             .field("stack", &self.stack)
             .finish()
-    }   
+    }
 }
 
 impl<'a> Scopes<'a> {
@@ -245,7 +247,9 @@ impl Scope {
 
     /// Define a variable as a constant value. It cannot be overwritten.
     pub fn define(&mut self, name: &'static str, value: impl IntoValue) -> &mut Binding {
-        let binding = Binding::new(value, Span::detached()).with_kind(BindingKind::Constant);
+        let binding = Binding::new(value, Span::detached())
+            .with_kind(BindingKind::Constant)
+            .with_visibility(Visibility::Public);
         self.bind(name.into(), binding)
     }
 
@@ -253,7 +257,7 @@ impl Scope {
         let data = T::data();
         self.define(data.name, Type::from(data))
     }
-    
+
     pub fn bindings(&self) -> &IndexMap<EcoString, Binding> {
         &self.map
     }
@@ -315,6 +319,7 @@ pub struct Binding {
     value: Value,
     span: Span,
     kind: BindingKind,
+    pub visibility: Visibility,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -328,9 +333,18 @@ pub enum BindingKind {
     ParamMut,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Visibility {
+    Public,
+    Private,
+}
+
 impl BindingKind {
     pub fn is_mut(&self) -> bool {
-        matches!(self, BindingKind::Mutable | BindingKind::ParamMut | BindingKind::UninitializedMutable)
+        matches!(
+            self,
+            BindingKind::Mutable | BindingKind::ParamMut | BindingKind::UninitializedMutable
+        )
     }
 }
 
@@ -339,12 +353,17 @@ impl Binding {
         Self {
             kind: BindingKind::Immutable { first_assign: None },
             value: value.into_value(),
+            visibility: Visibility::Private,
             span,
         }
     }
 
     pub fn with_kind(self, kind: BindingKind) -> Self {
         Self { kind, ..self }
+    }
+
+    pub fn with_visibility(self, visibility: Visibility) -> Self {
+        Self { visibility, ..self }
     }
 
     pub fn detached(value: impl IntoValue) -> Self {

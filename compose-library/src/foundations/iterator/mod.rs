@@ -326,8 +326,10 @@ impl IterValue {
 }
 
 pub trait ValueIterator: Debug + Send + Sync {
+    /// Compute the next element of the iterator
     fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>>;
 
+    /// Compute the nth element of the iterator.
     fn nth(&self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
         if n == 0 {
             return self.next(vm);

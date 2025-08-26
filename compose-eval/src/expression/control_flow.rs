@@ -2,7 +2,7 @@ use crate::expression::bindings::destructure_pattern;
 use crate::vm::{FlowEvent, Tracked};
 use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::{At, SourceResult};
-use compose_library::{BindingKind, IterValue, Value, ValueIterator};
+use compose_library::{BindingKind, IterValue, Value, ValueIterator, Visibility};
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 
@@ -82,6 +82,7 @@ impl Eval for ast::ForLoop<'_> {
                     pattern,
                     v,
                     BindingKind::Immutable { first_assign: None },
+                    Visibility::Private,
                 )?;
 
                 output = body.eval(vm)?.value;

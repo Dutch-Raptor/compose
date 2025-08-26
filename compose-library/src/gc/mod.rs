@@ -188,6 +188,7 @@ impl Trace for Value {
             Value::Array(a) => a.visit_refs(f),
             Value::Range(r) => r.visit_refs(f),
             Value::Map(m) => m.visit_refs(f),
+            Value::Module(m) => m.visit_refs(f),
         }
     }
 }
