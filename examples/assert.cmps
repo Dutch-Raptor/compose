@@ -1,0 +1,1 @@
+pub let assert_equal = { a, b => assert(a = b, "The values were not equal"); }
