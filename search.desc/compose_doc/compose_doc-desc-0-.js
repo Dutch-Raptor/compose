@@ -1,0 +1,1 @@
+searchState.loadedDescShard("compose_doc", 0, "Compose Markdown Processor\nReturns the argument unchanged.\nReturns the argument unchanged.\nReturns the argument unchanged.\nCalls <code>U::from(self)</code>.\nCalls <code>U::from(self)</code>.\nCalls <code>U::from(self)</code>.\nTransforms Markdown by evaluating fenced <code>compose</code> code …")

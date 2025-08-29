@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["compose_library",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.89.0/core/ops/deref/trait.DerefMut.html\" title=\"trait core::ops::deref::DerefMut\">DerefMut</a> for <a class=\"struct\" href=\"compose_library/struct.Array.html\" title=\"struct compose_library::Array\">Array</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.89.0/core/ops/deref/trait.DerefMut.html\" title=\"trait core::ops::deref::DerefMut\">DerefMut</a> for <a class=\"struct\" href=\"compose_library/struct.Map.html\" title=\"struct compose_library::Map\">Map</a>"],["impl&lt;T&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.89.0/core/ops/deref/trait.DerefMut.html\" title=\"trait core::ops::deref::DerefMut\">DerefMut</a> for <a class=\"struct\" href=\"compose_library/diag/struct.Warned.html\" title=\"struct compose_library::diag::Warned\">Warned</a>&lt;T&gt;"]]],["unicase",[["impl&lt;S&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.89.0/core/ops/deref/trait.DerefMut.html\" title=\"trait core::ops::deref::DerefMut\">DerefMut</a> for <a class=\"struct\" href=\"unicase/struct.Ascii.html\" title=\"struct unicase::Ascii\">Ascii</a>&lt;S&gt;"],["impl&lt;S&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.89.0/core/ops/deref/trait.DerefMut.html\" title=\"trait core::ops::deref::DerefMut\">DerefMut</a> for <a class=\"struct\" href=\"unicase/struct.UniCase.html\" title=\"struct unicase::UniCase\">UniCase</a>&lt;S&gt;"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[881,580]}

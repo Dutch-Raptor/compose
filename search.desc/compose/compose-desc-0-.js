@@ -1,0 +1,1 @@
+searchState.loadedDescShard("compose", 0, "The Compose Programming Language\nEval a source file.\n🌍 Overview\n🧩 Variables, Let Bindings, and Scoping\n🧠 Functions and Closures\nReturns the argument unchanged.\nReturns the argument unchanged.\nCalls <code>U::from(self)</code>.\nCalls <code>U::from(self)</code>.")

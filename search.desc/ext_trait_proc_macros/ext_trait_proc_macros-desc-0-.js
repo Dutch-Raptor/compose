@@ -1,0 +1,1 @@
+searchState.loadedDescShard("ext_trait_proc_macros", 0, "Crate not intended for direct use. Use …")
