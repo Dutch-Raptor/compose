@@ -40,7 +40,6 @@ compose-editor = { path = "compose-editor" }
 compose-doc-macros = { path = "compose-doc-macros" }
 compose-doc = { path = "compose-doc" }
 compose-codespan-reporting = { path = "compose-codespan-reporting" }
-dyn-clone = "1.0.19"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
