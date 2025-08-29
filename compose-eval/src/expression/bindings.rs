@@ -5,7 +5,6 @@ use compose_library::{BindingKind, Value, Visibility, diag};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, Expr, Pattern};
 use ecow::eco_vec;
-use tap::Tap;
 
 impl<'a> Eval for ast::Ident<'a> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

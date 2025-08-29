@@ -1,6 +1,6 @@
 use crate::vm::FlowEvent;
 use crate::{eval, Eval, EvalConfig, Evaluated, Machine};
-use compose_library::diag::{bail, error, SourceResult, Warned};
+use compose_library::diag::{bail, error, SourceResult, Trace, TracePoint, Warned};
 use compose_library::{Binding, IntoValue, Module};
 use compose_syntax::ast::{AstNode, BreakStatement};
 use compose_syntax::{ast, FileId};
@@ -106,7 +106,7 @@ impl Eval for ast::ModuleImport<'_> {
 
             let module = Module::new(name.clone(), vm.frames.top.scopes.top.clone());
             SourceResult::Ok(module.into_value())
-        })?;
+        }).trace(|| TracePoint::Import, self.source_span())?;
 
         vm.try_bind(name, Binding::new(module, self.span()))?;
 

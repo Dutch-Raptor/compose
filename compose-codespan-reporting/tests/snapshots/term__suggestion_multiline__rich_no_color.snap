@@ -1,0 +1,26 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_no_color(& config)
+---
+warning: this is a block expression, not an array
+  ┌─ suggestionReplace.fun:2:30
+  │  
+2 │       let _numbers: [i32; 3] = {
+  │ ╭──────────────────────────────^
+3 │ │         1,
+4 │ │         2,
+5 │ │         3,
+6 │ │     };
+  │ ╰─────^
+  │  
+  ┌─ suggestionReplace.fun:2:30
+  │  
+2 │       let _numbers: [i32; 3] = {
+  │ ╭──────────────────────────────'
+3 │ │         1,
+4 │ │         2,
+5 │ │         3,
+6 │ │     };
+  │ ╰──────' help: to make an array, use square brackets instead of curly braces
+  │  
+  = (Note: ignored 1 multi-line suggestion)

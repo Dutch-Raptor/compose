@@ -1,0 +1,16 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_color(&config)
+---
+{fg:Yellow bold bright}warning{bold bright}: writing `&Vec<_>` instead of `&[_]` involves one more reference and cannot be used with non-Vec-based slices{/}
+  {fg:Blue}┌─{/} suggestionReplace.fun:1:12
+  {fg:Blue}│{/}
+{fg:Blue}1{/} {fg:Blue}│{/} fn _foo(_: {fg:Yellow}&Vec<u32>{/}) {}
+  {fg:Blue}│{/}            {fg:Yellow}^^^^^^^^^{/} {fg:Yellow}this type{/}
+  {fg:Blue}│{/}
+  {fg:Blue}={/}{fg:Yellow} help: change this to: `&[u32]`
+{/}  {fg:Blue}│{/}
+{fg:Blue}1{/} {fg:Blue}│{/} fn _foo(_: {fg:Yellow}&[u32]{/}) {}
+  {fg:Blue}│{/}            {fg:Yellow}~~~~~~{/}
+
+

@@ -1,0 +1,23 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_no_color(& config)
+---
+error: expected four items, found three
+  ┌─ suggestionReplace.fun:2:30
+  │  
+2 │       let _numbers: [i32; 4] = [
+  │ ╭──────────────────────────────^
+3 │ │         1,
+4 │ │         2,
+5 │ │         3,
+6 │ │     ];
+  │ ╰─────^
+  │  
+  ┌─ suggestionReplace.fun:5:11
+  │  
+5 │           3,
+  │ ╭──────────'
+6 │ │     ];
+  │ ╰' help: add a new item
+  │  
+  = (Note: ignored 1 multi-line suggestion)

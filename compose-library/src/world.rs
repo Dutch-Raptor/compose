@@ -1,6 +1,6 @@
 use crate::Library;
 use crate::diag::FileResult;
-use codespan_reporting::files::Files;
+use compose_codespan_reporting::files::Files;
 use compose_syntax::{FileId, Source, Span};
 use std::io::{Read, Write};
 use std::ops::Range;
@@ -35,22 +35,22 @@ impl<'a> Files<'a> for &dyn World {
     type Name = String;
     type Source = Source;
 
-    fn name(&'a self, id: Self::FileId) -> Result<Self::Name, codespan_reporting::files::Error> {
+    fn name(&'a self, id: Self::FileId) -> Result<Self::Name, compose_codespan_reporting::files::Error> {
         Ok(World::name(*self, id))
     }
 
     fn source(
         &'a self,
         id: Self::FileId,
-    ) -> Result<Self::Source, codespan_reporting::files::Error> {
-        World::source(*self, id).map_err(|_| codespan_reporting::files::Error::FileMissing)
+    ) -> Result<Self::Source, compose_codespan_reporting::files::Error> {
+        World::source(*self, id).map_err(|_| compose_codespan_reporting::files::Error::FileMissing)
     }
 
     fn line_index(
         &'a self,
         id: Self::FileId,
         byte_index: usize,
-    ) -> Result<usize, codespan_reporting::files::Error> {
+    ) -> Result<usize, compose_codespan_reporting::files::Error> {
         let source = Files::source(self, id)?;
         Ok(source
             .line_starts()
@@ -62,10 +62,10 @@ impl<'a> Files<'a> for &dyn World {
         &'a self,
         id: Self::FileId,
         line_index: usize,
-    ) -> Result<Range<usize>, codespan_reporting::files::Error> {
+    ) -> Result<Range<usize>, compose_codespan_reporting::files::Error> {
         let source = Files::source(self, id)?;
         let start = source.line_starts().get(line_index).copied().ok_or(
-            codespan_reporting::files::Error::LineTooLarge {
+            compose_codespan_reporting::files::Error::LineTooLarge {
                 given: line_index,
                 max: source.line_starts().len(),
             },

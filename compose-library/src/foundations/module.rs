@@ -75,15 +75,6 @@ pub fn add_pub_fix(binding_span: Span, ctx: &SyntaxContext) -> Option<Fix> {
         let_binding.span(),
     );
 
-    // Omit long initial values as they do not add any clarity
-    if let Some(initial_value) = let_binding.initial_value() {
-        if let Some(len) = initial_value.span().len()
-            && len > 24
-        {
-            fix_builder.replace_node(&initial_value, "...");
-        }
-    }
-
     fix_builder.insert_before(&let_binding, "pub ");
 
     Some(fix_builder.build())

@@ -1,18 +1,18 @@
 use crate::diag::{At, SourceResult, Spanned};
 use crate::foundations::boxed::Boxed;
-use crate::{CastInfo, Str, SyntaxContext, UnitValue, World};
+use crate::{CastInfo, Str, SyntaxContext, UnitValue};
 use crate::{FromValue, Func};
 use crate::{IntoValue, Vm};
 use crate::{NativeScope, Reflect};
 use crate::{Sink, Type};
-use compose_library::diag::{bail, error, StrResult};
+use compose_library::diag::{StrResult, bail, error};
 use compose_library::foundations::range::RangeValue;
 use compose_library::repr::Repr;
 use compose_library::{Args, ArrayValue, IterValue, MapValue, Module};
 use compose_macros::func;
 use compose_macros::scope;
 use compose_syntax::Span;
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use std::{fmt, iter};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,9 +28,8 @@ pub enum Value {
     Array(ArrayValue),
     Range(RangeValue),
     Map(MapValue),
-    Module(Module)
+    Module(Module),
 }
-
 
 #[scope]
 impl Value {
@@ -59,7 +58,10 @@ impl Value {
 
     #[func]
     pub fn tap(self, vm: &mut dyn Vm, side_effect: Func) -> SourceResult<Self> {
-        vm.call_func(&side_effect, Args::new(side_effect.span, iter::once(self.clone())))?;
+        vm.call_func(
+            &side_effect,
+            Args::new(side_effect.span, iter::once(self.clone())),
+        )?;
         Ok(self)
     }
 
@@ -160,7 +162,13 @@ impl Value {
     }
 
     /// Access an associated value of this value by path syntax `a::b`
-    pub fn path(&self, path: &str, access_span: Span, sink: &mut Sink, ctx: &SyntaxContext) -> SourceResult<Value> {
+    pub fn path(
+        &self,
+        path: &str,
+        access_span: Span,
+        sink: &mut Sink,
+        ctx: &SyntaxContext,
+    ) -> SourceResult<Value> {
         match self {
             Self::Type(ty) => ty.path(path, access_span, sink).cloned().at(access_span),
             Self::Func(func) => func.path(path, access_span, sink).cloned().at(access_span),

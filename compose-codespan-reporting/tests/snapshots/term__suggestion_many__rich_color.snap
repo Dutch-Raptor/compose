@@ -1,0 +1,20 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_color(&config)
+---
+{fg:Yellow bold bright}warning{bold bright}: this is a block expression, not an array{/}
+  {fg:Blue}┌─{/} suggestionReplace.fun:2:30
+  {fg:Blue}│{/}
+{fg:Blue}2{/} {fg:Blue}│{/}     let _numbers: [i32; 3] = {fg:Yellow}{ 1, 2, 3 }{/};
+  {fg:Blue}│{/}                              {fg:Yellow}^^^^^^^^^^^{/}
+  {fg:Blue}│{/}
+  {fg:Blue}={/}{fg:Yellow} help: to make an array, use square brackets instead of curly braces
+{/}  {fg:Blue}│{/}
+{fg:Blue}2{/} {fg:Blue}│{/}     let _numbers: [i32; 3] = {fg:Yellow}[{/} 1, 2, 3 {fg:Yellow}]{/};
+  {fg:Blue}│{/}                              {fg:Yellow}~{/}         {fg:Yellow}~{/}
+  {fg:Blue}={/}{fg:Yellow} help: maybe you want a tuple instead?
+{/}  {fg:Blue}│{/}
+{fg:Blue}2{/} {fg:Blue}│{/}     let _numbers{fg:Red}: [i32; 3]{/} = { {fg:Green}({/}1, 2, 3{fg:Green}){/} };
+  {fg:Blue}│{/}                 {fg:Red}----------{/}     {fg:Green}+{/}       {fg:Green}+{/}
+
+

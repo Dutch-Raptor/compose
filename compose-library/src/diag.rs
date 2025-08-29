@@ -1,6 +1,6 @@
-pub use codespan_reporting;
-use codespan_reporting::term::termcolor::WriteColor;
-use codespan_reporting::{diagnostic, term};
+pub use compose_codespan_reporting;
+use compose_codespan_reporting::term::termcolor::WriteColor;
+use compose_codespan_reporting::{diagnostic, term};
 use compose_syntax::{
     FileId, Fix, FixDisplay, Label, LabelType, PatchEngine, Span, SyntaxError, SyntaxErrorSeverity,
 };
@@ -18,9 +18,8 @@ pub fn write_diagnostics(
     warnings: &[SourceDiagnostic],
     writer: &mut dyn WriteColor,
     config: &term::Config,
-) -> Result<(), codespan_reporting::files::Error> {
+) -> Result<(), compose_codespan_reporting::files::Error> {
     for diag in warnings.iter().chain(errors) {
-        dbg!(diag);
         let mut diagnostic = match diag.severity {
             Severity::Error => diagnostic::Diagnostic::error(),
             Severity::Warning => diagnostic::Diagnostic::warning(),
@@ -52,7 +51,11 @@ pub fn write_diagnostics(
                 continue;
             };
 
-            let message = format!("suggested fix: {}:\n`{}`", fix.message.trim_end_matches(':'), patched);
+            let message = format!(
+                "suggested fix: {}:\n`{}`",
+                fix.message.trim_end_matches(':'),
+                patched
+            );
             match fix.display {
                 FixDisplay::Inline { span } => diagnostic
                     .labels
@@ -78,6 +81,18 @@ pub fn write_diagnostics(
         }
 
         term::emit(writer, config, &world, &diagnostic)?;
+
+        for point in &diag.trace {
+            let message = point.value.to_string();
+            let help = diagnostic::Diagnostic::help()
+                .with_message(message)
+                .with_label(diagnostic::Label::primary(
+                    point.span.id().unwrap(),
+                    point.span.range().unwrap(),
+                ));
+
+            term::emit(writer, &config, &world, &help)?;
+        }
     }
 
     Ok(())
@@ -95,23 +110,15 @@ fn diag_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId>> {
     Some(label)
 }
 
-fn create_label(label: &Label) -> Vec<diagnostic::Label<FileId>> {
-    let Some(id) = label.span.id() else {
-        return vec![];
-    };
-    let Some(range) = label.span.range() else {
-        return vec![];
-    };
+fn create_label(label: &Label) -> Option<diagnostic::Label<FileId>> {
+    let id = label.span.id()?;
+    let range = label.span.range()?;
     let style = match label.ty {
         LabelType::Primary => diagnostic::LabelStyle::Primary,
         LabelType::Secondary => diagnostic::LabelStyle::Secondary,
     };
 
-    label
-        .message
-        .lines()
-        .map(|l| diagnostic::Label::new(style, id, range.clone()).with_message(l))
-        .collect()
+    Some(diagnostic::Label::new(style, id, range.clone()).with_message(&label.message))
 }
 
 /// Early-return with a [`StrResult`] or [`SourceResult`].
@@ -475,7 +482,7 @@ impl<T> Trace<T> for SourceResult<T> {
                         if error.span.id() == span.id()
                             && trace_range.start <= error_range.start
                             && error_range.end >= trace_range.end => {}
-                    _ => error.trace.push(Spanned::new(make_point(), error.span)),
+                    _ => error.trace.push(Spanned::new(make_point(), span)),
                 }
             }
             errors
@@ -499,7 +506,7 @@ impl Display for TracePoint {
                 write!(f, "error occurred in this call")
             }
             TracePoint::Import => {
-                write!(f, "error occurred while trying to import")
+                write!(f, "error occurred during this import")
             }
         }
     }

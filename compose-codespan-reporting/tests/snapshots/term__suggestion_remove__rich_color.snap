@@ -1,0 +1,16 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_color(&config)
+---
+{fg:Red bold bright}error[E0308]{bold bright}: mismatched types{/}
+  {fg:Blue}┌─{/} suggestionRemove.fun:4:9
+  {fg:Blue}│{/}
+{fg:Blue}4{/} {fg:Blue}│{/}     foo({fg:Red}&123{/});
+  {fg:Blue}│{/}         {fg:Red}^^^^{/} {fg:Red}expected `i32`, found `&{integer}`{/}
+  {fg:Blue}│{/}
+  {fg:Blue}={/}{fg:Red} consider removing the borrow
+{/}  {fg:Blue}│{/}
+{fg:Blue}4{/} {fg:Blue}│{/}     foo({fg:Red}&{/}123);
+  {fg:Blue}│{/}         {fg:Red}-{/}
+
+

@@ -16,7 +16,7 @@ compose-editor = { workspace = true }
 compose-utils = { workspace = true }
 compose-doc = {workspace = true}
 compose-error-codes = { workspace = true}
-codespan-reporting = { workspace = true}
+compose-codespan-reporting = { workspace = true}
 clap = { version = "4.5.37", features = ["derive"] }
 indoc = "2.0.6"
 tap = "1.0.1"

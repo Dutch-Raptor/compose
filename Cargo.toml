@@ -12,6 +12,7 @@ members = [
     "compose-error-codes",
     "compose-doc-macros",
     "compose-doc",
+    "compose-codespan-reporting"
 ]
 
 default-members = [
@@ -38,7 +39,7 @@ compose-error-codes = { path = "compose-error-codes" }
 compose-editor = { path = "compose-editor" }
 compose-doc-macros = { path = "compose-doc-macros" }
 compose-doc = { path = "compose-doc" }
-codespan-reporting = "0.12.0"
+compose-codespan-reporting = { path = "compose-codespan-reporting" }
 dyn-clone = "1.0.19"
 
 [workspace.lints.rust]

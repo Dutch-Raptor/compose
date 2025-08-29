@@ -34,7 +34,7 @@ let other_statement;
 
 ```compose error(E0001)
 {
-    let f = (x, a) => (x == a);
+    let f = { a, b => a == b };
 )
 ```
 
@@ -48,7 +48,7 @@ A block opened with `{` was never closed with `}`. Instead, an unrelated `)` was
 
 ```compose
 {
-    let f = (x, a) => (x == a);
+    let f = { a, b => a == b };
 }
 ```
 

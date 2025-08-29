@@ -1,0 +1,18 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_color(&config)
+---
+{fg:Yellow bold bright}warning{bold bright}: thingy{/}
+  {fg:Blue}┌─{/} note_labels:1:1
+  {fg:Blue}│{/}
+{fg:Blue}1{/} {fg:Blue}│{/} {fg:Yellow}hello{/}
+  {fg:Blue}│{/} {fg:Yellow}^^^^^{/} {fg:Yellow}1{/}
+  {fg:Blue}│{/}
+{fg:Cyan bold bright}help{bold bright}: due to this{/}
+  {fg:Blue}┌─{/} note_labels:3:1
+  {fg:Blue}│{/}
+{fg:Blue}3{/} {fg:Blue}│{/} {fg:Yellow}goodbye{/}
+  {fg:Blue}│{/} {fg:Yellow}^^^^^^^{/} {fg:Yellow}2{/}
+  {fg:Blue}│{/}
+
+

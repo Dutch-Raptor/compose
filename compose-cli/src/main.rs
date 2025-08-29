@@ -6,8 +6,8 @@ For the documentation of the Compose language, see [the language docs](compose).
 */
 use crate::error::CliError;
 use clap::Parser;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-use codespan_reporting::term;
+use compose_codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use compose_codespan_reporting::term;
 use compose_library::diag::{write_diagnostics, SourceDiagnostic};
 use compose_library::World;
 use std::path::PathBuf;
@@ -87,7 +87,7 @@ pub fn print_diagnostics(
     world: &dyn World,
     errors: &[SourceDiagnostic],
     warnings: &[SourceDiagnostic],
-) -> Result<(), codespan_reporting::files::Error> {
+) -> Result<(), compose_codespan_reporting::files::Error> {
     let writer = StandardStream::stderr(ColorChoice::Always);
     let config = term::Config::default();
 

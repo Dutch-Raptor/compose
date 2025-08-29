@@ -1,5 +1,5 @@
-use codespan_reporting::term::Config;
-use codespan_reporting::term::termcolor::{Ansi, NoColor, WriteColor};
+use compose_codespan_reporting::term::Config;
+use compose_codespan_reporting::term::termcolor::{Ansi, NoColor, WriteColor};
 use compose_library::diag::{write_diagnostics, SourceDiagnostic};
 use compose_library::World;
 use crate::DiagMode;

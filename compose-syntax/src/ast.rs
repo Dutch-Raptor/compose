@@ -56,7 +56,7 @@ pub trait AstNode<'a>: Sized {
 
 impl<'a, T> HasSpan for T where T: AstNode<'a> {
     fn span(&self) -> Span {
-        AstNode::span(self.clone())
+        AstNode::span(self)
     }
 }
 

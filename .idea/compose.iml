@@ -16,6 +16,9 @@
       <sourceFolder url="file://$MODULE_DIR$/compose-reporting/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/compose-doc-macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/compose-doc/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-codespan-reporting/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-codespan-reporting/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-codespan-reporting/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

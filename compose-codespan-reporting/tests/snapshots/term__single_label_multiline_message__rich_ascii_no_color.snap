@@ -1,0 +1,17 @@
+---
+source: compose-codespan/codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_no_color(& config)
+---
+error[E0499]: cannot borrow `v` as mutable more than once at a time
+  --> one_line_multiline_message.rs:3:12
+  |
+3 |     v.push(v.pop().unwrap());
+  |     - ---- ^ second mutable borrow occurs here
+  |     | |        while `v` is still borrowed mutably
+  |     | |     
+  |     | first mutable borrow occurs here
+  |     |   and stays borrowed mutably for the rest of the function call
+  |     first borrow later used by call
+
+error: aborting due to previous error
+ = For more information about this error, try `rustc --explain E0499`.

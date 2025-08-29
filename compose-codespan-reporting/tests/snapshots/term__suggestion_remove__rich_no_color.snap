@@ -1,0 +1,16 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_no_color(&config)
+---
+error[E0308]: mismatched types
+  ┌─ suggestionRemove.fun:4:9
+  │
+4 │     foo(&123);
+  │         ^^^^ expected `i32`, found `&{integer}`
+  │
+  = consider removing the borrow
+  │
+4 │     foo(&123);
+  │         -
+
+

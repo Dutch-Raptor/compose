@@ -8,7 +8,7 @@ compose-error-codes = {workspace = true}
 compose-eval = {workspace = true}
 compose-syntax = {workspace = true}
 compose-library = {workspace = true}
-codespan-reporting = {workspace = true}
+compose-codespan-reporting = {workspace = true}
 pulldown-cmark = { version = "0.13.0" }
 pulldown-cmark-to-cmark = "21.0.0"
 indoc = "2.0.6"

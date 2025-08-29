@@ -1,0 +1,26 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_color(& config)
+---
+{fg:Yellow bold bright}warning{bold bright}: this is a block expression, not an array{/}
+  {fg:Blue}┌─{/} suggestionReplace.fun:2:30
+  {fg:Blue}│{/}  
+{fg:Blue}2{/} {fg:Blue}│{/}       let _numbers: [i32; 3] = {fg:Yellow}{{/}
+  {fg:Blue}│{/} {fg:Yellow}╭{/}{fg:Yellow}──────────────────────────────^{/}
+{fg:Blue}3{/} {fg:Blue}│{/} {fg:Yellow}│{/} {fg:Yellow}        1,{/}
+{fg:Blue}4{/} {fg:Blue}│{/} {fg:Yellow}│{/} {fg:Yellow}        2,{/}
+{fg:Blue}5{/} {fg:Blue}│{/} {fg:Yellow}│{/} {fg:Yellow}        3,{/}
+{fg:Blue}6{/} {fg:Blue}│{/} {fg:Yellow}│{/} {fg:Yellow}    }{/};
+  {fg:Blue}│{/} {fg:Yellow}╰{/}{fg:Yellow}─────^{/}
+  {fg:Blue}│{/}  
+  {fg:Blue}┌─{/} suggestionReplace.fun:2:30
+  {fg:Blue}│{/}  
+{fg:Blue}2{/} {fg:Blue}│{/}       let _numbers: [i32; 3] = {
+  {fg:Blue}│{/} {fg:Blue}╭{/}{fg:Blue}──────────────────────────────'{/}
+{fg:Blue}3{/} {fg:Blue}│{/} {fg:Blue}│{/}         1,
+{fg:Blue}4{/} {fg:Blue}│{/} {fg:Blue}│{/}         2,
+{fg:Blue}5{/} {fg:Blue}│{/} {fg:Blue}│{/}         3,
+{fg:Blue}6{/} {fg:Blue}│{/} {fg:Blue}│{/}     };
+  {fg:Blue}│{/} {fg:Blue}╰{/}{fg:Blue}──────' help: to make an array, use square brackets instead of curly braces{/}
+  {fg:Blue}│{/}  
+  {fg:Blue}={/} (Note: ignored 1 multi-line suggestion)

@@ -1,0 +1,16 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_no_color(&config)
+---
+warning: writing `&Vec<_>` instead of `&[_]` involves one more reference and cannot be used with non-Vec-based slices
+  ┌─ suggestionReplace.fun:1:12
+  │
+1 │ fn _foo(_: &Vec<u32>) {}
+  │            ^^^^^^^^^ this type
+  │
+  = help: change this to: `&[u32]`
+  │
+1 │ fn _foo(_: &[u32]) {}
+  │            ~~~~~~
+
+

@@ -1,10 +1,10 @@
 use crate::vm::ErrorMode;
 use crate::{Eval, Evaluated, Machine};
-use compose_library::diag::{bail, At, SourceResult, Spanned};
+use compose_library::diag::{At, SourceResult, Spanned, Trace, TracePoint, bail};
 use compose_library::{Arg, Args, Func, NativeScope, Type, UnboundItem, Value};
 use compose_syntax::ast::AstNode;
-use compose_syntax::{ast, Label, Span};
-use ecow::{eco_format, EcoVec};
+use compose_syntax::{Label, Span, ast};
+use ecow::{EcoString, EcoVec, eco_format};
 use extension_traits::extension;
 
 impl Eval for ast::FuncCall<'_> {
@@ -15,7 +15,10 @@ impl Eval for ast::FuncCall<'_> {
 
         let func = callee.value.cast::<Func>().at(callee_span)?;
 
-        func.call(vm, args).map(Evaluated::mutable)
+        func.call(vm, args).map(Evaluated::mutable).trace(
+            || TracePoint::Call(func.name().map(EcoString::from)),
+            self.span(),
+        )
     }
 }
 

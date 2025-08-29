@@ -1,12 +1,14 @@
 use crate::{EvalConfig, Machine};
 use compose_error_codes::ErrorCode;
-use compose_library::diag::codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-use compose_library::diag::{
-    write_diagnostics, FileError, FileResult, SourceDiagnostic, SourceResult, Warned,
+use compose_library::diag::compose_codespan_reporting::term::termcolor::{
+    ColorChoice, StandardStream,
 };
-use compose_library::{library, Library, Value, World};
+use compose_library::diag::{
+    FileError, FileResult, SourceDiagnostic, SourceResult, Warned, write_diagnostics,
+};
+use compose_library::{Library, Value, World, library};
 use compose_syntax::{FileId, Source};
-use ecow::{eco_format, eco_vec, EcoVec};
+use ecow::{EcoVec, eco_format, eco_vec};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{Read, Write};
@@ -14,9 +16,9 @@ use std::sync::Mutex;
 use tap::pipe::Pipe;
 
 #[cfg(test)]
-mod snippets;
-#[cfg(test)]
 mod iterators;
+#[cfg(test)]
+mod snippets;
 
 pub struct TestWorld {
     sources: Mutex<HashMap<FileId, Source>>,
@@ -171,7 +173,7 @@ pub struct TestResult {
 }
 
 impl TestResult {
-    #[track_caller]   
+    #[track_caller]
     pub fn assert_no_errors(self) -> Self {
         match &self.value {
             Ok(_) => {}
@@ -198,7 +200,7 @@ impl TestResult {
             Ok(_) => panic!("expected errors, but got none"),
             Err(errors) => {
                 if expected_errors.is_empty() {
-                    panic!("expected no errors, but got: {:?}", errors)   
+                    panic!("expected no errors, but got: {:?}", errors)
                 }
                 if errors
                     .iter()

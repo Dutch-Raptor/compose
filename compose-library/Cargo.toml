@@ -8,11 +8,10 @@ compose-syntax = { workspace = true }
 compose-macros = { workspace = true }
 compose-utils = { workspace = true }
 compose-error-codes = { workspace = true }
-codespan-reporting = { workspace = true }
+compose-codespan-reporting = { workspace = true }
 ecow = { workspace = true }
 indexmap = { workspace = true }
 strsim = "0.11.1"
 tap = { workspace = true }
-dyn-clone = { workspace = true }
 slotmap = "1.0.7"
 

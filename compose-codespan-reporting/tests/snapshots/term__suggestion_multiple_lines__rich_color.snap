@@ -1,0 +1,23 @@
+---
+source: codespan-reporting/tests/term.rs
+expression: TEST_DATA.emit_color(& config)
+---
+{fg:Red bold bright}error{bold bright}: expected four items, found three{/}
+  {fg:Blue}┌─{/} suggestionReplace.fun:2:30
+  {fg:Blue}│{/}  
+{fg:Blue}2{/} {fg:Blue}│{/}       let _numbers: [i32; 4] = {fg:Red}[{/}
+  {fg:Blue}│{/} {fg:Red}╭{/}{fg:Red}──────────────────────────────^{/}
+{fg:Blue}3{/} {fg:Blue}│{/} {fg:Red}│{/} {fg:Red}        1,{/}
+{fg:Blue}4{/} {fg:Blue}│{/} {fg:Red}│{/} {fg:Red}        2,{/}
+{fg:Blue}5{/} {fg:Blue}│{/} {fg:Red}│{/} {fg:Red}        3,{/}
+{fg:Blue}6{/} {fg:Blue}│{/} {fg:Red}│{/} {fg:Red}    ]{/};
+  {fg:Blue}│{/} {fg:Red}╰{/}{fg:Red}─────^{/}
+  {fg:Blue}│{/}  
+  {fg:Blue}┌─{/} suggestionReplace.fun:5:11
+  {fg:Blue}│{/}  
+{fg:Blue}5{/} {fg:Blue}│{/}           3,
+  {fg:Blue}│{/} {fg:Blue}╭{/}{fg:Blue}──────────'{/}
+{fg:Blue}6{/} {fg:Blue}│{/} {fg:Blue}│{/}     ];
+  {fg:Blue}│{/} {fg:Blue}╰{/}{fg:Blue}' help: add a new item{/}
+  {fg:Blue}│{/}  
+  {fg:Blue}={/} (Note: ignored 1 multi-line suggestion)

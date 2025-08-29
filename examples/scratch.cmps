@@ -1,7 +1,13 @@
-let add = { a, b => a + b };
 
-import "./subpath/import_me.cmps" as math
+let f = { => 
+    import "./subpath/import_me.cmps" as math;
 
-assert::eq(math::add(2, 3), 5);
+    math::add(2, 3);
+};
 
-println(math::add(2, 7))
+let foo = #{
+    f
+};
+
+foo.get("f")()
+
