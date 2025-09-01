@@ -510,8 +510,16 @@ impl<'s> Parser<'s> {
         self.nodes.last()
     }
 
+    pub(crate) fn last_span(&self) -> Option<Span> {
+        self.nodes.last().map(|n| n.span())
+    }
+
     pub(crate) fn get_text(&self, range: Range<usize>) -> Option<&'s str> {
         self.text.get(range)
+    }
+
+    pub(crate) fn get_span_text(&self, span: Span) -> Option<&'s str> {
+        self.text.get(span.range()?)
     }
 
     pub(crate) fn current_text(&self) -> &'s str {

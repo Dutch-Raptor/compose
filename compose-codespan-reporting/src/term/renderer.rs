@@ -854,6 +854,7 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
         lines: Range<usize>,
         source: &str,
         parts: &[(Range<usize>, &str)],
+        locus: &Locus,
         message: &str,
     ) -> Result<(), Error> {
         #[derive(PartialEq)]
@@ -913,7 +914,8 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
         };
         self.render_snippet_note_with_color(outer_padding, message, message_color)?;
 
-        // Spacing between note and diff.
+        self.render_snippet_start(outer_padding, locus)?;
+
         self.render_gutter_line(outer_padding)?;
 
         // Line number

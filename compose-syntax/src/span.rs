@@ -150,6 +150,14 @@ impl Span {
 
         Span::new(self.id().unwrap(), at..at + 1)
     }
+    
+    pub fn with_range(self, range: Range<usize>) -> Self {
+        if self.is_detached() {
+            return self;
+        }
+        
+        Self::new(self.id().expect("detached span already handled"), range)
+    }
 }
 
 impl Span {
@@ -179,17 +187,17 @@ impl Debug for Span {
 }
 
 pub trait HasSpan {
-    fn span(&self) -> Span;
+    fn get_span(&self) -> Span;
 }
 
 impl HasSpan for Span {
-    fn span(&self) -> Span {
+    fn get_span(&self) -> Span {
         *self
     }
 }
 
 impl HasSpan for SyntaxNode {
-    fn span(&self) -> Span {
+    fn get_span(&self) -> Span {
         self.span()
     }
 }

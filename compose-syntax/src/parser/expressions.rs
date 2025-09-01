@@ -1,12 +1,13 @@
-use crate::ast::{AssignOp, BinOp};
+use crate::ast::{AssignOp, AstNode, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
 use crate::parser::funcs::block_or_lambda;
+use crate::parser::statements::let_binding;
 use crate::parser::{funcs, statements, ExprContext};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
 use crate::set::{syntax_set, SyntaxSet, UNARY_OP};
-use crate::{ast, set, Label};
+use crate::{ast, set, FixBuilder, Label, Span};
 use compose_error_codes::{
     E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT, E0008_EXPECTED_EXPRESSION,
 };
@@ -119,11 +120,13 @@ fn err_assign_in_expr_context(p: &mut Parser) {
         "Not at an assignment"
     );
     let current = p.current();
+    let operator_span = p.token.node.span();
     let op = current.descriptive_name();
-    let is_eq = current == SyntaxKind::Eq;
-    let lhs_text = p.last_text().to_owned();
 
     let error_marker = p.marker();
+
+    let lhs_span = p.last_node().expect("was just inserted").span();
+    let lhs_text = p.last_text();
 
     p.insert_error_here("assignments are not allowed in expression contexts")
         .with_code(&E0002_INVALID_ASSIGNMENT)
@@ -131,25 +134,30 @@ fn err_assign_in_expr_context(p: &mut Parser) {
     p.eat(); // eat the AssignOp
     code_expression(p); // parse the rhs
 
-    let rhs_text = p.last_text().to_owned();
+    let rhs_span = p.last_node().expect("was just inserted").span();
+    let assignment_span = Span::join(lhs_span, rhs_span);
 
     let err = p.err_at(error_marker).expect("An error was added");
     err.with_note(eco_format!(
         "assignments like `{lhs_text} {op} ...` are only valid as standalone statements"
     ));
-    if is_eq {
-        err.with_hint(eco_format!(
-            "if you meant to compare `{lhs_text}` and `{rhs_text}`, use `==` instead of `=`"
-        ));
-        err.with_hint(eco_format!("if you meant to assign to `{lhs_text}`, wrap the statement in a block: `{{ {lhs_text} {op} ... }}`"));
-        err.with_hint(eco_format!(
-            "or introduce a new variable with `let`: `{{ let {lhs_text} = ... }}`"
-        ));
-    } else {
-        err.with_hint(eco_format!(
-            "to use `{op}` here, wrap the assignment in a block: `{{ {lhs_text} {op} ... }}`"
-        ));
-    }
+    err.with_fix(
+        FixBuilder::new(
+            "if you meant to compare, use `==` instead of `=`:",
+            operator_span,
+        )
+        .replace_node(&operator_span, "==")
+        .build(),
+    );
+    err.with_fix(
+        FixBuilder::new(
+            "or, if you meant to assign, wrap the statement in a block:",
+            assignment_span,
+        )
+        .insert_before(&assignment_span, "{ ")
+        .insert_after(&assignment_span, " }")
+        .build(),
+    );
 }
 
 /// Parse a primary expression.
@@ -166,7 +174,9 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             code_expression(p);
             p.wrap(m, SyntaxKind::DestructureAssignment);
         }
-        SyntaxKind::LeftBrace => { block_or_lambda(p); },
+        SyntaxKind::LeftBrace => {
+            block_or_lambda(p);
+        }
         SyntaxKind::DotsEq | SyntaxKind::Dots => {
             p.eat();
             // for ..= an expression on the rhs is required
@@ -185,10 +195,17 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             p.assert(SyntaxKind::RightParen);
             p.wrap(m, SyntaxKind::Unit)
         }
-        SyntaxKind::LeftParen => { parenthesized(p); },
+        SyntaxKind::LeftParen => {
+            parenthesized(p);
+        }
         SyntaxKind::Import => import(p),
+        SyntaxKind::Let => err_let_as_expression(p),
         // Already fully handled in the lexer
-        SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str | SyntaxKind::Ident => p.eat(),
+        SyntaxKind::Int
+        | SyntaxKind::Float
+        | SyntaxKind::Bool
+        | SyntaxKind::Str
+        | SyntaxKind::Ident => p.eat(),
         _ => err_expected_expression(
             p,
             Some(syntax_set!(
@@ -202,6 +219,29 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
     }
 }
 
+fn err_let_as_expression(p: &mut Parser) {
+    debug_assert!(p.current() == SyntaxKind::Let);
+    let err_marker = p.marker();
+    p.insert_error_here("let bindings are not valid expressions")
+        .with_label_message("cannot use a let binding here")
+        .with_note("a let binding is only valid as a standalone statement, not within an expression");
+    // error here
+    let_binding(p);
+
+    let let_binding_span = p.last_span().expect("was just inserted");
+
+    let err = p.err_at(err_marker).expect("An error was added");
+    err.with_fix(
+        FixBuilder::new(
+            "use a block to allow statements:",
+            let_binding_span,
+        )
+        .insert_before(&let_binding_span, "{ ")
+        .insert_after(&let_binding_span, " }")
+        .build(),
+    );
+}
+
 fn import(p: &mut Parser) {
     let m = p.marker();
     p.assert(SyntaxKind::Import);
@@ -212,9 +252,9 @@ fn import(p: &mut Parser) {
     code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
 
     if p.eat_if(SyntaxKind::As) {
-       if !p.eat_if(SyntaxKind::Ident) {
-           p.insert_error_here("expected an identifier after `as`");
-       }
+        if !p.eat_if(SyntaxKind::Ident) {
+            p.insert_error_here("expected an identifier after `as`");
+        }
     }
 
     if p.at(SyntaxKind::LeftBrace) {
@@ -341,7 +381,7 @@ fn map_key(p: &mut Parser) -> Result<MapKeyType, ()> {
         _ => {
             p.insert_error_here("expected a map key")
                 .with_label_message("expected a key here")
-            .with_note(r#"map keys must be `identifiers`, `"strings"` or dynamic expressions in `[brackets]` (e.g. `[expr]: value`)"#);
+                .with_note(r#"map keys must be `identifiers`, `"strings"` or dynamic expressions in `[brackets]` (e.g. `[expr]: value`)"#);
 
             p.eat();
             Err(())

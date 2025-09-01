@@ -96,6 +96,7 @@ impl<FileId> Label<FileId> {
 #[cfg_attr(feature = "serialization", derive(Serialize, Deserialize))]
 pub struct Suggestion<FileId> {
     pub file_id: FileId,
+    pub range: Range<usize>,
     pub message: String,
     pub parts: Vec<SuggestionPart>,
 }

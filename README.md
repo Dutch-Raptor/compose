@@ -12,6 +12,27 @@ That said, the project already includes a working parser, interpreter, and a gro
 
 ---
 
+## Usage and Installation
+
+Using [Cargo](https://doc.rust-lang.org/cargo/):
+
+```bash
+# Install the latest release
+cargo install --git https://github.com/Dutch-Raptor/compose.git
+```
+
+Run a file:
+
+```bash
+compose file path/to/file.cmps
+```
+
+Start the REPL:
+
+```bash
+compose repl
+```
+
 ## ✨ Goals and Features
 
 * **Fault-Tolerant Parsing**

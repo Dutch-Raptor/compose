@@ -468,6 +468,7 @@ where
                 // ```
                 // FIXME: We currently skip suggestions that remove or insert multiple lines.
                 Subdiagnostic::Suggestion(Suggestion {
+                    range,
                     file_id,
                     message,
                     parts,
@@ -537,6 +538,10 @@ where
                         line_number_range,
                         source,
                         &parts,
+                        &Locus {
+                            name: files.name(file_id)?.to_string(),
+                            location: files.location(file_id, range.start)?,
+                        },
                         message,
                     )?;
                 }

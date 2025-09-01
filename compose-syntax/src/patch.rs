@@ -127,7 +127,7 @@ impl PatchEngine {
         node: &impl HasSpan,
         text: impl Into<EcoString>,
     ) -> Result<(), PatchError> {
-        let span = node.span();
+        let span = node.get_span();
         self.add_patch(Patch::Insert {
             at: span.range().ok_or(PatchError::SpanWithoutRange)?.start,
             text: text.into(),
@@ -141,7 +141,7 @@ impl PatchEngine {
         node: &impl HasSpan,
         text: impl Into<EcoString>,
     ) -> Result<(), PatchError> {
-        let span = node.span();
+        let span = node.get_span();
         self.add_patch(Patch::Insert {
             at: span.range().ok_or(PatchError::SpanWithoutRange)?.end,
             text: text.into(),
@@ -155,7 +155,7 @@ impl PatchEngine {
         node: &impl HasSpan,
         text: impl Into<EcoString>,
     ) -> Result<(), PatchError> {
-        let span = node.span();
+        let span = node.get_span();
         self.add_patch(Patch::Replace {
             range: span.range().ok_or(PatchError::SpanWithoutRange)?,
             text: text.into(),
@@ -166,7 +166,7 @@ impl PatchEngine {
 
     pub fn delete_node(&mut self, node: &impl HasSpan) -> Result<(), PatchError> {
         self.add_patch(Patch::Delete {
-            range: node.span().range().ok_or(PatchError::SpanWithoutRange)?,
+            range: node.get_span().range().ok_or(PatchError::SpanWithoutRange)?,
         });
 
         Ok(())

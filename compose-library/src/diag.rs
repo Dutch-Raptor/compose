@@ -1,10 +1,8 @@
 pub use compose_codespan_reporting;
 use compose_codespan_reporting::term::termcolor::WriteColor;
 use compose_codespan_reporting::{diagnostic, term};
-use compose_syntax::{
-    FileId, Fix, FixDisplay, Label, LabelType, PatchEngine, Span, SyntaxError, SyntaxErrorSeverity,
-};
-use ecow::{EcoVec, eco_vec};
+use compose_syntax::{FileId, Fix, Label, LabelType, Patch, Span, SyntaxError, SyntaxErrorSeverity};
+use ecow::{eco_vec, EcoVec};
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
@@ -35,35 +33,31 @@ pub fn write_diagnostics(
             let Some(file_id) = fix.span.id() else {
                 continue;
             };
-            let mut engine = PatchEngine::new();
-            let Ok(source) = world.source(file_id) else {
-                continue;
-            };
-            let Some(snippet) = source.span_text(fix.span) else {
-                continue;
-            };
-            let Some(offset) = fix.span.range().map(|r| r.start) else {
-                continue;
-            };
 
-            engine.add_patches(fix.patches.iter().cloned());
-            let Ok(patched) = engine.apply_all_with_offset(snippet, offset) else {
-                continue;
-            };
-
-            let message = format!(
-                "suggested fix: {}:\n`{}`",
-                fix.message.trim_end_matches(':'),
-                patched
-            );
-            match fix.display {
-                FixDisplay::Inline { span } => diagnostic
-                    .labels
-                    .extend(create_label(&Label::secondary(span, message))),
-                FixDisplay::Footer => {
-                    diagnostic.notes.push(message);
+            diagnostic.subdiagnostics.push(Subdiagnostic::Suggestion(
+                Suggestion {
+                    file_id,
+                    message: String::from(&fix.message),
+                    range: match fix.span.range() {
+                        Some(range) => range.clone(),
+                        None => continue,
+                    },
+                    parts: fix.patches.iter().map(|p| match p {
+                        Patch::Insert { at, text } => SuggestionPart {
+                            range: *at..*at,
+                            replacement: text.into(),
+                        },
+                        Patch::Replace { range, text } => SuggestionPart {
+                            range: range.clone(),
+                            replacement: text.into(),
+                        },
+                        Patch::Delete { range } => SuggestionPart {
+                            range: range.clone(),
+                            replacement: "".into(),
+                        }
+                    }).collect()
                 }
-            }
+            ));
         }
 
         diagnostic
@@ -263,6 +257,9 @@ macro_rules! __warning {
     };
 }
 
+use compose_codespan_reporting::diagnostic::{Subdiagnostic, Suggestion, SuggestionPart};
+use compose_error_codes::ErrorCode;
+use compose_library::World;
 #[rustfmt::skip]
 #[doc(inline)]
 pub use {
@@ -271,8 +268,6 @@ pub use {
     crate::__warning as warning,
     ecow::{eco_format, EcoString},
 };
-use compose_error_codes::ErrorCode;
-use compose_library::World;
 
 pub type SourceResult<T> = Result<T, EcoVec<SourceDiagnostic>>;
 pub type StrResult<T> = Result<T, EcoString>;
