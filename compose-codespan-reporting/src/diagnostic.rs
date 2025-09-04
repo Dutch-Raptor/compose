@@ -93,12 +93,26 @@ impl<FileId> Label<FileId> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(Serialize, Deserialize))]
-pub struct Suggestion<FileId> {
+pub struct Span<FileId> {
     pub file_id: FileId,
     pub range: Range<usize>,
+}
+
+impl<FileId> Span<FileId> {
+    pub fn new(file_id: FileId, range: impl Into<Range<usize>>) -> Span<FileId> {
+        Span {
+            file_id,
+            range: range.into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serialization", derive(Serialize, Deserialize))]
+pub struct Suggestion<FileId> {
+    pub span: Span<FileId>,
     pub message: String,
-    pub parts: Vec<SuggestionPart>,
+    pub parts: Vec<SuggestionPart<FileId>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -118,8 +132,9 @@ pub enum Subdiagnostic<FileId> {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serialization", derive(Serialize, Deserialize))]
-pub struct SuggestionPart {
-    pub range: Range<usize>,
+pub struct SuggestionPart<FileId> {
+    pub message: Option<String>,
+    pub span: Span<FileId>,
     pub replacement: String,
 }
 

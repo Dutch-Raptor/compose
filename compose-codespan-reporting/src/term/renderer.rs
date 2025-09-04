@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use std::iter::Peekable;
 use std::ops::{Range, RangeBounds};
 use std::slice::SliceIndex;
 use termcolor::{ColorSpec, WriteColor};
@@ -21,6 +22,173 @@ pub struct Locus {
 /// ^^^^^^^^^ blah blah
 /// ```
 pub type SingleLabel<'diagnostic> = (LabelStyle, Range<usize>, &'diagnostic str);
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
+pub enum Priority {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl LabeledLine for SingleLabel<'_> {
+    fn range(&self) -> &Range<usize> {
+        &self.1
+    }
+
+    fn message(&self) -> Option<&str> {
+        Some(self.2)
+    }
+
+    fn label_color<'s>(
+        &self,
+        styles: &'s Styles,
+        severity: Severity,
+    ) -> Option<(&'s ColorSpec, Priority)> {
+        Some((
+            styles.label(severity, self.0),
+            match self.0 {
+                LabelStyle::Primary => Priority::High,
+                LabelStyle::Secondary => Priority::Low,
+            },
+        ))
+    }
+
+    fn source_color<'s>(&self, styles: &'s Styles, severity: Severity) -> Option<(&'s ColorSpec, Priority)> {
+        if self.0 == LabelStyle::Primary {
+            self.label_color(styles, severity)
+        } else {
+            None
+        }
+    }
+
+    fn caret<'s>(&self, chars: &Chars) -> (char, Priority) {
+        match self.0 {
+            LabelStyle::Primary => (chars.single_primary_caret, Priority::High),
+            LabelStyle::Secondary => (chars.single_secondary_caret, Priority::Low),
+        }
+    }
+}
+
+pub trait LabeledLine {
+    fn range(&self) -> &Range<usize>;
+    fn message(&self) -> Option<&str>;
+    fn label_color<'s>(
+        &self,
+        styles: &'s Styles,
+        severity: Severity,
+    ) -> Option<(&'s ColorSpec, Priority)>;
+    fn caret<'s>(&self, chars: &Chars) -> (char, Priority);
+    /// A replacement for the source text
+    fn replacement(&self) -> Option<&str> {
+        None
+    }
+
+    fn source_color<'s>(&self, styles: &'s Styles, severity: Severity) -> Option<(&'s ColorSpec, Priority)> {
+        self.label_color(styles, severity)
+    }
+}
+
+pub struct SuggestionLine<'d> {
+    /// The range within the line
+    range: Range<usize>,
+    /// The text to replace the range with
+    replacement: &'d str,
+    /// an optional message to show
+    message: Option<&'d str>,
+}
+
+impl LabeledLine for SuggestionLine<'_> {
+    fn range(&self) -> &Range<usize> {
+        &self.range
+    }
+
+    fn message(&self) -> Option<&str> {
+        self.message
+    }
+
+    fn label_color<'s>(
+        &self,
+        styles: &'s Styles,
+        _severity: Severity,
+    ) -> Option<(&'s ColorSpec, Priority)> {
+        let has_addition = !self.replacement.is_empty();
+        let has_removal = self.range.end > self.range.start;
+
+        let color = match (has_removal, has_addition) {
+            (true, true) => &styles.suggest_replace,
+            (false, true) => &styles.suggest_add,
+            (true, false) => &styles.suggest_remove,
+            (false, false) => return None,
+        };
+
+        Some((color, Priority::Critical))
+    }
+
+    fn caret<'s>(&self, chars: &Chars) -> (char, Priority) {
+        let has_addition = !self.replacement.is_empty();
+        let has_removal = self.range.end > self.range.start;
+
+        let caret = match (has_removal, has_addition) {
+            (true, true) => chars.suggest_replace,
+            (false, true) => chars.suggest_add,
+            (true, false) => chars.suggest_remove,
+            (false, false) => return (' ', Priority::Low),
+        };
+
+        (caret, Priority::Critical)
+    }
+
+    fn replacement(&self) -> Option<&str> {
+        Some(self.replacement)
+    }
+}
+
+pub enum LabeledLineEnum<'s> {
+    Suggestion(SuggestionLine<'s>),
+    SingleLabel(SingleLabel<'s>),
+}
+
+impl LabeledLine for LabeledLineEnum<'_> {
+    fn range(&self) -> &Range<usize> {
+        match self {
+            LabeledLineEnum::Suggestion(line) => line.range(),
+            LabeledLineEnum::SingleLabel(line) => line.range(),
+        }
+    }
+
+    fn message(&self) -> Option<&str> {
+        match self {
+            LabeledLineEnum::Suggestion(line) => line.message(),
+            LabeledLineEnum::SingleLabel(line) => line.message(),
+        }
+    }
+
+    fn label_color<'s>(
+        &self,
+        styles: &'s Styles,
+        severity: Severity,
+    ) -> Option<(&'s ColorSpec, Priority)> {
+        match self {
+            LabeledLineEnum::Suggestion(line) => line.label_color(styles, severity),
+            LabeledLineEnum::SingleLabel(line) => line.label_color(styles, severity),
+        }
+    }
+
+    fn caret<'s>(&self, chars: &Chars) -> (char, Priority) {
+        match self {
+            LabeledLineEnum::Suggestion(line) => line.caret(chars),
+            LabeledLineEnum::SingleLabel(line) => line.caret(chars),
+        }
+    }
+
+    fn replacement(&self) -> Option<&str> {
+        match self {
+            LabeledLineEnum::Suggestion(line) => line.replacement(),
+            LabeledLineEnum::SingleLabel(line) => line.replacement(),
+        }
+    }
+}
 
 /// A multi-line label to render.
 ///
@@ -227,13 +395,13 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
     /// 10 │   │ muffin. Halvah croissant candy canes bonbon candy. Apple pie jelly
     ///    │ ╭─│─────────^
     /// ```
-    pub fn render_snippet_source(
+    pub fn render_snippet_source<Label: LabeledLine>(
         &mut self,
         outer_padding: usize,
         line_number: usize,
         source: &str,
         severity: Severity,
-        single_labels: &[SingleLabel<'_>],
+        single_labels: &[Label],
         num_multi_labels: usize,
         multi_labels: &[(usize, LabelStyle, MultiLabel<'_>)],
     ) -> Result<(), Error> {
@@ -275,37 +443,70 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
 
             // Write source text
             write!(self, " ")?;
-            let mut in_primary = false;
-            for (metrics, ch) in Self::char_metrics(self.config.tab_width, source.char_indices()) {
+            let mut used_color = None;
+
+            let mut chars =
+                Self::char_metrics(self.config.tab_width, source.char_indices()).peekable();
+            while let Some((metrics, ch)) = chars.peek().cloned() {
                 let column_range = metrics.byte_index..(metrics.byte_index + ch.len_utf8());
 
-                // Check if we are overlapping a primary label
-                let is_primary = single_labels.iter().any(|(ls, range, _)| {
-                    *ls == LabelStyle::Primary && is_overlapping(range, &column_range)
-                }) || multi_labels.iter().any(|(_, ls, label)| {
-                    *ls == LabelStyle::Primary
-                        && match label {
-                            MultiLabel::Top(start) => column_range.start >= *start,
-                            MultiLabel::Left => true,
-                            MultiLabel::Bottom(start, _) => column_range.end <= *start,
-                        }
-                });
+                let color = single_labels
+                    .iter()
+                    .filter(|l| is_overlapping(l.range(), &column_range))
+                    .flat_map(|l| l.source_color(&self.styles(), severity))
+                    .chain(
+                        multi_labels
+                            .iter()
+                            .filter(|(_, ls, label)| {
+                                let overlaps = match label {
+                                    MultiLabel::Top(start) => column_range.start >= *start,
+                                    MultiLabel::Left => true,
+                                    MultiLabel::Bottom(start, _) => column_range.end <= *start,
+                                };
+                                let is_primary = *ls == LabelStyle::Primary;
+                                overlaps && is_primary
+                            })
+                            .map(|_| {
+                                (
+                                    self.styles().label(severity, LabelStyle::Primary),
+                                    Priority::High,
+                                )
+                            }),
+                    )
+                    .max_by_key(|(_, prio)| *prio);
 
-                // Set the source color if we are in a primary label
-                if is_primary && !in_primary {
-                    self.set_color(self.styles().label(severity, LabelStyle::Primary))?;
-                    in_primary = true;
-                } else if !is_primary && in_primary {
+                if let Some((color, _)) = color
+                    && used_color != Some(color)
+                {
+                    self.set_color(color)?;
+                    used_color = Some(color);
+                }
+                if color.is_none() && used_color.is_some() {
                     self.reset()?;
-                    in_primary = false;
+                    used_color = None;
                 }
 
-                match ch {
-                    '\t' => (0..metrics.unicode_width).try_for_each(|_| write!(self, " "))?,
-                    _ => write!(self, "{}", ch)?,
-                }
+                self.write_char_or_replacement(
+                    ch,
+                    metrics,
+                    &mut chars,
+                    single_labels,
+                    |self_, ch, metrics| {
+                        match ch {
+                            '\t' => {
+                                (0..metrics.unicode_width).try_for_each(|_| write!(self_, " "))?
+                            }
+                            _ => write!(self_, "{}", ch)?,
+                        }
+                        Ok(())
+                    },
+                    |self_, _label, replacement| {
+                        self_.render_using_metrics(replacement)?;
+                        Ok(())
+                    },
+                )?;
             }
-            if in_primary {
+            if used_color.is_some() {
                 self.reset()?;
             }
             writeln!(self)?;
@@ -363,10 +564,11 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
             // ```text
             // ^^^ second mutable borrow occurs here
             // ```
-            let mut trailing_label: Option<(usize, &SingleLabel)> = None;
+            let mut trailing_label: Option<(usize, &Label)> = None;
 
             for (label_index, label) in single_labels.iter().enumerate() {
-                let (_, range, message) = label;
+                let range = label.range();
+                let message = label.message().unwrap_or_default();
                 if !message.is_empty() {
                     num_messages += 1;
                 }
@@ -389,19 +591,23 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                 .iter()
                 .map(|(idx, style, multilabel)| match multilabel {
                     // change any top labels to left labels if they start at the start of the line
-                    MultiLabel::Top(start) if *start <= source.len() - source.trim_start().len() => (*idx, *style, MultiLabel::Left),
+                    MultiLabel::Top(start)
+                        if *start <= source.len() - source.trim_start().len() =>
+                    {
+                        (*idx, *style, MultiLabel::Left)
+                    }
                     other => (*idx, *style, other.clone()),
                 })
                 .collect::<Vec<_>>();
 
-            if let Some((trailing_label_index, (_, trailing_range, _))) = trailing_label {
+            if let Some((trailing_label_index, label)) = trailing_label {
                 // Check to see if the trailing label candidate overlaps any of
                 // the other labels on the current line.
                 if single_labels
                     .iter()
                     .enumerate()
-                    .filter(|(label_index, _)| *label_index != trailing_label_index)
-                    .any(|(_, (_, range, _))| is_overlapping(trailing_range, range))
+                    .filter(|(label_idx, _)| *label_idx != trailing_label_index)
+                    .any(|(_, l)| is_overlapping(l.range(), label.range()))
                 {
                     // If it does, we'll instead want to render it below the
                     // carets along with the other hanging labels.
@@ -419,12 +625,13 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
             self.inner_gutter(severity, num_multi_labels, &multi_labels)?;
             write!(self, " ")?;
 
-            let mut previous_label_style = None;
+            let mut previous_color = None;
             let placeholder_metrics = Metrics {
                 byte_index: source.len(),
                 unicode_width: 1,
             };
-            for (metrics, ch) in Self::char_metrics(self.config.tab_width, source.char_indices())
+
+            let mut chars = Self::char_metrics(self.config.tab_width, source.char_indices())
                 // Add a placeholder source column at the end to allow for
                 // printing carets at the end of lines, eg:
                 //
@@ -433,46 +640,64 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                 //   │             ^
                 // ```
                 .chain(std::iter::once((placeholder_metrics, '\0')))
-            {
+                .peekable();
+
+            while let Some((metrics, ch)) = chars.peek().cloned() {
                 // Find the current label style at this column
                 let column_range = metrics.byte_index..(metrics.byte_index + ch.len_utf8());
-                let current_label_style = single_labels
+
+                let caret = single_labels
                     .iter()
-                    .filter(|(_, range, _)| is_overlapping(range, &column_range))
-                    .map(|(label_style, _, _)| *label_style)
-                    .max_by_key(label_priority_key);
+                    .filter(|l| is_overlapping(l.range(), &column_range))
+                    .map(|l| l.caret(self.chars()))
+                    .max_by_key(|(_, prio)| *prio)
+                    .map(|(caret, _)| caret)
+                    .unwrap_or(' ');
+
+                let color = single_labels
+                    .iter()
+                    .filter(|l| is_overlapping(l.range(), &column_range))
+                    .filter_map(|l| l.label_color(self.styles(), severity))
+                    .max_by_key(|(_, prio)| *prio)
+                    .map(|(caret, _)| caret);
 
                 // Update writer style if necessary
-                if previous_label_style != current_label_style {
-                    match current_label_style {
-                        None => self.reset()?,
-                        Some(label_style) => {
-                            self.set_color(self.styles().label(severity, label_style))?;
-                        }
+                if previous_color != color {
+                    if let Some(color) = color {
+                        self.set_color(color)?;
+                    } else {
+                        self.reset()?;
                     }
+                    previous_color = color;
                 }
 
-                let caret_ch = match current_label_style {
-                    Some(LabelStyle::Primary) => Some(self.chars().single_primary_caret),
-                    Some(LabelStyle::Secondary) => Some(self.chars().single_secondary_caret),
-                    // Only print padding if we are before the end of the last single line caret
-                    None if metrics.byte_index < max_label_end => Some(' '),
-                    None => None,
-                };
-                if let Some(caret_ch) = caret_ch {
-                    // FIXME: improve rendering of carets between character boundaries
-                    (0..metrics.unicode_width).try_for_each(|_| write!(self, "{}", caret_ch))?;
+                if color.is_none() && column_range.end > max_label_end {
+                    break;
                 }
 
-                previous_label_style = current_label_style;
+                self.write_char_or_replacement(
+                    ch,
+                    metrics.clone(),
+                    &mut chars,
+                    single_labels,
+                    |self_, _ch, metrics| {
+                        (0..metrics.unicode_width).try_for_each(|_| write!(self_, "{}", caret))?;
+                        Ok(())
+                    },
+                    |self_, _label, replacement| {
+                        self_.render_part_as_replacement_using_metrics(replacement, .., caret)?;
+                        Ok(())
+                    },
+                )?;
             }
             // Reset style if it was previously set
-            if previous_label_style.is_some() {
+            if previous_color.is_some() {
                 self.reset()?;
             }
+
             // Write first trailing label message
-            if let Some((_, (label_style, range, message))) = trailing_label {
-                for (line_no, line) in message.lines().enumerate() {
+            if let Some((_, label)) = trailing_label {
+                for (line_no, line) in label.message().unwrap_or_default().lines().enumerate() {
                     if line_no == 0 {
                         write!(self, " ")?;
                     } else {
@@ -489,16 +714,22 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                             trailing_label,
                             source.char_indices(),
                         )?;
-                        self.render_part_as_replacement_using_metrics(source, range.clone(), " ")?;
+                        self.render_part_as_replacement_using_metrics(
+                            source,
+                            label.range().clone(),
+                            " ",
+                        )?;
                         write!(self, "  ")?;
                     }
-                    self.set_color(self.styles().label(severity, *label_style))?;
+                    if let Some((color, _)) = label.label_color(self.styles(), severity) {
+                        self.set_color(color)?;
+                    }
                     write!(self, "{}", line)?;
                     self.reset()?;
                     writeln!(self)?;
                 }
 
-                if message.is_empty() {
+                if label.message().unwrap_or_default().is_empty() {
                     writeln!(self)?;
                 }
             } else {
@@ -540,10 +771,8 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                 //   │     first borrow later used by call
                 //   │     help: some help here
                 // ```
-                for (label_style, range, message) in
-                    hanging_labels(single_labels, trailing_label).rev()
-                {
-                    for (line_no, line) in message.lines().enumerate() {
+                for label in hanging_labels(single_labels, trailing_label).rev() {
+                    for (line_no, line) in label.message().unwrap_or_default().lines().enumerate() {
                         self.outer_gutter(outer_padding)?;
                         self.border_left()?;
                         self.inner_gutter(severity, num_multi_labels, &multi_labels)?;
@@ -555,9 +784,11 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                             trailing_label,
                             source
                                 .char_indices()
-                                .take_while(|(byte_index, _)| *byte_index < range.start),
+                                .take_while(|(byte_index, _)| *byte_index < label.range().start),
                         )?;
-                        self.set_color(self.styles().label(severity, *label_style))?;
+                        if let Some((color, _)) = label.label_color(self.styles(), severity) {
+                            self.set_color(color)?;
+                        }
                         if line_no > 0 {
                             write!(self, "  ")?;
                         }
@@ -586,31 +817,69 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                 MultiLabel::Bottom(range, message) => (*label_style, range, Some(message)),
             };
 
-
-
             // Finish the top or bottom caret
             match bottom_message {
                 None => {
                     self.outer_gutter(outer_padding)?;
                     self.border_left()?;
-                    self.multi_label_inner_gutter(severity, num_multi_labels, multi_labels, multi_label_index, label_style, false)?;
+                    self.multi_label_inner_gutter(
+                        severity,
+                        num_multi_labels,
+                        multi_labels,
+                        multi_label_index,
+                        label_style,
+                        false,
+                    )?;
                     self.label_multi_top_caret(severity, label_style, source, *range)?
-                },
+                }
                 Some(message) => {
                     if message.is_empty() {
                         self.outer_gutter(outer_padding)?;
                         self.border_left()?;
-                        self.multi_label_inner_gutter(severity, num_multi_labels, multi_labels, multi_label_index, label_style, false)?;
-                        self.label_multi_bottom_caret(severity, label_style, source, *range, message)?
+                        self.multi_label_inner_gutter(
+                            severity,
+                            num_multi_labels,
+                            multi_labels,
+                            multi_label_index,
+                            label_style,
+                            false,
+                        )?;
+                        self.label_multi_bottom_caret(
+                            severity,
+                            label_style,
+                            source,
+                            *range,
+                            message,
+                        )?
                     }
                     for (line_no, line) in message.lines().enumerate() {
                         self.outer_gutter(outer_padding)?;
                         self.border_left()?;
                         if line_no == 0 {
-                            self.multi_label_inner_gutter(severity, num_multi_labels, multi_labels, multi_label_index, label_style, false)?;
-                            self.label_multi_bottom_caret(severity, label_style, source, *range, line)?
+                            self.multi_label_inner_gutter(
+                                severity,
+                                num_multi_labels,
+                                multi_labels,
+                                multi_label_index,
+                                label_style,
+                                false,
+                            )?;
+                            self.label_multi_bottom_caret(
+                                severity,
+                                label_style,
+                                source,
+                                *range,
+                                line,
+                            )?
                         } else {
-                            self.multi_label_inner_gutter(severity, num_multi_labels, multi_labels, multi_label_index, label_style, true)?;
+                            self.multi_label_inner_gutter(
+                                severity,
+                                num_multi_labels,
+                                multi_labels,
+                                multi_label_index,
+                                label_style,
+                                true,
+                            )?;
                             self.render_part_as_replacement_using_metrics(source, 0..*range, " ")?;
                             self.set_color(self.styles().label(severity, label_style))?;
                             write!(self, "    ")?;
@@ -626,7 +895,47 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
         Ok(())
     }
 
-    fn multi_label_inner_gutter(&mut self, severity: Severity, num_multi_labels: usize, multi_labels: &[(usize, LabelStyle, MultiLabel)], multi_label_index: usize, label_style: LabelStyle, newline_continuation: bool) -> Result<(), Error> {
+    fn write_char_or_replacement<Label: LabeledLine>(
+        &mut self,
+        peeked_char: char,
+        peeked_metrics: Metrics,
+        chars: &mut Peekable<impl Iterator<Item = (Metrics, char)>>,
+        single_labels: &[Label],
+        write_char: impl FnOnce(&mut Self, char, &Metrics) -> Result<(), Error>,
+        write_replacement: impl FnOnce(&mut Self, &Label, &str) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        let replacement = single_labels.iter().find(|l| {
+            l.range().start == peeked_metrics.byte_index
+                && l.replacement().is_some_and(|r| !r.is_empty())
+        });
+
+        if let Some(label) = replacement {
+            write_replacement(self, label, label.replacement().unwrap())?;
+
+            // consume all chars within the range of the replacement;
+            while let Some((peeked_metrics, _)) = chars.peek() {
+                if peeked_metrics.byte_index >= label.range().end {
+                    break;
+                }
+                chars.next();
+            }
+        } else {
+            write_char(self, peeked_char, &peeked_metrics)?;
+            chars.next();
+        }
+
+        Ok(())
+    }
+
+    fn multi_label_inner_gutter(
+        &mut self,
+        severity: Severity,
+        num_multi_labels: usize,
+        multi_labels: &[(usize, LabelStyle, MultiLabel)],
+        multi_label_index: usize,
+        label_style: LabelStyle,
+        newline_continuation: bool,
+    ) -> Result<(), Error> {
         // Write inner gutter.
         //
         // ```text
@@ -651,7 +960,9 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                             underline = Some((*ls, VerticalBound::Top));
                             self.label_multi_top_left(severity, label_style)?
                         }
-                        MultiLabel::Bottom(..) if multi_label_index == *i && !newline_continuation => {
+                        MultiLabel::Bottom(..)
+                            if multi_label_index == *i && !newline_continuation =>
+                        {
                             underline = Some((*ls, VerticalBound::Bottom));
                             self.label_multi_bottom_left(severity, label_style)?;
                         }
@@ -1059,34 +1370,74 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
     }
 
     /// Write vertical lines pointing to carets.
-    fn caret_pointers(
+    fn caret_pointers<Label: LabeledLine>(
         &mut self,
         severity: Severity,
         max_label_start: usize,
-        single_labels: &[SingleLabel<'_>],
-        trailing_label: Option<(usize, &SingleLabel<'_>)>,
+        single_labels: &[Label],
+        trailing_label: Option<(usize, &Label)>,
         char_indices: impl Iterator<Item = (usize, char)>,
     ) -> Result<(), Error> {
-        for (metrics, ch) in Self::char_metrics(self.config.tab_width, char_indices) {
+        let mut chars = Self::char_metrics(self.config.tab_width, char_indices).peekable();
+        while let Some((metrics, ch)) = chars.peek().cloned() {
             let column_range = metrics.byte_index..(metrics.byte_index + ch.len_utf8());
-            let label_style = hanging_labels(single_labels, trailing_label)
-                .filter(|(_, range, _)| column_range.contains(&range.start))
-                .map(|(label_style, _, _)| *label_style)
-                .max_by_key(label_priority_key);
 
-            let mut spaces = match label_style {
-                None => 0..metrics.unicode_width,
-                Some(label_style) => {
-                    self.set_color(self.styles().label(severity, label_style))?;
-                    write!(self, "{}", self.chars().pointer_left)?;
-                    self.reset()?;
-                    1..metrics.unicode_width
-                }
-            };
-            // Only print padding if we are before the end of the last single line caret
-            if metrics.byte_index <= max_label_start {
-                spaces.try_for_each(|_| write!(self, " "))?;
+            if metrics.byte_index > max_label_start {
+                break;
             }
+
+            let color = hanging_labels(single_labels, trailing_label)
+                .filter(|label| column_range.contains(&label.range().start))
+                .flat_map(|label| label.label_color(self.styles(), severity))
+                .max_by_key(|(_, priority)| *priority)
+                .map(|(color, _)| color);
+
+            self.write_char_or_replacement(
+                ch,
+                metrics,
+                &mut chars,
+                single_labels,
+                |self_, _ch, metrics| {
+                    let mut spaces = match color {
+                        None => 0..metrics.unicode_width,
+                        Some(color) => {
+                            self_.set_color(color)?;
+                            write!(self_, "{}", self_.chars().pointer_left)?;
+                            self_.reset()?;
+                            1..metrics.unicode_width
+                        }
+                    };
+                    // Only print padding if we are before the end of the last single line caret
+                    if metrics.byte_index <= max_label_start {
+                        spaces.try_for_each(|_| write!(self_, " "))?;
+                    }
+                    Ok(())
+                },
+                |self_, _label, replacement| {
+                    // write the padding for the replacement. The first char should be the caret, the rest should be spacing
+                    let mut chars =
+                        Self::char_metrics(self_.config.tab_width, replacement.char_indices());
+                    if let Some((metrics, _ch)) = chars.next() {
+                        if let Some(color) = color {
+                            self_.set_color(color)?;
+                        }
+                        write!(self_, "{}", self_.chars().pointer_left)?;
+                        if let Some(_) = color {
+                            self_.reset()?;
+                        }
+                        // Only print padding if we are before the end of the last single line caret
+                        if metrics.byte_index <= max_label_start {
+                            (1..metrics.unicode_width).try_for_each(|_| write!(self_, " "))?;
+                        }
+                    }
+                    // Only print padding if we are before the end of the last single line caret
+                    for (metrics, _ch) in chars.take_while(|(m, _)| m.byte_index <= max_label_start)
+                    {
+                        (0..metrics.unicode_width).try_for_each(|_| write!(self_, " "))?;
+                    }
+                    Ok(())
+                },
+            )?;
         }
 
         Ok(())
@@ -1303,6 +1654,7 @@ impl WriteColor for Renderer<'_, '_> {
     }
 }
 
+#[derive(Clone, Copy)]
 struct Metrics {
     byte_index: usize,
     unicode_width: usize,
@@ -1325,14 +1677,14 @@ fn label_priority_key(label_style: &LabelStyle) -> u8 {
 
 /// Return an iterator that yields the labels that require hanging messages
 /// rendered underneath them.
-fn hanging_labels<'labels, 'diagnostic>(
-    single_labels: &'labels [SingleLabel<'diagnostic>],
-    trailing_label: Option<(usize, &'labels SingleLabel<'diagnostic>)>,
-) -> impl 'labels + DoubleEndedIterator<Item = &'labels SingleLabel<'diagnostic>> {
+fn hanging_labels<'labels, 'diagnostic, Label: LabeledLine>(
+    single_labels: &'labels [Label],
+    trailing_label: Option<(usize, &'labels Label)>,
+) -> impl 'labels + DoubleEndedIterator<Item = &'labels Label> {
     single_labels
         .iter()
         .enumerate()
-        .filter(|(_, (_, _, message))| !message.is_empty())
+        .filter(|(_, label)| !label.message().unwrap_or_default().is_empty())
         .filter(move |(i, _)| trailing_label.map_or(true, |(j, _)| *i != j))
         .map(|(_, label)| label)
 }

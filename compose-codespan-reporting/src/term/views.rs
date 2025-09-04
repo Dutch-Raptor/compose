@@ -4,8 +4,8 @@ use crate::diagnostic::{
     Diagnostic, Label, LabelStyle, SpannedNote, Subdiagnostic, Suggestion, SuggestionPart,
 };
 use crate::files::{Error, Files, Location};
-use crate::term::renderer::{Locus, MultiLabel, Renderer, SingleLabel};
 use crate::term::Config;
+use crate::term::renderer::{Locus, MultiLabel, Renderer, SingleLabel};
 
 /// Calculate the number of decimal digits in `n`.
 // TODO: simplify after https://github.com/rust-lang/rust/issues/70887 resolves
@@ -371,7 +371,7 @@ where
                                 .get(&(line_index + 1))
                                 .map_or(&[][..], |line| &line.multi_labels[..]);
 
-                            renderer.render_snippet_source(
+                            renderer.render_snippet_source::<SingleLabel>(
                                 outer_padding,
                                 files.line_number(file_id, line_index + 1)?,
                                 &source[files.line_range(file_id, line_index + 1)?],
@@ -468,12 +468,11 @@ where
                 // ```
                 // FIXME: We currently skip suggestions that remove or insert multiple lines.
                 Subdiagnostic::Suggestion(Suggestion {
-                    range,
-                    file_id,
+                    span,
                     message,
                     parts,
                 }) => {
-                    let file_id = *file_id;
+                    let file_id = span.file_id;
 
                     if parts.is_empty() {
                         empty_suggestions += 1;
@@ -483,7 +482,7 @@ where
                     // The start of the first suggestion.
                     let start_line_offset = parts
                         .iter()
-                        .map(|part| part.range.start)
+                        .map(|part| part.span.range.start)
                         .min()
                         .expect("(internal) should have checked for if no parts exist already");
                     let start_line_index = files.line_index(file_id, start_line_offset)?;
@@ -493,7 +492,7 @@ where
                     // The end of the last suggestion.
                     let end_line_offset = parts
                         .iter()
-                        .map(|part| part.range.end)
+                        .map(|part| part.span.range.end)
                         .max()
                         .expect("(internal) should have checked for if no parts exist already");
                     let end_line_index = files.line_index(file_id, end_line_offset)?;
@@ -511,11 +510,10 @@ where
                         multiline_suggestions += 1;
 
                         // for now, output a normal multi-line label and skip rendering the replacement
-                        let labels =
-                            vec![
-                                Label::secondary(file_id, start_line_offset..end_line_offset)
-                                    .with_message(message),
-                            ];
+                        let labels = vec![
+                            Label::secondary(file_id, start_line_offset..end_line_offset)
+                                .with_message(message),
+                        ];
                         let (outer_padding, labeled_files) = self.label_files(files, &labels)?;
                         self.render_source_snippets(outer_padding, files, labeled_files, renderer)?;
                         continue;
@@ -523,14 +521,18 @@ where
 
                     let parts: Vec<_> = parts
                         .iter()
-                        .map(|SuggestionPart { range, replacement }| {
-                            // Byte index in `source`.
-                            // NOTE: Not necessarily the correct thinking for multiple lines.
-                            let replacement_start = range.start - start_line_range.start;
-                            let replacement_end = range.end - start_line_range.start;
-                            let replacement_range = replacement_start..replacement_end;
-                            (replacement_range, replacement.as_str())
-                        })
+                        .map(
+                            |SuggestionPart {
+                                 span, replacement, ..
+                             }| {
+                                // Byte index in `source`.
+                                // NOTE: Not necessarily the correct thinking for multiple lines.
+                                let replacement_start = span.range.start - start_line_range.start;
+                                let replacement_end = span.range.end - start_line_range.start;
+                                let replacement_range = replacement_start..replacement_end;
+                                (replacement_range, replacement.as_str())
+                            },
+                        )
                         .collect();
 
                     renderer.render_suggestions(
@@ -540,7 +542,7 @@ where
                         &parts,
                         &Locus {
                             name: files.name(file_id)?.to_string(),
-                            location: files.location(file_id, range.start)?,
+                            location: files.location(file_id, span.range.start)?,
                         },
                         message,
                     )?;

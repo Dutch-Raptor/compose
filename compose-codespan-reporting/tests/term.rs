@@ -1,10 +1,10 @@
 #[allow(unused_imports)]
 use compose_codespan_reporting::{
     diagnostic::{
-        Diagnostic, Label, Severity, SpannedNote, Subdiagnostic, Suggestion, SuggestionPart,
+        Diagnostic, Label, Severity, Span, SpannedNote, Subdiagnostic, Suggestion, SuggestionPart,
     },
     files::{SimpleFile, SimpleFiles},
-    term::{termcolor::Color, Chars, Config, DisplayStyle, Styles}
+    term::{Chars, Config, DisplayStyle, Styles, termcolor::Color},
 };
 
 mod support;
@@ -1240,11 +1240,12 @@ mod suggestion_add {
                     ])
                     .with_subdiagnostics(vec![
                         Subdiagnostic::Suggestion(Suggestion {
-                            file_id,
+                            span: Span::new(file_id, 40..40),
                             message: format!("consider borrowing here"),
                             parts: vec![
                                 SuggestionPart {
-                                    range: 40..40,
+                                    message: None,
+                                    span: Span::new(file_id, 40..40),
                                     replacement: format!("&"),
                                 },
                             ]
@@ -1262,6 +1263,7 @@ mod suggestion_add {
 
 mod suggestion_remove {
     use super::*;
+    use compose_codespan_reporting::diagnostic::Span;
 
     lazy_static::lazy_static! {
         static ref TEST_DATA: TestData<'static, SimpleFiles<&'static str, String>> = {
@@ -1288,11 +1290,12 @@ mod suggestion_remove {
                     ])
                     .with_subdiagnostics(vec![
                        Subdiagnostic::Suggestion(Suggestion {
-                            file_id,
-                            message: format!("consider removing the borrow"),
+                            span: Span::new(file_id, 39..40),
+                            message: "consider removing the borrow".to_string(),
                             parts: vec![
                                 SuggestionPart {
-                                    range: 39..40,
+                                    span: Span::new(file_id, 39..40),
+                                    message: None,
                                     replacement: format!(""),
                                 }
                             ],
@@ -1333,11 +1336,12 @@ mod suggestion_replace {
                     ])
                     .with_subdiagnostics(vec![
                        Subdiagnostic::Suggestion(Suggestion {
-                            file_id,
+                            span: Span::new(file_id, 11..20),
                             message: format!("help: change this to: `&[u32]`"),
                             parts: vec![
                                 SuggestionPart {
-                                    range: 11..20,
+                                    span: Span::new(file_id, 11..20),
+                                    message: None,
                                     replacement: format!("&[u32]"),
                                 }
                             ],
@@ -1378,15 +1382,17 @@ mod suggestion_replace_multiple {
                     ])
                     .with_subdiagnostics(vec![
                        Subdiagnostic::Suggestion(Suggestion {
-                            file_id,
+                            span: Span::new(file_id, 41..52),
                             message: format!("help: to make an array, use square brackets instead of curly braces"),
                             parts: vec![
                                 SuggestionPart {
-                                    range: 41..42,
+                                    span: Span::new(file_id, 41..42),
                                     replacement: format!("["),
+                                    message: None,
                                 },
                                 SuggestionPart {
-                                    range: 51..52,
+                                    span: Span::new(file_id, 51..52),
+                                    message: None,
                                     replacement: format!("]"),
                                 },
                             ],
@@ -1427,15 +1433,17 @@ mod suggestion_many {
                     ])
                     .with_subdiagnostics(vec![
                        Subdiagnostic::Suggestion(Suggestion {
-                            file_id,
+                            span: Span::new(file_id, 41..52),
                             message: format!("help: to make an array, use square brackets instead of curly braces"),
                             parts: vec![
                                 SuggestionPart {
-                                    range: 41..42,
+                                    span: Span::new(file_id, 41..42),
+                                    message: None,
                                     replacement: format!("["),
                                 },
                                 SuggestionPart {
-                                    range: 51..52,
+                                    span: Span::new(file_id, 51..52),
+                                    message: None,
                                     replacement: format!("]"),
                                 },
                             ],
@@ -1444,22 +1452,25 @@ mod suggestion_many {
                         // This is a silly suggestion that tests both multiple suggestions and
                         // mixing add/remove in a suggestion.
                        Subdiagnostic::Suggestion(Suggestion {
-                            file_id,
+                            span: Span::new(file_id, 28..50),
                             message: format!("help: maybe you want a tuple instead?"),
                             parts: vec![
                                 // *Add* the tuple inside the expression
                                 SuggestionPart {
-                                    range: 43..43,
+                                    span: Span::new(file_id, 43..43),
+                                    message: None,
                                     replacement: format!("("),
                                 },
                                 SuggestionPart {
-                                    range: 50..50,
+                                    span: Span::new(file_id, 50..50),
+                                    message: None,
                                     replacement: format!(")"),
                                 },
 
                                 // *Remove* the type hint
                                 SuggestionPart {
-                                    range: 28..38,
+                                    span: Span::new(file_id, 28..38),
+                                    message: None,
                                     replacement: format!(""),
                                 },
                             ],
@@ -1504,15 +1515,17 @@ mod suggestion_multiline {
                     ])
                     .with_subdiagnostics(vec![
                        Subdiagnostic::Suggestion(Suggestion {
-                            file_id,
+                            span: Span::new(file_id, 41..81),
                             message: format!("help: to make an array, use square brackets instead of curly braces"),
                             parts: vec![
                                 SuggestionPart {
-                                    range: 41..42,
+                                    span: Span::new(file_id, 41..42),
+                                    message: None,
                                     replacement: format!("["),
                                 },
                                 SuggestionPart {
-                                    range: 81..82,
+                                    span: Span::new(file_id, 81..82),
+                                    message: None,
                                     replacement: format!("]"),
                                 },
                             ],
@@ -1600,11 +1613,12 @@ mod suggestion_multiple_lines {
                     ])
                     .with_subdiagnostics(vec![
                        Subdiagnostic::Suggestion(Suggestion {
-                            file_id,
+                            span: Span::new(file_id, 75..76),
                             message: format!("help: add a new item"),
                             parts: vec![
                                 SuggestionPart {
-                                    range: 75..76,
+                                    span: Span::new(file_id, 75..76),
+                                    message: None,
                                     replacement: format!("\n    4,"),
                                 },
                             ],

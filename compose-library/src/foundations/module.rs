@@ -75,7 +75,7 @@ pub fn add_pub_fix(binding_span: Span, ctx: &SyntaxContext) -> Option<Fix> {
         let_binding.span(),
     );
 
-    fix_builder.insert_before(&let_binding, "pub ");
+    fix_builder.insert_before(&let_binding, "pub ", None::<&str>);
 
     Some(fix_builder.build())
 }

@@ -5,7 +5,7 @@ use crate::parser::Parser;
 use crate::parser::{patterns, ExprContext};
 use crate::precedence::Precedence;
 use crate::set::{syntax_set, SyntaxSet, ASSIGN_OP};
-use crate::{set, PatchEngine, SyntaxNode};
+use crate::{set, SyntaxNode};
 use compose_error_codes::{
     E0003_EXPECTED_BINDING_AFTER_LET, E0006_UNTERMINATED_STATEMENT,
     E0007_MISSING_EQUALS_AFTER_LET_BINDING,
@@ -136,21 +136,16 @@ pub fn code(p: &mut Parser, end_set: SyntaxSet) {
 
         // Expect the end of an expression. Either a semicolon or a newline.
         if !p.end() && !p.skip_if(SyntaxKind::Semicolon) && !p.at_set(set::STMT_TERMINATOR) {
-            let mut engine = PatchEngine::new();
             let stmt_span = p
                 .last_node()
                 .map(SyntaxNode::span)
                 .expect("a node was just added");
-            engine
-                .insert_after(&stmt_span, ";")
-                .expect("only one patch will be added, so no conflicts");
-
             p
                 .insert_error_before("expected a semicolon after a statement")
                 .with_code(&E0006_UNTERMINATED_STATEMENT)
                 .with_fix(
                     FixBuilder::new("write a semicolon to terminate this statement", stmt_span)
-                        .insert_after(&stmt_span, ";")
+                        .insert_after(&stmt_span, ";", None::<&str>)
                         .build(),
                 )
                 .with_label_message("help: insert a semicolon here");

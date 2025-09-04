@@ -1,1 +1,10 @@
-let assert_equal = { a, b => assert(let a = b, "The values were not equal"); }
+pub let assert_equal =
+    { a, b
+        =>
+            assert(
+                a
+                =
+                b,
+                "The values were not equal"
+            );
+    }

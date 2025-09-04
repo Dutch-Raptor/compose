@@ -146,7 +146,7 @@ fn err_assign_in_expr_context(p: &mut Parser) {
             "if you meant to compare, use `==` instead of `=`:",
             operator_span,
         )
-        .replace_node(&operator_span, "==")
+        .replace_node(&operator_span, "==", None::<&str>)
         .build(),
     );
     err.with_fix(
@@ -154,8 +154,8 @@ fn err_assign_in_expr_context(p: &mut Parser) {
             "or, if you meant to assign, wrap the statement in a block:",
             assignment_span,
         )
-        .insert_before(&assignment_span, "{ ")
-        .insert_after(&assignment_span, " }")
+        .insert_before(&assignment_span, "{ ", None::<&str>)
+        .insert_after(&assignment_span, " }", None::<&str>)
         .build(),
     );
 }
@@ -236,8 +236,8 @@ fn err_let_as_expression(p: &mut Parser) {
             "use a block to allow statements:",
             let_binding_span,
         )
-        .insert_before(&let_binding_span, "{ ")
-        .insert_after(&let_binding_span, " }")
+        .insert_before(&let_binding_span, "{ ", None::<&str>)
+        .insert_after(&let_binding_span, " }", None::<&str>)
         .build(),
     );
 }

@@ -280,6 +280,9 @@ pub struct Chars {
     /// The character to use for the left of a pointer underneath a caret.
     /// Defaults to: `'│'` or `'|'` with [`Chars::ascii()`].
     pub pointer_left: char,
+    pub suggest_replace: char,
+    pub suggest_add: char,
+    pub suggest_remove: char,
 }
 
 impl Default for Chars {
@@ -312,6 +315,10 @@ impl Chars {
             multi_left: '│',
 
             pointer_left: '│',
+            
+            suggest_add: '+',
+            suggest_remove: '-',
+            suggest_replace: '~',
         }
     }
 
@@ -342,6 +349,10 @@ impl Chars {
             multi_left: '|',
 
             pointer_left: '|',
+
+            suggest_add: '+',
+            suggest_remove: '-',
+            suggest_replace: '~',
         }
     }
 }

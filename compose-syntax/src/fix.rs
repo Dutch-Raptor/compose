@@ -45,23 +45,23 @@ impl<'src> FixBuilder {
         self
     }
 
-    pub fn insert_before(&mut self, node: &impl HasSpan, text: &str) -> &mut FixBuilder {
-        _ =self.engine.insert_before(node, text);
+    pub fn insert_before(&mut self, node: &impl HasSpan, text: impl Into<EcoString>, message: Option<impl Into<EcoString>>) -> &mut FixBuilder {
+        _ =self.engine.insert_before(node, text, message);
         self
     }
 
-    pub fn insert_after(&mut self, node: &impl HasSpan, text: &str) -> &mut FixBuilder {
-        _ = self.engine.insert_after(node, text);
+    pub fn insert_after(&mut self, node: &impl HasSpan, text: impl Into<EcoString>, message: Option<impl Into<EcoString>>) -> &mut FixBuilder {
+        _ = self.engine.insert_after(node, text, message);
         self
     }
 
-    pub fn replace_node(&mut self, node: &impl HasSpan, text: &str) -> &mut FixBuilder {
-        _ = self.engine.replace_node(node, text);
+    pub fn replace_node(&mut self, node: &impl HasSpan, text: impl Into<EcoString>, message: Option<impl Into<EcoString>>) -> &mut FixBuilder {
+        _ = self.engine.replace_node(node, text, message);
         self
     }
 
-    pub fn delete_node(&mut self, node: &impl HasSpan) -> &mut FixBuilder {
-        _ = self.engine.delete_node(node);
+    pub fn delete_node(&mut self, node: &impl HasSpan, message: Option<impl Into<EcoString>>) -> &mut FixBuilder {
+        _ = self.engine.delete_node(node, message);
         self
     }
 

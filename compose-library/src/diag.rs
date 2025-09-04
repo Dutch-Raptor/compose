@@ -1,7 +1,9 @@
 pub use compose_codespan_reporting;
 use compose_codespan_reporting::term::termcolor::WriteColor;
 use compose_codespan_reporting::{diagnostic, term};
-use compose_syntax::{FileId, Fix, Label, LabelType, Patch, Span, SyntaxError, SyntaxErrorSeverity};
+use compose_syntax::{
+    FileId, Fix, Label, LabelType, Span, SyntaxError, SyntaxErrorSeverity,
+};
 use ecow::{eco_vec, EcoVec};
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
@@ -34,30 +36,32 @@ pub fn write_diagnostics(
                 continue;
             };
 
-            diagnostic.subdiagnostics.push(Subdiagnostic::Suggestion(
-                Suggestion {
-                    file_id,
+            diagnostic
+                .subdiagnostics
+                .push(Subdiagnostic::Suggestion(Suggestion {
+                    span: compose_codespan_reporting::diagnostic::Span::new(
+                        file_id,
+                        match fix.span.range() {
+                            Some(range) => range.clone(),
+                            None => continue,
+                        },
+                    ),
                     message: String::from(&fix.message),
-                    range: match fix.span.range() {
-                        Some(range) => range.clone(),
-                        None => continue,
-                    },
-                    parts: fix.patches.iter().map(|p| match p {
-                        Patch::Insert { at, text } => SuggestionPart {
-                            range: *at..*at,
-                            replacement: text.into(),
-                        },
-                        Patch::Replace { range, text } => SuggestionPart {
-                            range: range.clone(),
-                            replacement: text.into(),
-                        },
-                        Patch::Delete { range } => SuggestionPart {
-                            range: range.clone(),
-                            replacement: "".into(),
-                        }
-                    }).collect()
-                }
-            ));
+                    parts: fix
+                        .patches
+                        .iter()
+                        .filter_map(|p| {
+                            Some(SuggestionPart {
+                                message: p.message.as_ref().map(EcoString::to_string),
+                                span: diagnostic::Span {
+                                    range: p.span.range()?,
+                                    file_id: p.span.id()?,
+                                },
+                                replacement: p.replace.to_string(),
+                            })
+                        })
+                        .collect(),
+                }));
         }
 
         diagnostic
