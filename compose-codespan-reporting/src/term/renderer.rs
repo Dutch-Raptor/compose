@@ -4,7 +4,7 @@ use std::ops::{Range, RangeBounds};
 use std::slice::SliceIndex;
 use termcolor::{ColorSpec, WriteColor};
 
-use crate::diagnostic::{LabelStyle, Severity};
+use crate::diagnostic::{LabelStyle, Severity, Suggestion};
 use crate::files::{Error, Location};
 use crate::term::{Chars, Config, Styles};
 
@@ -68,6 +68,10 @@ impl LabeledLine for SingleLabel<'_> {
             LabelStyle::Secondary => (chars.single_secondary_caret, Priority::Low),
         }
     }
+
+    fn replacement(&self) -> Option<&str> {
+        None
+    }
 }
 
 pub trait LabeledLine {
@@ -80,22 +84,18 @@ pub trait LabeledLine {
     ) -> Option<(&'s ColorSpec, Priority)>;
     fn caret<'s>(&self, chars: &Chars) -> (char, Priority);
     /// A replacement for the source text
-    fn replacement(&self) -> Option<&str> {
-        None
-    }
+    fn replacement(&self) -> Option<&str>;
 
-    fn source_color<'s>(&self, styles: &'s Styles, severity: Severity) -> Option<(&'s ColorSpec, Priority)> {
-        self.label_color(styles, severity)
-    }
+    fn source_color<'s>(&self, styles: &'s Styles, severity: Severity) -> Option<(&'s ColorSpec, Priority)>;
 }
 
 pub struct SuggestionLine<'d> {
     /// The range within the line
-    range: Range<usize>,
+    pub(crate) range: Range<usize>,
     /// The text to replace the range with
-    replacement: &'d str,
+    pub(crate) replacement: &'d str,
     /// an optional message to show
-    message: Option<&'d str>,
+    pub(crate) message: Option<&'d str>,
 }
 
 impl LabeledLine for SuggestionLine<'_> {
@@ -142,6 +142,10 @@ impl LabeledLine for SuggestionLine<'_> {
     fn replacement(&self) -> Option<&str> {
         Some(self.replacement)
     }
+
+    fn source_color<'s>(&self, styles: &'s Styles, severity: Severity) -> Option<(&'s ColorSpec, Priority)> {
+        self.label_color(styles, severity)
+    }
 }
 
 pub enum LabeledLineEnum<'s> {
@@ -186,6 +190,13 @@ impl LabeledLine for LabeledLineEnum<'_> {
         match self {
             LabeledLineEnum::Suggestion(line) => line.replacement(),
             LabeledLineEnum::SingleLabel(line) => line.replacement(),
+        }
+    }
+
+    fn source_color<'s>(&self, styles: &'s Styles, severity: Severity) -> Option<(&'s ColorSpec, Priority)> {
+        match self {
+            LabeledLineEnum::Suggestion(line) => line.source_color(styles, severity),
+            LabeledLineEnum::SingleLabel(line) => line.source_color(styles, severity),
         }
     }
 }
@@ -648,7 +659,9 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
 
                 let caret = single_labels
                     .iter()
-                    .filter(|l| is_overlapping(l.range(), &column_range))
+                    .filter(|l|
+                        is_overlapping(l.range(), &column_range)
+                    )
                     .map(|l| l.caret(self.chars()))
                     .max_by_key(|(_, prio)| *prio)
                     .map(|(caret, _)| caret)
@@ -912,6 +925,12 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
         if let Some(label) = replacement {
             write_replacement(self, label, label.replacement().unwrap())?;
 
+            if label.range().end == label.range().start {
+                // if just an insertion, we also still need to write the char
+                write_char(self, peeked_char, &peeked_metrics)?;
+                chars.next();
+            }
+
             // consume all chars within the range of the replacement;
             while let Some((peeked_metrics, _)) = chars.peek() {
                 if peeked_metrics.byte_index >= label.range().end {
@@ -923,6 +942,7 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
             write_char(self, peeked_char, &peeked_metrics)?;
             chars.next();
         }
+
 
         Ok(())
     }
@@ -1114,6 +1134,25 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                 _ => write!(self, "{}", replacement)?,
             }
         }
+        Ok(())
+    }
+
+    pub fn render_suggestion_header<FileId>(&mut self, suggestion: &Suggestion<FileId>, outer_padding: usize) -> Result<(), Error> {
+        let (has_additions, has_removals) = suggestion.parts.iter().fold((false, false), |(a, r), p| {
+            let has_addition = !p.replacement.is_empty();
+            let has_removal = p.span.range.start != p.span.range.end;
+            (a || has_addition, r || has_removal)
+        });
+
+        // Render message with different colors depending on if it's a removal,
+        // addition or replacement (both removal and addition).
+        let message_color = match (has_additions, has_removals) {
+            (true, false) => &self.styles().suggest_add,
+            (false, true) => &self.styles().suggest_remove,
+            _ => &self.styles().suggest_replace,
+        };
+        self.render_snippet_note_with_color(outer_padding, &suggestion.message, Some(message_color))?;
+
         Ok(())
     }
 

@@ -1,11 +1,13 @@
 use std::ops::Range;
 
 use crate::diagnostic::{
-    Diagnostic, Label, LabelStyle, SpannedNote, Subdiagnostic, Suggestion, SuggestionPart,
+    Diagnostic, Label, LabelStyle, SpannedNote, Subdiagnostic, Suggestion,
 };
 use crate::files::{Error, Files, Location};
+use crate::term::renderer::{
+    LabeledLine, LabeledLineEnum, Locus, MultiLabel, Renderer, SingleLabel, SuggestionLine,
+};
 use crate::term::Config;
-use crate::term::renderer::{Locus, MultiLabel, Renderer, SingleLabel};
 
 /// Calculate the number of decimal digits in `n`.
 // TODO: simplify after https://github.com/rust-lang/rust/issues/70887 resolves
@@ -47,9 +49,9 @@ impl<'diagnostic, FileId> LabeledFile<'diagnostic, FileId> {
 
 struct Line<'diagnostic> {
     number: usize,
-    range: std::ops::Range<usize>,
+    range: Range<usize>,
     // TODO: How do we reuse these allocations?
-    single_labels: Vec<SingleLabel<'diagnostic>>,
+    single_labels: Vec<LabeledLineEnum<'diagnostic>>,
     multi_labels: Vec<(usize, LabelStyle, MultiLabel<'diagnostic>)>,
     must_render: bool,
 }
@@ -69,6 +71,99 @@ where
         config: &'config Config,
     ) -> RichDiagnostic<'diagnostic, 'config, FileId> {
         RichDiagnostic { diagnostic, config }
+    }
+
+    fn label_suggestion_parts<'files>(
+        &self,
+        files: &'files impl Files<'files, FileId = FileId>,
+        suggestion: &'diagnostic Suggestion<FileId>,
+    ) -> Result<(usize, Vec<LabeledFile<'diagnostic, FileId>>), Error> {
+        let mut labeled_files = Vec::<LabeledFile<'_, _>>::new();
+        let mut outer_padding = 0;
+
+        for part in &suggestion.parts {
+            let start_line_index = files.line_index(part.span.file_id, part.span.range.start)?;
+            let start_line_number = files.line_number(part.span.file_id, start_line_index)?;
+            let start_line_range = files.line_range(part.span.file_id, start_line_index)?;
+            let end_line_index = files.line_index(part.span.file_id, part.span.range.end)?;
+            let end_line_number = files.line_number(part.span.file_id, end_line_index)?;
+            let end_line_range = files.line_range(part.span.file_id, end_line_index)?;
+
+            outer_padding = std::cmp::max(outer_padding, count_digits(start_line_number));
+            outer_padding = std::cmp::max(outer_padding, count_digits(end_line_number));
+
+            let replacement_lines = part.replacement.lines().collect::<Vec<_>>();
+
+            // find the related labeled file or create it
+            let labeled_file = match labeled_files
+                .iter_mut()
+                .find(|labeled_file| labeled_file.file_id == part.span.file_id)
+            {
+                Some(labeled_file) => labeled_file,
+                None => {
+                    labeled_files.push(LabeledFile {
+                        file_id: part.span.file_id,
+                        start: part.span.range.start,
+                        name: files.name(part.span.file_id)?.to_string(),
+                        location: files.location(part.span.file_id, part.span.range.start)?,
+                        num_multi_labels: 0,
+                        lines: Default::default(),
+                        max_label_style: LabelStyle::Secondary,
+                    });
+                    labeled_files
+                        .last_mut()
+                        .expect("just pushed an element that disappeared")
+                }
+            };
+
+            // for each line in the replacement create a new labeled line
+            for (line_index, replacement_line) in replacement_lines.iter().enumerate() {
+                let line = if line_index == 0 {
+                    // first line
+                    labeled_file.get_or_insert_line(
+                        start_line_index,
+                        start_line_range.clone(),
+                        start_line_number,
+                    )
+                } else if line_index == replacement_lines.len() - 1 {
+                    labeled_file.get_or_insert_line(
+                        start_line_index,
+                        start_line_range.clone(),
+                        start_line_number + line_index,
+                    )
+                    // last line
+                } else {
+                    labeled_file.get_or_insert_line(
+                        end_line_index,
+                        end_line_range.clone(),
+                        start_line_number + line_index,
+                    )
+                };
+
+                let range = if line_index == 0 {
+                    part.span.range.start - start_line_range.start
+                        ..part.span.range.end - start_line_range.start
+                } else if line_index == replacement_lines.len() - 1 {
+                    0..part.span.range.end - end_line_range.start
+                } else {
+                    start_line_range.clone()
+                };
+
+                line.must_render = true;
+
+                line.single_labels
+                    .push(LabeledLineEnum::Suggestion(SuggestionLine {
+                        range,
+                        replacement: replacement_line,
+                        message: match &part.message {
+                            Some(message) if line_index == 0 => Some(&message),
+                            _ => None,
+                        },
+                    }));
+            }
+        }
+
+        Ok((outer_padding, labeled_files))
     }
 
     fn label_files<'files>(
@@ -95,7 +190,7 @@ where
             outer_padding = std::cmp::max(outer_padding, count_digits(end_line_number));
 
             // NOTE: This could be made more efficient by using an associative
-            // data structure like a hashmap or B-tree,  but we use a vector to
+            // data structure like a hashmap or B-tree, but we use a vector to
             // preserve the order that unique files appear in the list of labels.
             let labeled_file = match labeled_files
                 .iter_mut()
@@ -125,7 +220,7 @@ where
                         lines: BTreeMap::new(),
                         max_label_style: label.style,
                     });
-                    // this unwrap should never fail because we just pushed an element
+
                     labeled_files
                         .last_mut()
                         .expect("just pushed an element that disappeared")
@@ -190,10 +285,10 @@ where
 
                 // Ensure that the single line labels are lexicographically
                 // sorted by the range of source code that they cover.
-                let index = match line.single_labels.binary_search_by(|(_, range, _)| {
+                let index = match line.single_labels.binary_search_by(|l| {
                     // `Range<usize>` doesn't implement `Ord`, so convert to `(usize, usize)`
                     // to piggyback off its lexicographic comparison implementation.
-                    (range.start, range.end).cmp(&(label_start, label_end))
+                    (l.range().start, l.range().end).cmp(&(label_start, label_end))
                 }) {
                     // If the ranges are the same, order the labels in reverse
                     // to how they were originally specified in the diagnostic.
@@ -201,8 +296,14 @@ where
                     Ok(index) | Err(index) => index,
                 };
 
-                line.single_labels
-                    .insert(index, (label.style, label_start..label_end, &label.message));
+                line.single_labels.insert(
+                    index,
+                    LabeledLineEnum::SingleLabel((
+                        label.style,
+                        label_start..label_end,
+                        &label.message,
+                    )),
+                );
 
                 // If this line is not rendered, the SingleLabel is not visible.
                 line.must_render = true;
@@ -467,85 +568,11 @@ where
                 // |                       ~ replace size here
                 // ```
                 // FIXME: We currently skip suggestions that remove or insert multiple lines.
-                Subdiagnostic::Suggestion(Suggestion {
-                    span,
-                    message,
-                    parts,
-                }) => {
-                    let file_id = span.file_id;
-
-                    if parts.is_empty() {
-                        empty_suggestions += 1;
-                        continue;
-                    }
-
-                    // The start of the first suggestion.
-                    let start_line_offset = parts
-                        .iter()
-                        .map(|part| part.span.range.start)
-                        .min()
-                        .expect("(internal) should have checked for if no parts exist already");
-                    let start_line_index = files.line_index(file_id, start_line_offset)?;
-                    let start_line_number = files.line_number(file_id, start_line_index)?;
-                    let start_line_range = files.line_range(file_id, start_line_index)?;
-
-                    // The end of the last suggestion.
-                    let end_line_offset = parts
-                        .iter()
-                        .map(|part| part.span.range.end)
-                        .max()
-                        .expect("(internal) should have checked for if no parts exist already");
-                    let end_line_index = files.line_index(file_id, end_line_offset)?;
-                    let end_line_number = files.line_number(file_id, end_line_index)?;
-                    let end_line_range = files.line_range(file_id, end_line_index)?;
-
-                    let line_number_range = start_line_number..end_line_number;
-                    // Get the lines that include the text to be replaced.
-                    let source = files.source(file_id)?;
-                    let source = &source.as_ref()[start_line_range.start..end_line_range.end];
-
-                    let replacement_has_newline =
-                        parts.iter().any(|part| part.replacement.contains("\n"));
-                    if start_line_number != end_line_number || replacement_has_newline {
-                        multiline_suggestions += 1;
-
-                        // for now, output a normal multi-line label and skip rendering the replacement
-                        let labels = vec![
-                            Label::secondary(file_id, start_line_offset..end_line_offset)
-                                .with_message(message),
-                        ];
-                        let (outer_padding, labeled_files) = self.label_files(files, &labels)?;
-                        self.render_source_snippets(outer_padding, files, labeled_files, renderer)?;
-                        continue;
-                    }
-
-                    let parts: Vec<_> = parts
-                        .iter()
-                        .map(
-                            |SuggestionPart {
-                                 span, replacement, ..
-                             }| {
-                                // Byte index in `source`.
-                                // NOTE: Not necessarily the correct thinking for multiple lines.
-                                let replacement_start = span.range.start - start_line_range.start;
-                                let replacement_end = span.range.end - start_line_range.start;
-                                let replacement_range = replacement_start..replacement_end;
-                                (replacement_range, replacement.as_str())
-                            },
-                        )
-                        .collect();
-
-                    renderer.render_suggestions(
-                        outer_padding,
-                        line_number_range,
-                        source,
-                        &parts,
-                        &Locus {
-                            name: files.name(file_id)?.to_string(),
-                            location: files.location(file_id, span.range.start)?,
-                        },
-                        message,
-                    )?;
+                Subdiagnostic::Suggestion(suggestion) => {
+                    let (outer_padding, labeled_files) =
+                        self.label_suggestion_parts(files, suggestion)?;
+                    renderer.render_suggestion_header(suggestion, outer_padding)?;
+                    self.render_source_snippets(outer_padding, files, labeled_files, renderer)?;
                 }
                 // Additional notes, potentially with labels
                 //
