@@ -1,13 +1,5 @@
+let a = 3;
+let b = 4;
+let f = { c => a * 2 * c };
 
-let f = { => 
-    import "./subpath/import_me.cmps" as math;
-
-    math::add(2, 3);
-};
-
-let foo = #{
-    f
-};
-
-foo.get("f")()
-
+f(b)

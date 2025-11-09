@@ -113,7 +113,18 @@ impl Value {
     pub fn named(self, name: Spanned<EcoString>) -> Self {
         match self {
             Value::Func(v) => Value::Func(v.named(name)),
-            _ => self,
+
+            other @ (Value::Int(_)
+            | Value::Bool(_)
+            | Value::Unit(_)
+            | Value::Str(_)
+            | Value::Type(_)
+            | Value::Iterator(_)
+            | Value::Box(_)
+            | Value::Array(_)
+            | Value::Range(_)
+            | Value::Map(_)
+            | Value::Module(_)) => other,
         }
     }
 

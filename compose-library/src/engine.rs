@@ -8,7 +8,7 @@ pub struct Engine<'a> {
 }
 
 impl<'a> Engine<'a> {
-    pub fn syntax_ctx(&self) -> SyntaxContext {
+    pub fn syntax_ctx(&self) -> SyntaxContext<'_> {
         SyntaxContext {
             world: self.world
         }

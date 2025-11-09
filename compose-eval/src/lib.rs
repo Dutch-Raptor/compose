@@ -83,6 +83,22 @@ impl Tracked for Evaluated {
     }
 }
 
+pub trait ValueEvaluatedExtensions {
+    fn mutable(self) -> Evaluated;
+    fn immutable(self) -> Evaluated;
+}
+
+impl ValueEvaluatedExtensions for Value {
+    fn mutable(self) -> Evaluated {
+        Evaluated::new(self, true)
+    }
+
+    fn immutable(self) -> Evaluated {
+        Evaluated::new(self, false)
+    }
+}
+
+
 #[derive(Default)]
 pub struct EvalConfig {
     /// Whether to include syntax warnings in the returned result.

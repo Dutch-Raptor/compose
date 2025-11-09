@@ -1,52 +1,43 @@
-use crate::vm::{Machine};
-use crate::{Eval, Evaluated};
-use compose_library::diag::{At, SourceResult, StrResult, bail};
-use compose_library::{Value, ops};
+use crate::vm::Machine;
+use crate::{Eval, Evaluated, ValueEvaluatedExtensions};
+use compose_library::diag::{bail, At, SourceResult};
+use compose_library::{ops, Value};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
 
 impl Eval for ast::Binary<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
-        match self.op() {
-            BinOp::Add => apply_binary(self, vm, ops::add),
-            BinOp::Sub => apply_binary(self, vm, ops::sub),
-            BinOp::Mul => apply_binary(self, vm, ops::mul),
-            BinOp::Lt => apply_binary(self, vm, ops::lt),
-            BinOp::Gt => apply_binary(self, vm, ops::gt),
-            BinOp::Gte => apply_binary(self, vm, ops::gte),
-            BinOp::Eq => apply_binary(self, vm, ops::eq),
-            BinOp::Neq => apply_binary(self, vm, ops::neq),
-            BinOp::And => apply_binary(self, vm, ops::logical_and),
-            BinOp::Or => apply_binary(self, vm, ops::logical_or),
-            BinOp::Mod => apply_binary(self, vm, ops::mod_),
+        let op = match self.op() {
+            BinOp::Add => ops::add,
+            BinOp::Sub => ops::sub,
+            BinOp::Mul => ops::mul,
+            BinOp::Lt => ops::lt,
+            BinOp::Gt => ops::gt,
+            BinOp::Gte => ops::gte,
+            BinOp::Eq => ops::eq,
+            BinOp::Neq => ops::neq,
+            BinOp::And => ops::logical_and,
+            BinOp::Or => ops::logical_or,
             other => bail!(
                 self.span(),
                 "unsupported binary operator `{}`",
                 other.descriptive_name()
             ),
+        };
+
+        let l = self.lhs();
+        let lhs = l.eval(vm)?;
+
+        // make sure we dont evaluate rhs when short-circuiting
+        if self.op().short_circuits(&lhs.value) {
+            return Ok(lhs.value.mutable());
         }
+
+        let r = self.rhs();
+        let rhs = r.eval(vm)?;
+
+        Ok(op(&lhs.value, &rhs.value).at(self.span())?.mutable())
     }
-}
-
-fn apply_binary(
-    binary: ast::Binary,
-    vm: &mut Machine,
-    op: fn(&Value, &Value) -> StrResult<Value>,
-) -> SourceResult<Evaluated> {
-    let l = binary.lhs();
-    let lhs = l.eval(vm)?;
-
-    // make sure we dont evaluate rhs when short-circuiting
-    if binary.op().short_circuits(&lhs.value) {
-        return Ok(Evaluated::mutable(lhs.value));
-    }
-
-    let r = binary.rhs();
-    let rhs = r.eval(vm)?;
-
-    Ok(Evaluated::mutable(
-        op(&lhs.value, &rhs.value).at(binary.span())?,
-    ))
 }
 
 trait ShortCircuits {

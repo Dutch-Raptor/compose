@@ -166,21 +166,25 @@ impl UnBoundError {
             ),
         };
 
-        self.apply_hint(&mut diag);
+        if let Some(hint) = self.misspellings_hint_message() {
+            diag.hint(hint);
+        }
         diag
     }
 
-    pub fn apply_hint(self, diag: &mut SourceDiagnostic) {
-        if !self.possible_misspellings.is_empty() {
-            diag.hint(eco_format!(
-                "Did you mean one of these?\n{}.",
-                self.possible_misspellings
-                    .iter()
-                    .map(|i| eco_format!("  - `{i}`"))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            ))
+    pub fn misspellings_hint_message(&self) -> Option<EcoString> {
+        if self.possible_misspellings.is_empty() {
+            return None;
         }
+
+        Some(eco_format!(
+            "Did you mean one of these?\n{}.",
+            self.possible_misspellings
+                .iter()
+                .map(|i| eco_format!("  - `{i}`"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        ))
     }
 }
 

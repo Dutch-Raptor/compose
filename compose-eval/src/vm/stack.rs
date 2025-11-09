@@ -110,7 +110,6 @@ impl<T> Tracked for T
 where
     T: Trace,
 {
-    
     fn track_tmp_root(self, vm: &mut Machine) -> Self {
         vm.track_tmp_root(&self);
         self

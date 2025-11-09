@@ -1,6 +1,6 @@
-use crate::{Eval, Evaluated, Machine};
+use crate::{Eval, Evaluated, Machine, ValueEvaluatedExtensions};
 use compose_library::diag::SourceResult;
-use compose_library::{ArrayValue, Value, Vm};
+use compose_library::{ArrayValue, IntoValue, Value, Vm};
 use compose_syntax::ast;
 
 impl<'a> Eval for ast::Array<'a> {
@@ -11,9 +11,8 @@ impl<'a> Eval for ast::Array<'a> {
             .map(|e| e.eval(vm).map(|v| v.value))
             .collect::<SourceResult<Vec<Value>>>()?;
 
-        Ok(Evaluated::mutable(Value::Array(ArrayValue::from(
-            vm.heap_mut(),
-            inner,
-        ))))
+        Ok(ArrayValue::from(vm.heap_mut(), inner)
+            .into_value()
+            .mutable())
     }
 }

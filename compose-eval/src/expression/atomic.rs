@@ -1,24 +1,24 @@
 use crate::vm::Machine;
-use crate::{Eval, Evaluated};
-use compose_library::Value;
+use crate::{Eval, Evaluated, ValueEvaluatedExtensions};
 use compose_library::diag::SourceResult;
+use compose_library::{IntoValue, Value};
 use compose_syntax::ast;
 
 impl Eval for ast::Int<'_> {
     fn eval(self, _vm: &mut Machine) -> SourceResult<Evaluated> {
-        Ok(Evaluated::mutable(Value::Int(self.get())))
+        Ok(self.get().into_value().mutable())
     }
 }
 
 impl Eval for ast::Str<'_> {
     fn eval(self, _vm: &mut Machine) -> SourceResult<Evaluated> {
-        Ok(Evaluated::mutable(Value::Str(self.get().into())))
+        Ok(self.get().into_value().mutable())
     }
 }
 
 impl Eval for ast::Bool<'_> {
     fn eval(self, _vm: &mut Machine) -> SourceResult<Evaluated> {
-        Ok(Evaluated::mutable(Value::Bool(self.get())))
+        Ok(self.get().into_value().mutable())
     }
 }
 

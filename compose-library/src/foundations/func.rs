@@ -13,6 +13,7 @@ use ecow::{EcoString, eco_format, eco_vec};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::LazyLock;
+use tap::Tap;
 
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast)]
@@ -38,8 +39,11 @@ impl Func {
     }
 
     pub(crate) fn resolve(&self) -> SourceResult<()> {
-        if let FuncKind::Closure(closure) = &self.kind {
-            closure.resolve()?;
+        match &self.kind {
+            FuncKind::Closure(closure) => {
+                closure.resolve_captures()?;
+            }
+            FuncKind::Native(_) => {}
         }
         Ok(())
     }
@@ -181,7 +185,7 @@ impl PartialEq for Closure {
 }
 
 impl Closure {
-    pub fn resolve(&self) -> SourceResult<()> {
+    pub fn resolve_captures(&self) -> SourceResult<()> {
         if !self.unresolved_captures.is_empty() {
             let mut captures = self.unresolved_captures.iter();
 
@@ -190,6 +194,7 @@ impl Closure {
                 .keys()
                 .map(|name| name.trim())
                 .collect::<Vec<_>>()
+                .tap_mut(|v| v.sort_unstable())
                 .join(", ");
 
             let params = self
@@ -202,11 +207,11 @@ impl Closure {
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            let (first_name, first_span) = captures.next().unwrap();
+            let (first_name, first_span) = captures.next().expect("unresolved captures was checked to be non-empty");
 
-            let mut err = error!(*first_span, "outer variables used in closure but not captured";
+            let mut err = error!(*first_span, "closure uses outer variables that are not captured";
                 label_message: "outer variable `{first_name}` used here";
-                hint: "explicitly capture them by adding them to a capture group: `|{names}| ({params}) => ...`";
+                hint: "explicitly capture them by adding them to a capture list: `{{ |{names}| {params}=> ... }}`";
                 code: &E0010_UNCAPTURED_VARIABLE
             );
 

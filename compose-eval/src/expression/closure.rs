@@ -1,7 +1,10 @@
 use crate::vm::{FlowEvent, TrackedContainer};
-use crate::{Eval, Evaluated, Machine};
+use crate::{Eval, Evaluated, Machine, ValueEvaluatedExtensions};
 use compose_library::diag::{IntoSourceDiagnostic, SourceResult, Spanned, bail, error};
-use compose_library::{Args, Binding, BindingKind, Closure, Func, Library, Scope, Scopes, Value, VariableAccessError, Visibility};
+use compose_library::{
+    Args, Binding, BindingKind, Closure, Func, IntoValue, Library, Scope, Scopes, Value,
+    VariableAccessError, Visibility,
+};
 use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind};
 use compose_syntax::{Label, Span, SyntaxNode, ast};
 use ecow::{EcoString, EcoVec};
@@ -36,7 +39,9 @@ impl Eval for ast::Lambda<'_> {
                             span, "unknown variable `{name}` in closure capture list";
                             label_message: "variable `{name}` is not defined in the outer scope and cannot be captured";
                         );
-                        unbound.apply_hint(&mut err);
+                        if let Some(msg) = unbound.misspellings_hint_message() {
+                            err.hint(msg);
+                        }
                         errors.push(err);
 
                         continue;
@@ -91,12 +96,13 @@ impl Eval for ast::Lambda<'_> {
         };
 
         if !guard.vm.context.closure_capture.should_defer() {
-            closure.resolve()?
+            closure.resolve_captures()?
         }
 
-        Ok(Evaluated::mutable(
-            Value::Func(Func::from(closure)).spanned(self.span()),
-        ))
+        Ok(Func::from(closure)
+            .into_value()
+            .spanned(self.span())
+            .mutable())
     }
 }
 
@@ -222,11 +228,11 @@ pub fn eval_lambda(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRes
                     Some(FlowEvent::Return(_, Some(explicit))) => {
                         let explicit = explicit.clone();
                         vm.flow = None;
-                        return Ok(explicit)
-                    },
+                        return Ok(explicit);
+                    }
                     Some(FlowEvent::Return(_, None)) => {
                         vm.flow = None;
-                        return Ok(Value::unit())
+                        return Ok(Value::unit());
                     }
                     Some(other) => bail!(other.forbidden()),
                 }
