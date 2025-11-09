@@ -1,0 +1,68 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="🧠 Functions and Closures"><title>compose::docs::C4_Functions_and_closures - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-e56847b5.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="compose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.91.0 (f8297e351 2025-10-28)" data-channel="1.91.0" data-search-js="search-e256b49e.js" data-stringdex-js="stringdex-c3e638e9.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-6dc2a7f3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module C4_Functions_and_closures</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../compose/index.html">compose</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module C4_<wbr>Functions_<wbr>and_<wbr>closures</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#-functions-and-closures" title="🧠 Functions and Closures">🧠 Functions and Closures</a><ul><li><a href="#-calling-functions" title="☎️ Calling Functions">☎️ Calling Functions</a></li><li><a href="#-closures-inline-functions" title="🧬 Closures: Inline Functions">🧬 Closures: Inline Functions</a></li><li><a href="#-capturing-variables" title="🧲 Capturing Variables">🧲 Capturing Variables</a></li><li><a href="#-owned-captures-by-value" title="🔒 Owned Captures (by value)">🔒 Owned Captures (by value)</a></li><li><a href="#-higher-order-usage" title="🛠 Higher-Order Usage">🛠 Higher-Order Usage</a></li><li><a href="#-summary" title="✅ Summary">✅ Summary</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In compose::<wbr>docs</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">compose</a>::<wbr><a href="../index.html">docs</a></div><h1>Module <span>C4_<wbr>Functions_<wbr>and_<wbr>closures</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/compose/docs/basics.rs.html#259">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h3 id="-functions-and-closures"><a class="doc-anchor" href="#-functions-and-closures">§</a>🧠 Functions and Closures</h3>
+<p>Functions and closures are essential building blocks in Compose. They allow you to reuse logic, abstract behavior, and structure your code clearly and concisely.</p>
+<p>Let’s walk through how function calls work, how to define closures, and how variable capturing works in Compose.</p>
+<hr />
+<h4 id="-calling-functions"><a class="doc-anchor" href="#-calling-functions">§</a>☎️ Calling Functions</h4>
+<p>Function calls in Compose use parentheses to pass arguments, just like most languages:</p>
+<div class="example-wrap"><pre class="language-compose"><code>print(&quot;Hello!&quot;);
+add(1, 2);</code></pre></div>
+<p>You can call:</p>
+<ul>
+<li>Built-in functions like <code>print</code>, <code>assert::eq</code>, etc.</li>
+<li>User-defined closures or functions</li>
+</ul>
+<p>Function arguments are <strong>evaluated left to right</strong> and passed by value unless a reference is explicitly requested (e.g., via <code>ref</code> or <code>ref mut</code>).</p>
+<hr />
+<h4 id="-closures-inline-functions"><a class="doc-anchor" href="#-closures-inline-functions">§</a>🧬 Closures: Inline Functions</h4>
+<p>Closures are anonymous functions that you can assign to variables, pass around, and call later.</p>
+<p>Basic syntax:</p>
+<div class="example-wrap"><pre class="language-compose"><code>let double = { x =&gt; x * 2; };
+assert::eq(double(5), 10);</code></pre></div>
+<p>Closures can take any number of arguments and produce a value:</p>
+<div class="example-wrap"><pre class="language-compose"><code>let greet = { name =&gt; &quot;Hi, &quot; + name + &quot;!&quot;; };
+assert::eq(greet(&quot;Pieter&quot;), &quot;Hi, Pieter!&quot;);</code></pre></div>
+<blockquote>
+<p>Closures are <strong>expressions</strong>, so you can use them inline, assign them to variables, or return them from other functions.</p>
+</blockquote>
+<hr />
+<h4 id="-capturing-variables"><a class="doc-anchor" href="#-capturing-variables">§</a>🧲 Capturing Variables</h4>
+<p>Closures can <strong>capture variables</strong> from their surrounding environment. In Compose, only <strong>boxed values</strong> (<code>box</code>) can be captured by reference. This helps ensure clarity and memory safety.</p>
+<p>Variables need to be captured explicitly using a capture list: <code>let closure = |x| () =&gt; x + 1;</code> (the <code>|x|</code> part is the capture list).</p>
+<h5 id="-capturing-by-reference"><a class="doc-anchor" href="#-capturing-by-reference">§</a>✅ Capturing by Reference</h5><div class="example-wrap"><pre class="language-compose"><code>let mut b = box::new(10);
+let get = { |ref b| =&gt; *b; };
+assert::eq(get(), 10);
+*b = 20;
+assert::eq(get(), 20); // Closure sees the updated value</code></pre></div>
+<p>This is powerful when closures need to access or mutate shared state.</p>
+<h5 id="-capturing-mutably"><a class="doc-anchor" href="#-capturing-mutably">§</a>🧯 Capturing Mutably</h5>
+<p>To mutate a captured box inside a closure, use <code>ref mut</code>:</p>
+<div class="example-wrap"><pre class="language-compose"><code>let mut b = box::new(1);
+let inc = { |ref mut b| =&gt; *b = *b + 1; };
+inc();
+assert::eq(*b, 2);</code></pre></div>
+<hr />
+<h4 id="-owned-captures-by-value"><a class="doc-anchor" href="#-owned-captures-by-value">§</a>🔒 Owned Captures (by value)</h4>
+<p>Compose also supports <em>owned captures</em>, where the closure takes ownership of a value from its environment:</p>
+<div class="example-wrap"><pre class="language-compose"><code>let a = 42;
+let closure = { |a| =&gt; a + 1; };
+assert::eq(closure(), 43);</code></pre></div>
+<blockquote>
+<p>Owned captures cannot refer to boxed values (you must use <code>ref</code> or <code>ref mut</code> instead).</p>
+</blockquote>
+<hr />
+<h4 id="-higher-order-usage"><a class="doc-anchor" href="#-higher-order-usage">§</a>🛠 Higher-Order Usage</h4>
+<p>Closures can be returned from functions or passed to other functions:</p>
+<div class="example-wrap"><pre class="language-compose"><code>let make_adder = { base =&gt; { |base| x =&gt; x + base; }; };
+let add_five = make_adder(5);
+assert::eq(add_five(3), 8);</code></pre></div>
+<p>Compose’s support for closures enables expressive patterns without boilerplate.</p>
+<hr />
+<h4 id="-summary"><a class="doc-anchor" href="#-summary">§</a>✅ Summary</h4><div class="example-wrap"><pre class="language-markdown"><code>| Feature                | Syntax                           | Notes                                   |
+| ---------------------- | -------------------------------- | --------------------------------------- |
+| Basic closure          | `(x) =&gt; x * 2`                   | Anonymous function                      |
+| Call closure           | `f(5)`                           | Works just like calling a function      |
+| Capture by reference   | `|ref y| () =&gt; *y + 1`           | Can read the captured boxed value       |
+| Capture by mut ref     | `|ref mut y| () =&gt; { *y += 1; }` | Can mutate the captured boxed value     |
+| Owned capture (by val) | `|y| () =&gt; y + 1`                | Captures a copy (non-boxed values only) |</code></pre></div>
+<p>Compose makes closures easy to write and reason about, with clear scoping and safe capturing.</p>
+</div></details></section></div></main></body></html>
