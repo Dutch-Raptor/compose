@@ -3,18 +3,19 @@ mod stack;
 //noinspection RsUnusedImport - false positive, actually used
 use crate::expression::eval_lambda;
 use crate::vm::stack::{StackFrames, TrackMarker};
-use compose_library::diag::{At, SourceDiagnostic, SourceResult, error};
+use compose_library::diag::{error, At, SourceDiagnostic, SourceResult};
 use compose_library::{
     Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink,
-    SyntaxContext, Trace, UntypedRef, Value, VariableAccessError, Visibility, Vm, World,
+    SyntaxContext, UntypedRef, Value, VariableAccessError, Visibility, Vm, World,
 };
 use compose_syntax::ast::AstNode;
-use compose_syntax::{Span, ast};
+use compose_syntax::{ast, Span};
 use ecow::EcoString;
 pub use stack::Tracked;
 pub use stack::TrackedContainer;
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
+use compose_library::Trace;
 
 pub struct Machine<'a> {
     pub frames: StackFrames<'a>,

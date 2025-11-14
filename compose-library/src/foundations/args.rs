@@ -1,10 +1,11 @@
 use crate::diag::{bail, error, At, SourceDiagnostic, SourceResult, Spanned};
 use crate::foundations::cast::FromValue;
 use crate::foundations::IntoValue;
-use crate::{Trace, Value};
+use crate::Value;
 use compose_library::UntypedRef;
 use compose_syntax::Span;
 use ecow::{eco_vec, EcoVec};
+use crate::gc::trace::Trace;
 
 #[derive(Debug, Clone)]
 pub struct Args {

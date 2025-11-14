@@ -1,19 +1,20 @@
-use crate::diag::{SourceResult, StrResult, bail};
+use crate::diag::{bail, SourceResult, StrResult};
 use crate::foundations::args::Args;
 use crate::vm::Vm;
-use crate::{Sink, Trace, Value};
+use crate::{Sink, Value};
 use compose_error_codes::E0010_UNCAPTURED_VARIABLE;
-use compose_library::diag::{Spanned, error};
+use compose_library::diag::{error, Spanned};
 use compose_library::{Scope, UntypedRef};
 use compose_macros::{cast, ty};
-use compose_syntax::ast::{AstNode};
-use compose_syntax::{Label, Span, SyntaxNode, ast};
+use compose_syntax::ast::AstNode;
+use compose_syntax::{ast, Label, Span, SyntaxNode};
 use compose_utils::Static;
-use ecow::{EcoString, eco_format, eco_vec};
+use ecow::{eco_format, eco_vec, EcoString};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::LazyLock;
 use tap::Tap;
+use crate::gc::trace::Trace;
 
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast)]

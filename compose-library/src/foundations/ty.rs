@@ -1,4 +1,4 @@
-use crate::{Scope, Sink, Trace, UnBoundError, Value};
+use crate::{Scope, Sink, UnBoundError, Value};
 use compose_library::diag::StrResult;
 use compose_library::{UnboundItem, UntypedRef};
 use compose_macros::{cast, ty};
@@ -7,6 +7,7 @@ use compose_utils::Static;
 use ecow::eco_format;
 use std::fmt::Display;
 use std::sync::LazyLock;
+use crate::gc::trace::Trace;
 
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast, name = "type")]

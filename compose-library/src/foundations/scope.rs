@@ -1,13 +1,13 @@
-use crate::diag::{At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult, error, warning};
-use crate::{IntoValue, Trace};
+use crate::diag::{error, warning, At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult};
+use crate::IntoValue;
 use crate::{Library, NativeFuncData, NativeType, Sink, Type, Value};
 use compose_error_codes::{
     E0004_MUTATE_IMMUTABLE_VARIABLE, E0011_UNBOUND_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE,
 };
-use compose_library::diag::{StrResult, bail};
+use compose_library::diag::{bail, StrResult};
 use compose_library::{Func, NativeFunc, UntypedRef};
 use compose_syntax::{Label, Span};
-use ecow::{EcoString, eco_format, eco_vec};
+use ecow::{eco_format, eco_vec, EcoString};
 use indexmap::IndexMap;
 use indexmap::map::Entry;
 use std::collections::HashSet;
@@ -17,6 +17,7 @@ use std::iter;
 use std::sync::LazyLock;
 use strsim::jaro_winkler;
 use tap::Pipe;
+use crate::gc::trace::Trace;
 
 pub trait NativeScope {
     fn scope() -> &'static Scope;

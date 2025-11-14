@@ -1,17 +1,18 @@
 // Workaround to refer to self as compose_library instead of crate. Needed for some macros
 extern crate self as compose_library;
 pub mod diag;
-mod world;
-mod foundations;
-mod sink;
-pub mod repr;
 mod engine;
+mod foundations;
 mod gc;
-mod vm;
 mod modules;
+pub mod repr;
+mod sink;
+mod vm;
+mod world;
 
 pub use engine::*;
 pub use foundations::*;
+pub use gc::trace::Trace;
 pub use gc::*;
 pub use sink::*;
 use std::fmt::Debug;
@@ -36,9 +37,7 @@ impl Trace for Library {
     }
 }
 
-pub struct Routines {
-}
-
+pub struct Routines {}
 
 pub fn library() -> Library {
     let mut global = Scope::new();
@@ -56,7 +55,7 @@ pub fn library() -> Library {
     global.define_type::<RangeValue>();
 
     global.define("std", Module::new("std", global.clone()));
-    
+
     Library {
         global: Module::new("global", global),
     }

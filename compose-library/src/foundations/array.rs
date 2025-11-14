@@ -1,10 +1,11 @@
 use crate::repr::Repr;
-use crate::{HeapRef, Iter, IterValue, Trace};
+use crate::{HeapRef, Iter, IterValue};
 use compose_library::diag::StrResult;
 use compose_library::{ArrayIter, Heap, UntypedRef, Value, Vm};
 use compose_macros::{func, scope, ty};
 use ecow::{eco_format, EcoString};
 use std::ops::{Deref, DerefMut};
+use crate::gc::trace::Trace;
 
 #[ty(scope, cast, name = "array")]
 #[derive(Debug, Clone, PartialEq)]

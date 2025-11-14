@@ -1,4 +1,4 @@
-use crate::{Scope, SyntaxContext, Trace};
+use crate::{Scope, SyntaxContext};
 use compose_library::diag::{bail, error, SourceResult};
 use compose_library::{Sink, UntypedRef, Value};
 use compose_macros::ty;
@@ -6,6 +6,7 @@ use compose_syntax::ast::{AstNode, LetBinding};
 use compose_syntax::{FileId, Fix, FixBuilder, Label, Span};
 use ecow::EcoString;
 use std::sync::Arc;
+use crate::gc::trace::Trace;
 
 #[derive(Debug, Clone)]
 #[ty(cast)]

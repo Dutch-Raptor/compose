@@ -1,12 +1,13 @@
 use crate::IterValue;
 use crate::diag::StrResult;
-use compose_library::diag::{At, SourceResult, bail};
+use compose_library::diag::{bail, At, SourceResult};
 use compose_library::vm::Vm;
-use compose_library::{Args, Func, Trace, UntypedRef, Value, ValueIterator};
+use compose_library::{Args, Func, UntypedRef, Value, ValueIterator};
 use std::iter;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use compose_library::support::eval_predicate;
+use crate::gc::trace::Trace;
 
 #[derive(Debug, Clone)]
 pub struct TakeIter {
@@ -209,7 +210,7 @@ impl ValueIterator for MapIter {
             .nth(vm, n)?
             .map(|item| {
                 let span = self.map.span();
-                let args = Args::new(span, iter::once(item.clone()));
+                let args = Args::new(span, iter::once(item));
 
                 self.map.call(vm, args)
             })

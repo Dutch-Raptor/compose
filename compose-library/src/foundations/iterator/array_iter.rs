@@ -1,8 +1,9 @@
-use crate::{Array, Trace};
+use crate::Array;
 use compose_library::{UntypedRef, Value, ValueIterator, Vm};
 use ecow::EcoVec;
 use std::sync::{Arc, Mutex};
 use compose_library::diag::SourceResult;
+use crate::gc::trace::Trace;
 
 #[derive(Debug, Clone)]
 pub struct ArrayIter {

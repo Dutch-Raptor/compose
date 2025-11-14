@@ -1,6 +1,6 @@
-use crate::{ArrayValue, HeapRef, MapValue, Trace};
+use crate::{ArrayValue, HeapRef, MapValue};
 use crate::{UntypedRef, Value};
-use compose_library::diag::{SourceResult, bail, error};
+use compose_library::diag::{bail, error, SourceResult};
 use compose_library::vm::Vm;
 use compose_library::{Func, Str};
 use compose_macros::{func, scope, ty};
@@ -21,6 +21,7 @@ use compose_library::support::eval_predicate;
 pub use iter_combinators::*;
 pub use range_iter::*;
 pub use string_iter::*;
+use crate::gc::trace::Trace;
 
 #[ty(scope, cast, name = "Iterator")]
 #[derive(Debug, Clone, PartialEq, Copy)]

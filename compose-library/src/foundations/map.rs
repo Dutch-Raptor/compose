@@ -1,11 +1,12 @@
 use crate::repr::Repr;
-use crate::{ArrayIter, Heap, Trace};
+use crate::{ArrayIter, Heap};
 use compose_library::{HeapRef, IntoValue, IterValue, UntypedRef, Value, Vm};
 use compose_macros::func;
 use compose_macros::{scope, ty};
 use ecow::{EcoString, EcoVec};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
+use crate::gc::trace::Trace;
 
 #[ty(scope, cast, name = "Map")]
 #[derive(Debug, Clone, PartialEq)]

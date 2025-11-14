@@ -1,5 +1,6 @@
 mod clean;
 mod trigger;
+pub mod trace;
 
 use crate::gc::trigger::{GcTriggerPolicy, SimplePolicy};
 use crate::{Array, Value};
@@ -9,6 +10,62 @@ use slotmap::{new_key_type, SlotMap};
 use std::fmt::Debug;
 use std::ops::Deref;
 
+/// A managed heap containing [`HeapItem`s](HeapItem) accessible through [`UntypedRef`](UntypedRef) keys.
+///
+/// The heap implements garbage collection through a simple mark and sweep algorithm. When cleaning the roots need to be provided.
+/// These roots are any type implementing the [Trace] trait. Anything not accessible through the provided roots will be deallocated.
+///
+/// # Example: Interacting with heap values
+///
+/// ```
+/// use compose_library::{Heap, Value, HeapItem};
+/// let mut heap = Heap::new();
+///
+/// let value = Value::Int(6);
+///
+/// // Allocate a value on the heap and get a key to it.
+/// let key = heap.alloc(value);
+///
+/// // Now the value is accessible through the key.
+/// assert_eq!(heap.get(key), Some(&Value::Int(6)));
+///
+/// let value_mut = heap.get_mut(key).unwrap();
+/// *value_mut = Value::Int(7);
+///
+/// // The value is updated and anyone with the key will see the new value
+/// assert_eq!(heap.get(key), Some(&Value::Int(7)));
+///
+/// // Remove the value from the heap. This will give ownership of the value to the caller.
+/// let removed_item = heap.remove(key);
+///
+/// assert_eq!(removed_item, Some(HeapItem::Value(Value::Int(7))));
+/// assert_eq!(heap.get(key), None);
+/// ```
+///
+/// # Example: Garbage Collection
+///
+/// ```
+/// use compose_library::{Heap, UntypedRef};
+/// use compose_library::Value;
+/// let mut heap = Heap::new();
+///
+/// let key = heap.alloc(Value::Int(6));
+/// assert_eq!(heap.metadata().heap_size, 1);
+/// assert_eq!(heap.get(key), Some(&Value::Int(6)));
+///
+/// // clean while passing the key to the value as a simple root
+/// heap.clean(&key);
+///
+/// // The value is still accessible and the heap size hasn't changed
+/// assert_eq!(heap.metadata().heap_size, 1);
+/// assert_eq!(heap.get(key), Some(&Value::Int(6)));
+///
+/// // clean while passing a root that doesn't have access to the value
+/// heap.clean(&None::<UntypedRef>);
+///
+/// assert_eq!(heap.metadata().heap_size, 0);
+/// assert_eq!(heap.get(key), None);
+/// ```
 #[derive(Debug)]
 pub struct Heap {
     map: SlotMap<UntypedRef, HeapItem>,
@@ -108,7 +165,7 @@ impl Heap {
         self.map.insert(value.to_untyped()).into()
     }
 
-    pub fn data(&self) -> GcData {
+    pub fn metadata(&self) -> GcData {
         GcData {
             heap_size: self.map.len(),
         }
@@ -124,19 +181,6 @@ impl Heap {
     
     pub fn get_untyped(&self, key: UntypedRef) -> Option<&HeapItem> {
         self.map.get(key)
-    }
-}
-
-/// A type that can keep references to heap values
-pub trait Trace: Debug {
-    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef));
-}
-
-impl Trace for &[UntypedRef] {
-    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
-        for key in *self {
-            f(*key)
-        }
     }
 }
 
@@ -174,25 +218,6 @@ macro_rules! heap_enum {
     };
 }
 
-impl Trace for Value {
-    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
-        match self {
-            Value::Int(_) => {}
-            Value::Bool(_) => {}
-            Value::Unit(_) => {}
-            Value::Str(_) => {}
-            Value::Func(func) => func.visit_refs(f),
-            Value::Type(ty) => ty.visit_refs(f),
-            Value::Iterator(i) => i.visit_refs(f),
-            Value::Box(b) => f(b.key()),
-            Value::Array(a) => a.visit_refs(f),
-            Value::Range(r) => r.visit_refs(f),
-            Value::Map(m) => m.visit_refs(f),
-            Value::Module(m) => m.visit_refs(f),
-        }
-    }
-}
-
 macro_rules! impl_heap_obj {
     ($ident:ident, $ty:ty) => {
         impl HeapObject for $ty {
@@ -218,6 +243,7 @@ macro_rules! impl_heap_obj {
 }
 
 pub(crate) use impl_heap_obj;
+use trace::Trace;
 use crate::diag::StrResult;
 
 impl_heap_obj!(Value, Value);
