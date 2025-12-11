@@ -1,12 +1,13 @@
 use crate::repr::Repr;
 use crate::{HeapRef, Iter, IterValue, Trace};
-use compose_library::diag::StrResult;
+use compose_library::diag::{At, SourceResult, StrResult};
 use compose_library::{ArrayIter, Heap, UntypedRef, Value, Vm};
 use compose_macros::{func, scope, ty};
+use compose_syntax::Span;
 use ecow::{eco_format, EcoString};
 use std::ops::{Deref, DerefMut};
 
-#[ty(scope, cast, name = "array")]
+#[ty(scope, cast, name = "Array")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArrayValue(HeapRef<Array>);
 
@@ -56,6 +57,22 @@ impl ArrayValue {
 
     pub fn from(heap: &mut Heap, values: Vec<Value>) -> Self {
         Self(heap.alloc(Array::from(values)))
+    }
+
+    pub fn index(
+        &self,
+        index: Value,
+        index_span: Span,
+        heap: &Heap,
+    ) -> SourceResult<Option<Value>> {
+        let index_as_int = index.cast::<usize>().at(index_span)?;
+
+        let arr = self.0.get_unwrap(heap);
+        Ok(arr.get(index_as_int).cloned())
+    }
+
+    pub fn heap_ref(&self) -> HeapRef<Array> {
+        self.0
     }
 }
 
@@ -129,7 +146,7 @@ impl ArrayValue {
         let arr = self.0.try_get(vm.heap())?;
         Ok(arr.contains(&value))
     }
-    
+
     #[func]
     pub fn get(&self, vm: &mut dyn Vm, index: usize) -> StrResult<Option<Value>> {
         let arr = self.0.try_get(vm.heap())?;

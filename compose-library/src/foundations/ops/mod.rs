@@ -1,5 +1,9 @@
-use crate::diag::StrResult;
+mod equality;
+
 use crate::Value;
+use crate::diag::StrResult;
+use compose_library::Heap;
+pub use compose_library::ops::equality::*;
 use ecow::eco_format;
 
 macro_rules! type_error {
@@ -51,6 +55,13 @@ pub fn mul(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     }
 }
 
+pub fn div(lhs: &Value, rhs: &Value) -> StrResult<Value> {
+    match (lhs, rhs) {
+        (Value::Int(left), Value::Int(right)) => Ok(Value::Int(left / right)),
+        (left, right) => type_error!("cannot divide {} by {}", left, right),
+    }
+}
+
 pub fn lt(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     match (lhs, rhs) {
         (Value::Int(left), Value::Int(right)) => Ok(Value::Bool(left < right)),
@@ -76,8 +87,8 @@ pub fn neq(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     Ok(Value::Bool(lhs != rhs))
 }
 
-pub fn eq(lhs: &Value, rhs: &Value) -> StrResult<Value> {
-    Ok(Value::Bool(lhs == rhs))
+pub fn eq(lhs: &Value, rhs: &Value, heap: &Heap) -> StrResult<Value> {
+    lhs.equals(rhs, heap).map(Value::Bool)
 }
 
 pub fn unary_plus(value: Value) -> StrResult<Value> {

@@ -1,5 +1,9 @@
-let a = 3;
-let b = 4;
-let f = { c => a * 2 * c };
+let mut arr = [1, 2, [[3, 4], 5]];
 
-f(b)
+println(arr);
+
+arr[2][0][0] = 6;
+assert::eq(arr, [1, 2, [[6, 4], 5]]);
+arr[0] = [7, 8];
+assert::eq(arr, [[7, 8], 2, [[6, 4], 5]]);
+

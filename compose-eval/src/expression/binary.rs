@@ -8,16 +8,16 @@ use compose_syntax::ast::{AstNode, BinOp};
 impl Eval for ast::Binary<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let op = match self.op() {
-            BinOp::Add => ops::add,
-            BinOp::Sub => ops::sub,
-            BinOp::Mul => ops::mul,
-            BinOp::Lt => ops::lt,
-            BinOp::Gt => ops::gt,
-            BinOp::Gte => ops::gte,
-            BinOp::Eq => ops::eq,
-            BinOp::Neq => ops::neq,
-            BinOp::And => ops::logical_and,
-            BinOp::Or => ops::logical_or,
+            BinOp::Add => |l, r, _heap| ops::add(l, r),
+            BinOp::Sub => |l, r, _heap| ops::sub(l, r),
+            BinOp::Mul => |l, r, _heap| ops::mul(l, r),
+            BinOp::Lt => |l, r, _heap| ops::lt(l, r),
+            BinOp::Gt => |l, r, _heap| ops::gt(l, r),
+            BinOp::Gte => |l, r, _heap| ops::gte(l, r),
+            BinOp::Eq => |l, r, heap| ops::eq(l, r, heap),
+            BinOp::Neq => |l, r, _heap| ops::neq(l, r),
+            BinOp::And => |l, r, _heap| ops::logical_and(l, r),
+            BinOp::Or => |l, r, _heap| ops::logical_or(l, r),
             other => bail!(
                 self.span(),
                 "unsupported binary operator `{}`",
@@ -36,7 +36,7 @@ impl Eval for ast::Binary<'_> {
         let r = self.rhs();
         let rhs = r.eval(vm)?;
 
-        Ok(op(&lhs.value, &rhs.value).at(self.span())?.mutable())
+        Ok(op(&lhs.value, &rhs.value, &vm.heap).at(self.span())?.mutable())
     }
 }
 

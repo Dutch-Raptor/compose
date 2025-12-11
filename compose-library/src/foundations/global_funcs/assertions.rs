@@ -1,3 +1,4 @@
+use crate::foundations::ops::Comparison;
 use crate::diag::bail;
 use compose_library::{Value, Vm};
 use compose_library::diag::StrResult;
@@ -22,7 +23,7 @@ impl assert {
     #[func]
     pub fn eq(vm: &dyn Vm, left: Value, right: Value, #[named] message: Option<EcoString>) -> StrResult<()> {
         
-        if left != right {
+        if !left.equals(&right, vm.heap())? {
             let l_repr = left.repr(vm);
             let r_repr = right.repr(vm);
             bail!(
@@ -37,8 +38,8 @@ impl assert {
     }
 
     #[func]
-    pub fn ne(left: Value, right: Value) -> StrResult<()> {
-        if left == right {
+    pub fn ne(vm: &dyn Vm, left: Value, right: Value) -> StrResult<()> {
+        if left.equals(&right, vm.heap())? {
             bail!(
                 "assertion `left != right` failed\n{:>7} = {left:?}\n{:>7} = {right:?}",
                 "left:",

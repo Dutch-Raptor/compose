@@ -9,6 +9,7 @@ use compose_library::diag::{eco_format, Warned};
 use compose_library::{Value, World};
 use compose_syntax::{FileId, Lexer, Source, SyntaxKind};
 use std::fs;
+use compose_library::repr::Repr;
 
 mod editor;
 
@@ -227,7 +228,7 @@ pub fn eval_repl_input(vm: &mut Machine, world: &SystemWorld, input: &str, args:
             crate::print_diagnostics(world, &[], &warnings).unwrap();
 
             if value != Value::unit() {
-                println!("{value:?}")
+                println!("{}", value.repr(vm))
             }
         }
         Err(err) => {

@@ -4,7 +4,7 @@ use crate::ast::control_flow::Conditional;
 use crate::ast::map::MapLiteral;
 use crate::ast::range::Range;
 use crate::ast::unary::Unary;
-use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, Int, Lambda, Parenthesized, WhileLoop};
+use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, IndexAccess, Int, Lambda, Parenthesized, WhileLoop};
 use crate::ast::{Bool, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
 use crate::kind::SyntaxKind;
 
@@ -40,6 +40,7 @@ pub enum Expr<'a> {
     Range(Range<'a>),
     Map(MapLiteral<'a>),
     Lambda(Lambda<'a>),
+    IndexAccess(IndexAccess<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -67,6 +68,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::Range => Some(Self::Range(Range::from_untyped(node)?)),
             SyntaxKind::MapLiteral => Some(Self::Map(MapLiteral::from_untyped(node)?)),
             SyntaxKind::Lambda => Some(Self::Lambda(Lambda::from_untyped(node)?)),
+            SyntaxKind::IndexAccess => Some(Self::IndexAccess(IndexAccess::from_untyped(node)?)),
             _ => None,
         }
     }
@@ -93,6 +95,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::Range(range) => range.to_untyped(),
             Self::Map(map) => map.to_untyped(),
             Self::Lambda(lambda) => lambda.to_untyped(),
+            Self::IndexAccess(index_access) => index_access.to_untyped(),
         }
     }
 }

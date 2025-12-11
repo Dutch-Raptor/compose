@@ -8,7 +8,7 @@ use crate::{Sink, Type};
 use compose_library::diag::{StrResult, bail, error};
 use compose_library::foundations::range::RangeValue;
 use compose_library::repr::Repr;
-use compose_library::{Args, ArrayValue, IterValue, MapValue, Module};
+use compose_library::{Args, ArrayValue, Heap, IterValue, MapValue, Module};
 use compose_macros::func;
 use compose_macros::scope;
 use compose_syntax::Span;
@@ -172,6 +172,13 @@ impl Value {
         }
     }
 
+    pub fn index(&self, index: Value, target_span: Span, index_span: Span, heap: &Heap) -> SourceResult<Option<Value>> {
+        match self {
+            Value::Array(arr) => arr.index(index, index_span, heap),
+            _ => bail!(target_span, "cannot index into `{}`", self.ty()),
+        }
+    }
+
     /// Access an associated value of this value by path syntax `a::b`
     pub fn path(
         &self,
@@ -192,6 +199,7 @@ impl Value {
             ),
         }
     }
+    
 }
 
 impl fmt::Display for Value {

@@ -1,33 +1,28 @@
 use crate::access::Access;
 use crate::{Eval, Evaluated, Machine};
-use compose_library::diag::{At, SourceResult, StrResult, bail};
-use compose_library::{Value, ops};
+use compose_library::diag::{bail, At, SourceResult};
+use compose_library::{ops, Value};
 use compose_syntax::ast;
 use compose_syntax::ast::{AssignOp, AstNode};
 
 impl Eval for ast::Assignment<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
-        match self.op() {
-            AssignOp::Assign => apply_assignment(self, vm, |_init, rhs| Ok(rhs.clone())),
-            AssignOp::AddAssign => apply_assignment(self, vm, ops::add),
-            AssignOp::SubAssign => apply_assignment(self, vm, ops::sub),
-            AssignOp::MulAssign => apply_assignment(self, vm, ops::mul),
+        let op = match self.op() {
+            AssignOp::Assign => |_init: &Value, rhs: &Value| Ok(rhs.clone()),
+            AssignOp::AddAssign => ops::add,
+            AssignOp::SubAssign => ops::sub,
+            AssignOp::MulAssign => ops::mul,
+            AssignOp::DivAssign => ops::div,
             other => bail!(self.span(), "unsupported assignment operator: {:?}", other),
-        }
+        };
+
+        // assignments are right associative
+        let rhs = self.rhs().eval(vm)?;
+
+        let lhs = self.lhs().access(vm)?;
+        let value = op(&lhs, &rhs.value).at(self.span())?;
+        *lhs = value;
+
+        Ok(Evaluated::unit())
     }
-}
-
-fn apply_assignment(
-    binary: ast::Assignment,
-    vm: &mut Machine,
-    op: fn(&Value, &Value) -> StrResult<Value>,
-) -> SourceResult<Evaluated> {
-    // assignments are right associative
-    let rhs = binary.rhs().eval(vm)?;
-
-    let lhs = binary.lhs().access(vm)?;
-    let value = op(&lhs, &rhs.value).at(binary.span())?;
-    *lhs = value;
-
-    Ok(Evaluated::unit())
 }
