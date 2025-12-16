@@ -83,8 +83,8 @@ pub fn gte(lhs: &Value, rhs: &Value) -> StrResult<Value> {
     }
 }
 
-pub fn neq(lhs: &Value, rhs: &Value) -> StrResult<Value> {
-    Ok(Value::Bool(lhs != rhs))
+pub fn neq(lhs: &Value, rhs: &Value, heap: &Heap) -> StrResult<Value> {
+    lhs.not_equals(rhs, heap).map(|eq| Value::Bool(eq))
 }
 
 pub fn eq(lhs: &Value, rhs: &Value, heap: &Heap) -> StrResult<Value> {

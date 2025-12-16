@@ -15,7 +15,7 @@ impl Eval for ast::Binary<'_> {
             BinOp::Gt => |l, r, _heap| ops::gt(l, r),
             BinOp::Gte => |l, r, _heap| ops::gte(l, r),
             BinOp::Eq => |l, r, heap| ops::eq(l, r, heap),
-            BinOp::Neq => |l, r, _heap| ops::neq(l, r),
+            BinOp::Neq => |l, r, heap| ops::neq(l, r, heap),
             BinOp::And => |l, r, _heap| ops::logical_and(l, r),
             BinOp::Or => |l, r, _heap| ops::logical_or(l, r),
             other => bail!(
