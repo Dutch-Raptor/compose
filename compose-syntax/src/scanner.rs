@@ -97,9 +97,9 @@ impl<'a> Scanner<'a> {
     /// Iterates through the current level of delimiters (does not enter nested delims) and checks if
     /// the given `kind` is contained within
     pub fn level_contains_kind(&mut self, expected_kind: SyntaxKind) -> Result<bool, EcoString> {
-        self.find_in_level(expected_kind).map(|opt| opt.is_some())
+        self.find_in_matching_delims(expected_kind).map(|opt| opt.is_some())
     }
-    pub(crate) fn find_in_level(
+    pub(crate) fn find_in_matching_delims(
         &mut self,
         expected_kind: SyntaxKind,
     ) -> Result<Option<SyntaxNode>, EcoString> {
@@ -152,7 +152,7 @@ mod tests {
     use super::*;
     use crate::FileId;
 
-    fn from_str(code: &str) -> Scanner {
+    fn from_str(code: &str) -> Scanner<'_> {
         let lexer = Lexer::new(code, FileId::new("main.cmps"));
         Scanner::new(lexer)
     }

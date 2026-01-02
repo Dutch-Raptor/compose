@@ -69,11 +69,13 @@ fn lambda(p: &mut Parser) {
             }
 
             // Skip over broken params and recover to the `=>` arrow or closing brace
-            if let Ok(Some(arrow)) = p.scanner().find_in_level(SyntaxKind::Arrow) {
+            if let Ok(Some(arrow)) = p.scanner().find_in_matching_delims(SyntaxKind::Arrow) {
                 // Fast path: skip directly to the arrow
                 p.recover_until_node(&arrow);
-            } else if let Ok(Some(closing)) =
-                p.scanner().with_entered_delim(Delimiter::LeftBrace).matching_closing_delim()
+            } else if let Ok(Some(closing)) = p
+                .scanner()
+                .with_entered_delim(Delimiter::LeftBrace)
+                .matching_closing_delim()
             {
                 // Fallback: skip to the end of the lambda block
                 p.recover_until_node(&closing);
@@ -81,7 +83,7 @@ fn lambda(p: &mut Parser) {
                 p.wrap(m, SyntaxKind::Lambda);
                 return;
             } else {
-                // Give up: consume one token to make progress
+                // Give up: consume one token to make progress and accept lower quality diagnostics
                 p.eat();
             }
         }

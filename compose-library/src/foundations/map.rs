@@ -6,6 +6,8 @@ use compose_macros::{scope, ty};
 use ecow::{EcoString, EcoVec};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
+use compose_library::diag::StrResult;
+use compose_library::ops::Comparison;
 
 #[ty(scope, cast, name = "Map")]
 #[derive(Debug, Clone, PartialEq)]
@@ -30,6 +32,10 @@ impl MapValue {
         let clone = self.0.get_unwrap(vm.heap()).clone();
 
         Self(vm.heap_mut().alloc(clone))
+    }
+
+    pub fn heap_ref(&self) -> HeapRef<Map> {
+        self.0
     }
 }
 
@@ -98,6 +104,12 @@ impl Map {
         Self {
             values: HashMap::new(),
         }
+    }
+}
+
+impl Comparison for Map {
+    fn equals(&self, other: &Self, _heap: &Heap) -> StrResult<bool> {
+        Ok(self.values == other.values)
     }
 }
 
