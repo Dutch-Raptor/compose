@@ -80,7 +80,7 @@ impl Source {
         self.nodes().iter().flat_map(SyntaxNode::warnings).collect()
     }
 
-    pub fn find(&self, span: Span) -> Option<LinkedNode> {
+    pub fn find(&self, span: Span) -> Option<LinkedNode<'_>> {
         for node in self.nodes() {
             let linked_node = LinkedNode::new(node);
             match linked_node.find(span) {

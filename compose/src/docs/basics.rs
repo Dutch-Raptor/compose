@@ -61,7 +61,7 @@ compose_doc!(
     > ```
 
     Reading an uninitialized variable is allowed, but emits a warning and produces the unit value ()
-    You should avoid relying on this behavior.
+    You should avoid relying on this behaviour.
 
     ```compose warn(W0001)
     let x;

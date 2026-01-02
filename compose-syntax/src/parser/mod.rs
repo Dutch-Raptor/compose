@@ -393,7 +393,7 @@ impl<'s> Parser<'s> {
         expected: SyntaxKind,
         message: impl Into<EcoString>,
         recover_set: SyntaxSet,
-    ) -> ExpectResult {
+    ) -> ExpectResult<'_> {
         if self.at(expected) {
             self.eat();
             return ExpectResult::Ok;
@@ -540,7 +540,7 @@ impl<'s> Parser<'s> {
         let (kind, _) = self.lexer.clone().next();
         kind
     }
-    pub(crate) fn peeker(&self) -> SyntaxKindIter {
+    pub(crate) fn peeker(&self) -> SyntaxKindIter<'_> {
         SyntaxKindIter::new(self.lexer.clone())
     }
 
