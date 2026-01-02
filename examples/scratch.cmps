@@ -1,9 +1,14 @@
-let mut arr = [1, 2, [[3, 4], 5]];
+let apply = { x, f => f(x) };
 
-println(arr);
+let v = apply(1) { x =>
+    x + 1
+};
 
-arr[2][0][0] = 6;
-assert::eq(arr, [1, 2, [[6, 4], 5]]);
-arr[0] = [7, 8];
-assert::eq(arr, [[7, 8], 2, [[6, 4], 5]]);
+assert::eq(v, 2);
 
+
+let v = (0..10).iter().map {
+    x => x * 2
+}.to_array();
+
+println(v);

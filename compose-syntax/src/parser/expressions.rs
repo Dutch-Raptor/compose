@@ -32,7 +32,7 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
 
     loop {
         trace_fn!("parse_code_expr_prec loop", "{:?}", p.current());
-        if p.at(SyntaxKind::LeftParen) {
+        if p.at_set(syntax_set!(LeftParen, LeftBrace)) {
             if Precedence::Call < min_prec {
                 break;
             }

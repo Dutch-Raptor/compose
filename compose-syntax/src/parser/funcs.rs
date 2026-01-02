@@ -13,21 +13,27 @@ use std::collections::HashSet;
 
 pub fn args(p: &mut Parser) {
     trace_fn!("parse_args");
+
+    debug_assert!(
+        p.at_set(syntax_set!(LeftParen, LeftBrace)),
+        "Expected `(` or `{{` for args, got {:?}",
+        p.current()
+    );
     let m = p.marker();
 
-    p.assert(SyntaxKind::LeftParen);
+    if p.eat_if(SyntaxKind::LeftParen) {
+        while !p.current().is_terminator() {
+            arg(p);
 
-    while !p.current().is_terminator() {
-        arg(p);
-
-        if !p.current().is_terminator() && !p.eat_if(SyntaxKind::Comma) {
-            p.insert_error_before("expected a comma between the function arguments")
-                .with_code(&E0009_ARGS_MISSING_COMMAS)
-                .with_label_message("help: insert a comma here");
+            if !p.current().is_terminator() && !p.eat_if(SyntaxKind::Comma) {
+                p.insert_error_before("expected a comma between the function arguments")
+                    .with_code(&E0009_ARGS_MISSING_COMMAS)
+                    .with_label_message("help: insert a comma here");
+            }
         }
-    }
 
-    p.expect_closing_delimiter(m, SyntaxKind::RightParen);
+        p.expect_closing_delimiter(m, SyntaxKind::RightParen);
+    }
 
     if p.at(SyntaxKind::LeftBrace) {
         // trailing lambda
@@ -249,8 +255,8 @@ fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
 
     patterns::pattern(p, false, seen, Some("parameter"));
 
-    // Parse named params like `a = 1`
-    if p.eat_if(SyntaxKind::Eq) {
+    // Parse named params like `a: 1`
+    if p.eat_if(SyntaxKind::Colon) {
         if was_at_pat && p[pat_m].kind() != SyntaxKind::Ident {
             p[m].expected("identifier");
         }
@@ -312,7 +318,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_parse_closure_discard_param() {
         assert_parse_tree!(
@@ -331,12 +336,12 @@ mod tests {
     #[test]
     fn test_parse_closure_named_param() {
         assert_parse_tree!(
-            "{a = b => }",
+            "{a: b => }",
             Lambda [
                 LeftBrace("{")
                 Params [
                     Param [
-                        Named [ Ident("a") Eq("=") Ident("b") ]
+                        Named [ Ident("a") Colon(":") Ident("b") ]
                     ]
                 ]
                 Arrow("=>")
@@ -507,5 +512,115 @@ mod tests {
                 ...
             ]
         );
+    }
+
+    #[test]
+    fn test_parse_trailing_lambda() {
+        assert_parse_tree!("foo() { x => x + 1 }",
+            FuncCall [
+                Ident("foo")
+                Args [
+                    LeftParen("(")
+                    RightParen(")")
+                    Lambda [
+                        LeftBrace("{")
+                        Params [
+                            Param [ Ident("x") ]
+                        ]
+                        Arrow("=>")
+                        Binary [
+                            Ident("x")
+                            Plus("+")
+                            Int("1")
+                        ]
+                        RightBrace("}")
+                    ]
+                ]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_trailing_lambda_and_args() {
+        assert_parse_tree!("foo(1) { x => x + 1 }",
+            FuncCall [
+                Ident("foo")
+                Args [
+                    LeftParen("(")
+                    Int("1")
+                    RightParen(")")
+                    Lambda [
+                        LeftBrace("{")
+                        Params [
+                            Param [ Ident("x") ]
+                        ]
+                        Arrow("=>")
+                        Binary [
+                            Ident("x")
+                            Plus("+")
+                            Int("1")
+                        ]
+                        RightBrace("}")
+                    ]
+                ]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_trailing_lambda_omit_parens() {
+        assert_parse_tree!("foo { x => x + 1 }",
+            FuncCall [
+                Ident("foo")
+                Args [
+                    Lambda [
+                        LeftBrace("{")
+                        Params [
+                            Param [ Ident("x") ]
+                        ]
+                        Arrow("=>")
+                        Binary [
+                            Ident("x")
+                            Plus("+")
+                            Int("1")
+                        ]
+                        RightBrace("}")
+                    ]
+                ]
+            ]
+        )
+    }
+
+    #[test]
+    fn test_parse_args_with_named_positional_and_trailing_lambda() {
+        assert_parse_tree!("foo(1, 2, a: 1, b: 1) { x => x + 1 }",
+            FuncCall [
+                Ident("foo")
+                Args [
+                    LeftParen("(")
+                    Int("1")
+                    Comma(",")
+                    Int("2")
+                    Comma(",")
+                    Named [ Ident("a") Colon(":") Int("1") ]
+                    Comma(",")
+                    Named [ Ident("b") Colon(":") Int("1") ]
+                    RightParen(")")
+                    Lambda [
+                        LeftBrace("{")
+                        Params [
+                            Param [ Ident("x") ]
+                        ]
+                        Arrow("=>")
+                        Binary [
+                            Ident("x")
+                            Plus("+")
+                            Int("1")
+                        ]
+                        RightBrace("}")
+                    ]
+                ]
+            ]
+        )
     }
 }
