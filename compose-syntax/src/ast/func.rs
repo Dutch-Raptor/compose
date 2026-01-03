@@ -1,4 +1,4 @@
-use crate::ast::{node, AstNode, Expr, Ident, Statement};
+use crate::ast::{AstNode, Expr, Ident, Statement, node};
 use crate::kind::SyntaxKind;
 use crate::{Span, SyntaxNode};
 
@@ -15,7 +15,7 @@ impl<'a> Lambda<'a> {
         self.0.cast_first()
     }
 
-    pub fn statements(self) -> impl Iterator<Item=Statement<'a>> {
+    pub fn statements(self) -> impl Iterator<Item = Statement<'a>> {
         self.0
             .children()
             .skip_while(|n| n.kind() != SyntaxKind::Arrow)
@@ -28,7 +28,7 @@ node! {
 }
 
 impl<'a> CaptureList<'a> {
-    pub fn children(self) -> impl DoubleEndedIterator<Item=Capture<'a>> {
+    pub fn children(self) -> impl DoubleEndedIterator<Item = Capture<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }
 }
@@ -70,7 +70,7 @@ node! {
 }
 
 impl<'a> Params<'a> {
-    pub fn children(self) -> impl DoubleEndedIterator<Item=Param<'a>> {
+    pub fn children(self) -> impl DoubleEndedIterator<Item = Param<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }
 }
@@ -195,6 +195,9 @@ impl<'a> Named<'a> {
         self.0.cast_last()
     }
 
+    /// The right hand of the pair as a pattern.
+    ///
+    /// This should only be used in `destructuring`
     pub fn pattern(self) -> Pattern<'a> {
         self.0.cast_last()
     }
@@ -205,7 +208,7 @@ node! {
 }
 
 impl<'a> Destructuring<'a> {
-    pub fn items(self) -> impl DoubleEndedIterator<Item=DestructuringItem<'a>> {
+    pub fn items(self) -> impl DoubleEndedIterator<Item = DestructuringItem<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }
 
@@ -214,6 +217,9 @@ impl<'a> Destructuring<'a> {
             .flat_map(|binding| match binding {
                 DestructuringItem::Named(named) => named.pattern().bindings(),
                 DestructuringItem::Pattern(pattern) => pattern.bindings(),
+                DestructuringItem::Spread(spread) => {
+                    spread.sink_ident().into_iter().collect()
+                }
             })
             .collect()
     }
@@ -222,12 +228,44 @@ impl<'a> Destructuring<'a> {
 pub enum DestructuringItem<'a> {
     Pattern(Pattern<'a>),
     Named(Named<'a>),
+    Spread(Spread<'a>),
+}
+
+node! {
+    struct Spread
+}
+
+impl<'a> Spread<'a> {
+    /// The spread expression.
+    ///
+    /// This should only be accessed if this `Spread` is contained in an
+    /// `ArrayItem`, `MapItem`, or `Arg`.
+    pub fn expr(self) -> Expr<'a> {
+        self.0.cast_first()
+    }
+
+    /// The sink identifier, if present.
+    ///
+    /// This should only be accessed if this `Spread` is contained in a
+    /// `Param` or binding `DestructuringItem`.
+    pub fn sink_ident(self) -> Option<Ident<'a>> {
+        self.0.try_cast_first()
+    }
+
+    /// The sink expressions, if present.
+    ///
+    /// This should only be accessed if this `Spread` is contained in a
+    /// `DestructuringItem`.
+    pub fn sink_expr(self) -> Option<Expr<'a>> {
+        self.0.try_cast_first()
+    }
 }
 
 impl<'a> AstNode<'a> for DestructuringItem<'a> {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self> {
         match node.kind() {
             SyntaxKind::Named => Some(Self::Named(Named::from_untyped(node)?)),
+            SyntaxKind::Spread => Some(Self::Spread(Spread(node))),
             _ => node.cast().map(Self::Pattern),
         }
     }
@@ -236,6 +274,7 @@ impl<'a> AstNode<'a> for DestructuringItem<'a> {
         match self {
             Self::Named(n) => n.to_untyped(),
             Self::Pattern(p) => p.to_untyped(),
+            Self::Spread(s) => s.to_untyped(),
         }
     }
 }
@@ -244,8 +283,8 @@ impl<'a> AstNode<'a> for DestructuringItem<'a> {
 mod tests {
     use super::*;
     use crate::assert_ast;
-    use crate::ast::binary::{BinOp, Binary};
     use crate::ast::FuncCall;
+    use crate::ast::binary::{BinOp, Binary};
 
     #[test]
     fn trailing_lambda() {

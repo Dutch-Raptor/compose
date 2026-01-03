@@ -88,6 +88,7 @@ pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
 pub const EXPR: SyntaxSet = ATOMIC_EXPR.union(UNARY_OP);
 
 pub const PATTERN_LEAF: SyntaxSet = syntax_set![
+    Underscore,
     Ident,
     Int,
     Float,
@@ -96,10 +97,13 @@ pub const PATTERN_LEAF: SyntaxSet = syntax_set![
 ];
 
 pub const PATTERN: SyntaxSet = syntax_set![
-    At,
+    LeftParen,
+    LeftBracket,
     Underscore,
     Ident,
 ];
+
+pub const DESTRUCTURING_ITEM: SyntaxSet = PATTERN.add(SyntaxKind::Dots);
 
 pub const STMT_TERMINATOR: SyntaxSet = syntax_set![RightBrace];
 

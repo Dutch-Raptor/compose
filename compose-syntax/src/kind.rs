@@ -111,6 +111,7 @@ pub enum SyntaxKind {
     Lambda,
     ImportItem,
     ModuleImport,
+    Spread,
 }
 
 impl SyntaxKind {
@@ -223,6 +224,7 @@ impl SyntaxKind {
             SyntaxKind::Semicolon => ";",
             SyntaxKind::Slash => "/",
             SyntaxKind::SlashEq => "/=",
+            SyntaxKind::Spread => "..",
             SyntaxKind::Star => "*",
             SyntaxKind::StarEq => "*=",
             SyntaxKind::Str => "string literal",

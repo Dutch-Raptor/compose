@@ -1,10 +1,11 @@
 use crate::vm::{ErrorMode, Machine};
 use crate::{Eval, Evaluated};
-use compose_library::diag::{At, SourceResult, Spanned};
-use compose_library::{BindingKind, Value, Visibility, diag};
+use compose_error_codes::E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS;
+use compose_library::diag::{bail, error, At, SourceDiagnostic, SourceResult, Spanned};
+use compose_library::{diag, ArrayValue, BindingKind, IntoValue, Value, Visibility, Vm};
 use compose_syntax::ast;
-use compose_syntax::ast::{AstNode, Expr, Pattern};
-use ecow::eco_vec;
+use compose_syntax::ast::{AstNode, DestructuringItem, Expr, Pattern};
+use ecow::{eco_format, eco_vec};
 
 impl<'a> Eval for ast::Ident<'a> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -92,18 +93,115 @@ fn destructure_impl(
     match pattern {
         Pattern::Single(expr) => bind(vm, expr, value)?,
         Pattern::PlaceHolder(_) => {} // A placeholder means we discard the value, no need to bind
-        Pattern::Destructuring(_) => {
-            unimplemented!("destructuring")
+        Pattern::Destructuring(destruct) => match value {
+            Value::Array(value) => destructure_array(vm, destruct, value, bind)?,
+            Value::Map(value) => destructure_map(vm, destruct, value, bind)?,
+            _ => bail!(pattern.span(), "cannot destructure {}", value.ty()),
         }
     };
 
     Ok(())
 }
 
+fn destructure_array(vm: &mut Machine, destruct: ast::Destructuring, value: ArrayValue, bind: &mut impl Fn(&mut Machine, Expr, Value) -> SourceResult<()>) -> SourceResult<()> {
+    let arr = value.heap_ref().get_unwrap(&vm.heap).clone();
+
+    let len = arr.len();
+    let mut index = 0;
+
+    for p in destruct.items() {
+        match p {
+            DestructuringItem::Pattern(pat) => {
+                let Some(v) = arr.get(index) else {
+                    bail!(wrong_number_of_elements(destruct, len))
+                };
+
+                destructure_impl(vm, pat, v.clone(), bind)?;
+                index += 1;
+            }
+            DestructuringItem::Named(named) => {
+                bail!(named.span(), "cannot destructure a named pattern from an array")
+            }
+            DestructuringItem::Spread(spread) => {
+                // The number of elements that have not been bound by a destructuring item and will be bound by the spread
+                let sink_size = (1 + len).checked_sub(destruct.items().count());
+
+                // The items that will be bound by the spread
+                let sunk_items = sink_size.and_then(|n| arr.get(index..index + n));
+
+                let (Some(sink_size), Some(sunk_items)) = (sink_size, sunk_items) else {
+                    bail!(wrong_number_of_elements(destruct, len))
+                };
+
+                if let Some(expr) = spread.sink_expr() {
+                    let sunk_arr = ArrayValue::from(vm.heap_mut(), sunk_items.to_vec()).into_value();
+                    bind(vm, expr, sunk_arr)?;
+                }
+                index += sink_size;
+            }
+        }
+    }
+
+    // require all items to be bound
+    if index != len {
+        bail!(wrong_number_of_elements(destruct, len))
+    }
+
+    Ok(())
+}
+
+#[allow(unused)]
+fn destructure_map(vm: &mut Machine, destruct: ast::Destructuring, value: compose_library::MapValue, bind: &mut impl Fn(&mut Machine, Expr, Value) -> SourceResult<()>) -> SourceResult<()> {
+
+    unimplemented!("destructuring maps")
+}
+
+
+/// The error message when the number of elements of the destructuring and the
+/// array is mismatched.
+#[cold]
+fn wrong_number_of_elements(
+    destruct: ast::Destructuring,
+    len: usize,
+) -> SourceDiagnostic {
+    let mut count = 0;
+    let mut spread = false;
+
+    for p in destruct.items() {
+        match p {
+            DestructuringItem::Pattern(_) => count += 1,
+            DestructuringItem::Spread(_) => spread = true,
+            DestructuringItem::Named(_) => {}
+        }
+    }
+
+    let quantifier = if len > count { "too many" } else { "not enough" };
+    let expected = match (spread, count) {
+        (true, 1) => "at least 1 element".into(),
+        (true, c) => eco_format!("at least {c} elements"),
+        (false, 0) => "an empty array".into(),
+        (false, 1) => "a single element".into(),
+        (false, c) => eco_format!("{c} elements",),
+    };
+
+    let mut err = error!(
+        destruct.span(), "{quantifier} elements to destructure";
+        hint: "the provided array has a length of {len}, \
+               but the pattern expects {expected}";
+        code: &E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS;
+    );
+
+    if len > count {
+        err.hint("use `..` to ignore the remaining elements, or `..rest` to bind them");
+    }
+
+    err
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{TestWorld, assert_eval, assert_eval_with_vm, eval_code_with_vm};
+    use crate::test::{assert_eval, assert_eval_with_vm, eval_code_with_vm, TestWorld};
     use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
     use compose_library::{BindingKind, UnitValue};
 

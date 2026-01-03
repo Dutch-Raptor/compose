@@ -49,7 +49,7 @@ impl VirtualPath {
     /// Create a new virtual path.
     pub fn new(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
-        Self(path.clone().canonicalize().unwrap_or(path))
+        Self(path)
     }
 
     pub fn display(&self) -> String {

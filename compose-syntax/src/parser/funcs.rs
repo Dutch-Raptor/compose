@@ -1,12 +1,12 @@
 use crate::kind::SyntaxKind;
 use crate::parser::expressions::block;
 use crate::parser::statements::code;
-use crate::parser::{ExprContext, Parser};
 use crate::parser::{expressions, patterns};
+use crate::parser::{ExprContext, Parser};
 use crate::precedence::Precedence;
 use crate::scanner::Delimiter;
 use crate::set;
-use crate::set::{ARG_RECOVER, syntax_set};
+use crate::set::{syntax_set, ARG_RECOVER};
 use compose_error_codes::E0009_ARGS_MISSING_COMMAS;
 use compose_utils::trace_fn;
 use std::collections::HashSet;

@@ -450,10 +450,12 @@ mod tests {
     }
 
     #[track_caller]
-    fn test(scopes: &Scopes, existing_scope: &Scope, text: &str, result: &[&str]) {
+    fn test(scopes: &Scopes, existing_scope: &Scope, text: &str, expected_names: &[&str]) {
         let mut visitor = CapturesVisitor::new(scopes, None, existing_scope);
         let nodes = parse(text, FileId::new("test.comp"));
+
         for node in &nodes {
+            assert!(node.errors().is_empty(), "node has errors: {:#?}", node.errors());
             visitor.visit(node);
         }
 
@@ -461,7 +463,7 @@ mod tests {
         let mut names: Vec<_> = captures.iter().map(|(k, ..)| k).collect();
         names.sort();
 
-        assert_eq!(names, result);
+        assert_eq!(names, expected_names);
     }
 
     #[test]
@@ -504,7 +506,7 @@ mod tests {
         test(
             s,
             e,
-            "let f = { x = x, y = y, z = z => f(); }",
+            "let f = { x: x, y: y, z: z => f(); }",
             &["x", "y", "z"],
         );
 

@@ -1,11 +1,13 @@
-use std::collections::HashSet;
+use crate::kind::SyntaxKind;
+use crate::parser::Parser;
+use crate::parser::{ExprContext, expressions};
+use crate::precedence::Precedence;
+use crate::set::syntax_set;
+use crate::{SyntaxError, set};
 use compose_utils::trace_fn;
 use ecow::eco_format;
-use crate::kind::SyntaxKind;
-use crate::parser::{expressions, ExprContext};
-use crate::parser::Parser;
-use crate::precedence::Precedence;
-use crate::{set, SyntaxError};
+use std::collections::HashSet;
+use std::mem;
 
 /// Parses a binding or reassignment pattern.
 pub fn pattern<'s>(
@@ -17,8 +19,62 @@ pub fn pattern<'s>(
     trace_fn!("parse_pattern");
     match p.current() {
         SyntaxKind::Underscore => p.eat(),
-        SyntaxKind::At => destructuring(p, reassignment, seen, dupe),
+        SyntaxKind::LeftBracket => destructure_array(p, seen),
         _ => pattern_leaf(p, reassignment, seen, dupe),
+    }
+}
+
+fn destructure_array<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
+    trace_fn!("parse_destructure_array");
+
+    let m = p.marker();
+    p.assert(SyntaxKind::LeftBracket);
+
+    let mut sink = false;
+    while !p.current().is_terminator() {
+        if !p.at_set(set::DESTRUCTURING_ITEM) {
+            p.unexpected("expected a destructuring item", None);
+            continue;
+        }
+
+        destructuring_item(p, seen, &mut sink);
+
+        if !p.current().is_terminator() {
+            p.expect_or_recover(SyntaxKind::Comma, syntax_set!(RightBracket));
+        }
+    }
+
+    p.expect_closing_delimiter(m, SyntaxKind::RightBracket);
+
+    p.wrap(m, SyntaxKind::Destructuring);
+}
+
+fn destructuring_item<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, sink: &mut bool) {
+    let m = p.marker();
+
+    if p.eat_if(SyntaxKind::Dots) {
+        // sink
+        if p.at_set(set::PATTERN_LEAF) {
+            pattern_leaf(p, false, seen, None);
+        }
+        p.wrap(m, SyntaxKind::Spread);
+        if mem::replace(sink, true) {
+            p[m].convert_to_error("duplicate spread operator (`..`) in destructuring pattern");
+        }
+        return;
+    }
+
+    // parse normal array element or map key
+    pattern(p, false, seen, None);
+
+    if p.eat_if(SyntaxKind::Colon) {
+        pattern(p, true, seen, None);
+
+        if p[m].kind() != SyntaxKind::Ident {
+            p[m].expected("identifier after `:` in destructuring pattern")
+        }
+
+        p.wrap(m, SyntaxKind::Named)
     }
 }
 
@@ -38,10 +94,14 @@ fn pattern_leaf<'s>(
         return;
     }
 
+    if p.eat_if(SyntaxKind::Underscore) {
+        return;
+    }
+
     let m = p.marker();
     let text = p.current_text();
 
-    // Parse a full expression, even though we only care about an identifier.
+    // Parse a full atomic expression, even though we only care about an identifier.
     // This way the entire expression can be marked as an error if it is not.
     expressions::code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
 
@@ -62,9 +122,54 @@ fn pattern_leaf<'s>(
     }
 }
 
-fn destructuring(p: &mut Parser, _reassignment: bool, _seen: &mut HashSet<&str>, _dupe: Option<&str>) {
+fn parenthesized_or_destructuring(
+    p: &mut Parser,
+    _reassignment: bool,
+    _seen: &mut HashSet<&str>,
+    _dupe: Option<&str>,
+) {
     trace_fn!("parse_destructuring");
     p.assert(SyntaxKind::At);
 
     unimplemented!("destructuring")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::assert_parse_tree;
+
+    #[test]
+    fn test_destructuring_underscore() {
+        assert_parse_tree!("let _ = 2",
+            LetBinding [
+                Let("let")
+                Underscore("_")
+                Eq("=")
+                Int("2")
+            ]
+        );
+    }
+
+    #[test]
+    fn test_destructuring_array() {
+        assert_parse_tree!("let [a, b, ..c] = 2",
+            LetBinding [
+                Let("let")
+                    Destructuring [
+                        LeftBracket("[")
+                            Ident("a")
+                            Comma(",")
+                            Ident("b")
+                            Comma(",")
+                            Spread [
+                                Dots("..")
+                                Ident("c")
+                            ]
+                        RightBracket("]")
+                    ]
+                Eq("=")
+                Int("2")
+            ]
+        )
+    }
 }

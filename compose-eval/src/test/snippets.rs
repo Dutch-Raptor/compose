@@ -77,7 +77,7 @@ fn closure_recursion_2() {
 #[test]
 fn closure_capturing() {
     let input = r#"
-        let create_counter = { from = 0 =>
+        let create_counter = { from: 0 =>
             let mut cur = box::new(from);
             { |ref mut cur| =>
                 let ret = *cur;

@@ -1,7 +1,7 @@
 use crate::ast::func::Pattern;
 use crate::ast::{node, AstNode, Expr, Ident};
 use crate::kind::SyntaxKind;
-use crate::{Span, SyntaxNode};
+use crate::Span;
 
 node! {
     struct LetBinding
@@ -11,16 +11,20 @@ impl<'a> LetBinding<'a> {
     pub fn has_initial_value(self) -> bool {
         self.0.children().any(|n| n.kind() == SyntaxKind::Eq)
     }
-    
+
     pub fn initial_value(self) -> Option<Expr<'a>> {
-        self.0.children().filter_map(SyntaxNode::cast).nth(1)
+        self.0
+            .children()
+            .skip_while(|n| n.kind() != SyntaxKind::Eq)
+            .nth(1)
+            .and_then(|n| n.cast())
     }
-    
+
     fn bindings(self) -> Vec<Ident<'a>> {
         let pattern: Pattern = self.0.try_cast_first().expect("expected pattern");
         pattern.bindings()
     }
-    
+
     pub fn pattern(self) -> Pattern<'a> {
         self.0.cast_first()
     }
@@ -28,15 +32,22 @@ impl<'a> LetBinding<'a> {
     pub fn is_mut(self) -> bool {
         self.0.children().any(|n| n.kind() == SyntaxKind::Mut)
     }
-    
+
     pub fn eq_span(self) -> Span {
-        self.0.children().find(|&n| n.kind() == SyntaxKind::Eq).map(|n| n.span()).unwrap_or_else(|| self.0.span())
+        self.0
+            .children()
+            .find(|&n| n.kind() == SyntaxKind::Eq)
+            .map(|n| n.span())
+            .unwrap_or_else(|| self.0.span())
     }
-    
+
     pub fn mut_span(self) -> Option<Span> {
-        self.0.children().find(|&n| n.kind() == SyntaxKind::Mut).map(|n| n.span())
+        self.0
+            .children()
+            .find(|&n| n.kind() == SyntaxKind::Mut)
+            .map(|n| n.span())
     }
-    
+
     pub fn initial_value_span(self) -> Option<Span> {
         self.initial_value().map(|e| e.span())
     }
@@ -46,10 +57,12 @@ impl<'a> LetBinding<'a> {
     }
 
     pub fn pub_span(self) -> Option<Span> {
-        self.0.children().find(|&n| n.kind() == SyntaxKind::Pub).map(|n| n.span())
+        self.0
+            .children()
+            .find(|&n| n.kind() == SyntaxKind::Pub)
+            .map(|n| n.span())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
