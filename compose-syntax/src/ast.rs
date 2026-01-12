@@ -16,6 +16,8 @@ mod range;
 mod map;
 mod module;
 mod index_access;
+mod pattern;
+mod match_expression;
 
 use ecow::EcoString;
 use crate::node::SyntaxNode;
@@ -39,6 +41,8 @@ pub use range::*;
 pub use map::*;
 pub use module::*;
 pub use index_access::*;
+pub use pattern::*;
+pub use match_expression::*;
 
 pub trait AstNode<'a>: Sized {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self>;

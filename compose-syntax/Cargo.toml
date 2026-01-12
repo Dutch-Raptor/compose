@@ -9,5 +9,6 @@ compose-utils = { path = "../compose-utils" }
 compose-error-codes = { path = "../compose-error-codes"}
 unscanny = "0.1.0"
 extension-traits = { workspace = true }
+itertools = { workspace = true }
 
 [dev-dependencies]

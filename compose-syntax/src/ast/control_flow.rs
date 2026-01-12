@@ -1,5 +1,6 @@
 use crate::ast::macros::node;
-use crate::ast::{CodeBlock, Expr, Pattern};
+use crate::ast::{CodeBlock, Expr};
+use crate::ast::pattern::Pattern;
 use crate::kind::SyntaxKind;
 use crate::SyntaxNode;
 
@@ -59,7 +60,7 @@ impl<'a> ForLoop<'a> {
     pub fn iterable(self) -> Expr<'a> {
         self.0
             .children()
-            .skip_while(|n| n.kind() != SyntaxKind::In)
+            .skip_while(|n| n.kind() != SyntaxKind::InKW)
             .find_map(SyntaxNode::cast)
             .unwrap_or_default()
     }

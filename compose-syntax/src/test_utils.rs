@@ -491,8 +491,8 @@ impl NodesTester {
 ///         LeftBrace("{")
 ///         Params [
 ///             Param [
-///                 Ref("ref")
-///                 Mut("mut")
+///                 RefKW("ref")
+///                 MutKW("mut")
 ///                 Ident("a")
 ///             ]
 ///         ]

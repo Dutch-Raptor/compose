@@ -38,7 +38,7 @@ macro_rules! syntax_set {
 
 pub(crate) use syntax_set;
 
-pub const STMT: SyntaxSet = syntax_set![Let].union(ATOMIC_EXPR);
+pub const STMT: SyntaxSet = syntax_set![LetKW].union(ATOMIC_EXPR);
 
 pub const ARG_RECOVER: SyntaxSet = syntax_set![
     Comma,
@@ -69,14 +69,14 @@ pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
     LeftBrace,
     LeftBracket,
     LeftParen,
-    If,
-    While,
-    Loop,
-    For,
-    Break,
-    Continue,
-    Import,
-    Return,
+    IfKW,
+    WhileKW,
+    LoopKW,
+    ForKW,
+    BreakKW,
+    ContinueKW,
+    ImportKW,
+    ReturnKW,
     Unit,
     Int,
     Float,
@@ -96,19 +96,21 @@ pub const PATTERN_LEAF: SyntaxSet = syntax_set![
     Bool,
 ];
 
+pub const LITERAL: SyntaxSet = syntax_set![Int, Float, Str, Bool];
+
 pub const PATTERN: SyntaxSet = syntax_set![
     LeftParen,
     LeftBracket,
     Underscore,
     Ident,
-];
+].union(LITERAL);
 
 pub const DESTRUCTURING_ITEM: SyntaxSet = PATTERN.add(SyntaxKind::Dots);
 
 pub const STMT_TERMINATOR: SyntaxSet = syntax_set![RightBrace];
 
-pub const PARAM: SyntaxSet = PATTERN.union(syntax_set![Ref, Mut]);
+pub const PARAM: SyntaxSet = PATTERN.union(syntax_set![RefKW, MutKW]);
 
-pub const CAPTURE: SyntaxSet = syntax_set![Ident, Ref, Mut];
+pub const CAPTURE: SyntaxSet = syntax_set![Ident, RefKW, MutKW];
 
 pub const CAPTURE_RECOVER: SyntaxSet = syntax_set![Comma, Pipe].union(CAPTURE);

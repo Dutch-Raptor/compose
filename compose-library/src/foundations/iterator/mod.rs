@@ -23,9 +23,16 @@ pub use range_iter::*;
 pub use string_iter::*;
 
 #[ty(scope, cast, name = "Iterator")]
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct IterValue {
     iter: HeapRef<Iter>,
+}
+
+impl PartialEq for IterValue {
+    fn eq(&self, _other: &Self) -> bool {
+        // Iterators are not comparable.
+        false
+    }
 }
 
 impl Trace for IterValue {
@@ -102,7 +109,7 @@ pub fn requires_mutable_iter<T>(value: Value) -> Result<T, UnSpanned<SourceDiagn
     .into())
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Iter {
     String(StringIterator),
     Array(ArrayIter),
@@ -113,6 +120,7 @@ pub enum Iter {
     Range(RangeIter),
     StepBy(StepByIter),
     Filter(FilterIter),
+    Enumerate(EnumerateIter),
 }
 
 impl Trace for Iter {
@@ -127,6 +135,7 @@ impl Trace for Iter {
             Iter::Range(_) => {}
             Iter::StepBy(iter) => iter.visit_refs(f),
             Iter::Filter(filter) => filter.visit_refs(f),
+            Iter::Enumerate(enumerate) => enumerate.visit_refs(f),
         }
     }
 }
@@ -143,6 +152,7 @@ impl Iter {
             Iter::Range(r) => r.next(vm),
             Iter::StepBy(s) => s.next(vm),
             Iter::Filter(f) => f.next(vm),
+            Iter::Enumerate(e) => e.next(vm),
         }
     }
 
@@ -157,6 +167,7 @@ impl Iter {
             Iter::Range(r) => r.nth(vm, n),
             Iter::StepBy(s) => s.nth(vm, n),
             Iter::Filter(f) => f.nth(vm, n),
+            Iter::Enumerate(e) => e.nth(vm, n),
         }
     }
 }
@@ -241,6 +252,17 @@ impl IterValue {
             Iter::Filter(FilterIter {
                 inner: self,
                 predicate: Arc::new(predicate),
+            }),
+            vm,
+        )
+    }
+
+    #[func]
+    fn enumerate(self, vm: &mut dyn Vm) -> Self {
+        IterValue::new(
+            Iter::Enumerate(EnumerateIter {
+                inner: self,
+                index: Arc::new(Mutex::new(0)),
             }),
             vm,
         )

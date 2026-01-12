@@ -6,6 +6,7 @@ use crate::ast::range::Range;
 use crate::ast::unary::Unary;
 use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, IndexAccess, Int, Lambda, Parenthesized, WhileLoop};
 use crate::ast::{Bool, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
+use crate::ast::match_expression::MatchExpression;
 use crate::kind::SyntaxKind;
 
 /// An expression. The base of Compose. Any "statement" is an expression.
@@ -41,6 +42,7 @@ pub enum Expr<'a> {
     Map(MapLiteral<'a>),
     Lambda(Lambda<'a>),
     IndexAccess(IndexAccess<'a>),
+    MatchExpression(MatchExpression<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -69,6 +71,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::MapLiteral => Some(Self::Map(MapLiteral::from_untyped(node)?)),
             SyntaxKind::Lambda => Some(Self::Lambda(Lambda::from_untyped(node)?)),
             SyntaxKind::IndexAccess => Some(Self::IndexAccess(IndexAccess::from_untyped(node)?)),
+            SyntaxKind::MatchExpression => Some(Self::MatchExpression(MatchExpression::from_untyped(node)?)),
             _ => None,
         }
     }
@@ -96,6 +99,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::Map(map) => map.to_untyped(),
             Self::Lambda(lambda) => lambda.to_untyped(),
             Self::IndexAccess(index_access) => index_access.to_untyped(),
+            Self::MatchExpression(match_expression) => match_expression.to_untyped(),
         }
     }
 }

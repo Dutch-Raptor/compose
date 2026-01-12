@@ -1,4 +1,4 @@
-use crate::ast::func::Pattern;
+use crate::ast::pattern::Pattern;
 use crate::ast::{node, AstNode, Expr, Ident};
 use crate::kind::SyntaxKind;
 use crate::Span;
@@ -30,7 +30,7 @@ impl<'a> LetBinding<'a> {
     }
 
     pub fn is_mut(self) -> bool {
-        self.0.children().any(|n| n.kind() == SyntaxKind::Mut)
+        self.0.children().any(|n| n.kind() == SyntaxKind::MutKW)
     }
 
     pub fn eq_span(self) -> Span {
@@ -44,7 +44,7 @@ impl<'a> LetBinding<'a> {
     pub fn mut_span(self) -> Option<Span> {
         self.0
             .children()
-            .find(|&n| n.kind() == SyntaxKind::Mut)
+            .find(|&n| n.kind() == SyntaxKind::MutKW)
             .map(|n| n.span())
     }
 
@@ -53,13 +53,13 @@ impl<'a> LetBinding<'a> {
     }
 
     pub fn is_public(self) -> bool {
-        self.0.children().any(|n| n.kind() == SyntaxKind::Pub)
+        self.0.children().any(|n| n.kind() == SyntaxKind::PubKW)
     }
 
     pub fn pub_span(self) -> Option<Span> {
         self.0
             .children()
-            .find(|&n| n.kind() == SyntaxKind::Pub)
+            .find(|&n| n.kind() == SyntaxKind::PubKW)
             .map(|n| n.span())
     }
 }
