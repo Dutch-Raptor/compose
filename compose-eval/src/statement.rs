@@ -58,7 +58,7 @@ impl Eval for ast::ReturnStatement<'_> {
     }
 }
 
-impl Eval for ast::Continue<'_> {
+impl Eval for ast::ContinueStatement<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         vm.flow = Some(FlowEvent::Continue(self.span()));
         Ok(Evaluated::unit())

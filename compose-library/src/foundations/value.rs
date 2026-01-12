@@ -240,6 +240,19 @@ impl Repr for Value {
     }
 }
 
+pub trait DebugRepr {
+    fn debug_repr(&self, vm: &dyn Vm) -> EcoString;
+}
+
+impl DebugRepr for Value {
+    fn debug_repr(&self, vm: &dyn Vm) -> EcoString {
+        match self {
+            Value::Str(v) => eco_format!("\"{v}\""),
+            other => other.repr(vm),
+        }
+    }
+}
+
 impl Default for Value {
     fn default() -> Self {
         Value::Unit(UnitValue)

@@ -1,4 +1,4 @@
-use crate::expression::bindings::destructure_pattern;
+use crate::expression::pattern::{destructure_pattern, PatternContext};
 use crate::vm::{FlowEvent, Tracked};
 use crate::{Eval, Evaluated, Machine};
 use compose_library::diag::{At, SourceResult};
@@ -81,6 +81,7 @@ impl Eval for ast::ForLoop<'_> {
                     vm,
                     pattern,
                     v,
+                    PatternContext::ForLoopBinding,
                     BindingKind::Immutable { first_assign: None },
                     Visibility::Private,
                 )?;

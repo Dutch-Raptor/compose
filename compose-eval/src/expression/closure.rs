@@ -1,12 +1,12 @@
 use crate::vm::{FlowEvent, TrackedContainer};
 use crate::{Eval, Evaluated, Machine, ValueEvaluatedExtensions};
-use compose_library::diag::{IntoSourceDiagnostic, SourceResult, Spanned, bail, error};
+use compose_library::diag::{bail, error, IntoSourceDiagnostic, SourceResult, Spanned};
 use compose_library::{
     Args, Binding, BindingKind, Closure, Func, IntoValue, Library, Scope, Scopes, Value,
     VariableAccessError, Visibility,
 };
-use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind};
-use compose_syntax::{Label, Span, SyntaxNode, ast};
+use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind, Pattern};
+use compose_syntax::{ast, Label, Span, SyntaxNode};
 use ecow::{EcoString, EcoVec};
 use std::collections::HashMap;
 
@@ -201,7 +201,7 @@ pub fn eval_lambda(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRes
             for p in params.children() {
                 match p.kind() {
                     ast::ParamKind::Pos(pattern) => match pattern {
-                        ast::Pattern::Single(Expr::Ident(ident)) => {
+                        Pattern::Single(Expr::Ident(ident)) => {
                             define(vm, ident, args.expect(&ident)?, p)?;
                         }
                         pattern => bail!(pattern.span(), "Patterns not supported in closures yet"),
@@ -403,7 +403,7 @@ mod tests {
     use crate::expression::closure::CapturesVisitor;
     use crate::test::*;
     use compose_library::{Scope, Scopes};
-    use compose_syntax::{FileId, parse};
+    use compose_syntax::{parse, FileId};
 
     #[test]
     fn capturing() {

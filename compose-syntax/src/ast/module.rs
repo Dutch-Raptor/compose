@@ -22,7 +22,7 @@ impl<'a> ModuleImport<'a> {
             .children()
             .take_while(|n| n.kind() != SyntaxKind::Colon);
         while let Some(child) = children.next() {
-            if child.kind() == SyntaxKind::As {
+            if child.kind() == SyntaxKind::AsKW {
                 return children.next().and_then(SyntaxNode::cast);
             }
         }
@@ -47,7 +47,7 @@ impl<'a> ImportItem<'a> {
     pub fn alias(self) -> Option<Ident<'a>> {
         self.0
             .children()
-            .skip_while(|n| n.kind() != SyntaxKind::As)
+            .skip_while(|n| n.kind() != SyntaxKind::AsKW)
             .find_map(SyntaxNode::cast)
     }
 }

@@ -1,7 +1,7 @@
 use crate::kind::SyntaxKind;
 use crate::parser::expressions::block;
 use crate::parser::statements::code;
-use crate::parser::{expressions, patterns};
+use crate::parser::{expressions, pattern};
 use crate::parser::{ExprContext, Parser};
 use crate::precedence::Precedence;
 use crate::scanner::Delimiter;
@@ -136,8 +136,8 @@ fn arg(p: &mut Parser) {
     let m_mods = p.marker();
 
     let mut had_modifiers = false;
-    had_modifiers |= p.eat_if(SyntaxKind::Ref);
-    had_modifiers |= p.eat_if(SyntaxKind::Mut);
+    had_modifiers |= p.eat_if(SyntaxKind::RefKW);
+    had_modifiers |= p.eat_if(SyntaxKind::MutKW);
 
     let m = p.marker();
     expressions::code_expression(p);
@@ -187,8 +187,8 @@ fn captures(p: &mut Parser) -> bool {
 fn capture(p: &mut Parser) {
     let m = p.marker();
 
-    p.eat_if(SyntaxKind::Ref);
-    p.eat_if(SyntaxKind::Mut);
+    p.eat_if(SyntaxKind::RefKW);
+    p.eat_if(SyntaxKind::MutKW);
 
     let ident_m = p.marker();
     // Parse a full expression, even though we only care about an identifier.
@@ -247,13 +247,13 @@ fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
     trace_fn!("parse_param");
     let m = p.marker();
 
-    p.eat_if(SyntaxKind::Ref);
-    p.eat_if(SyntaxKind::Mut);
+    p.eat_if(SyntaxKind::RefKW);
+    p.eat_if(SyntaxKind::MutKW);
 
     let was_at_pat = p.at_set(set::PATTERN);
     let pat_m = p.marker();
 
-    patterns::pattern(p, false, seen, Some("parameter"));
+    pattern::pattern(p, false, seen, Some("parameter"));
 
     // Parse named params like `a: 1`
     if p.eat_if(SyntaxKind::Colon) {
@@ -450,7 +450,7 @@ mod tests {
                 LeftBrace("{")
                 Params [
                     Param [
-                        Ref("ref")
+                        RefKW("ref")
                         Ident("a")
                     ]
                 ]
@@ -465,7 +465,7 @@ mod tests {
                 LeftBrace("{")
                 Params [
                     Param [
-                        Mut("mut")
+                        MutKW("mut")
                         Ident("a")
                     ]
                 ]
@@ -479,8 +479,8 @@ mod tests {
                 LeftBrace("{")
                 Params [
                     Param [
-                        Ref("ref")
-                        Mut("mut")
+                        RefKW("ref")
+                        MutKW("mut")
                         Ident("a")
                     ]
                 ]
@@ -498,11 +498,11 @@ mod tests {
                     Pipe("|")
                     Capture [ Ident("a") ]
                     Comma(",")
-                    Capture [ Ref("ref") Ident("b") ]
+                    Capture [ RefKW("ref") Ident("b") ]
                     Comma(",")
-                    Capture [ Mut("mut") Ident("c") ]
+                    Capture [ MutKW("mut") Ident("c") ]
                     Comma(",")
-                    Capture [ Ref("ref") Mut("mut") Ident("d") ]
+                    Capture [ RefKW("ref") MutKW("mut") Ident("d") ]
                     Pipe("|")
                 ]
                 Params [

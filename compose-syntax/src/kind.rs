@@ -6,7 +6,7 @@ pub enum SyntaxKind {
     Apostrophe,
     Args,
     Arrow,
-    As,
+    AsKW,
     Assignment,
     At,
     Backtick,
@@ -14,7 +14,7 @@ pub enum SyntaxKind {
     BangEq,
     Binary,
     Bool,
-    Break,
+    BreakKW,
     Capture,
     CaptureList,
     CodeBlock,
@@ -26,7 +26,7 @@ pub enum SyntaxKind {
     Conditional,
     ConditionalAlternate,
     ConditionalElse,
-    Continue,
+    ContinueKW,
     DestructureAssignment,
     Destructuring,
     DocComment,
@@ -36,15 +36,15 @@ pub enum SyntaxKind {
     DotsEq,
     DoubleQuote,
     Ellipsis,
-    Else,
+    ElseKW,
     End,
-    Enum,
+    EnumKW,
     Eq,
     EqEq,
     Error,
     FieldAccess,
     Float,
-    For,
+    ForKW,
     ForLoop,
     FuncCall,
     Gt,
@@ -54,23 +54,23 @@ pub enum SyntaxKind {
     Hat,
     HatEq,
     Ident,
-    If,
-    Import,
-    In,
+    IfKW,
+    ImportKW,
+    InKW,
     IndexAccess,
     Int,
     LeftBrace,
     LeftBracket,
     LeftParen,
-    Let,
+    LetKW,
     LetBinding,
-    Loop,
+    LoopKW,
     Lt,
     LtEq,
     LtLt,
     Minus,
     MinusEq,
-    Mut,
+    MutKW,
     Named,
     NewLine,
     Param,
@@ -83,9 +83,9 @@ pub enum SyntaxKind {
     PipePipe,
     Plus,
     PlusEq,
-    Pub,
-    Ref,
-    Return,
+    PubKW,
+    RefKW,
+    ReturnKW,
     RightBrace,
     RightBracket,
     RightParen,
@@ -100,18 +100,22 @@ pub enum SyntaxKind {
     Unary,
     Underscore,
     Unit,
-    While,
+    WhileKW,
     WhileLoop,
     Array,
     Range,
     MapLiteral,
     MapEntry,
+    MatchKW,
     BreakStatement,
     ReturnStatement,
     Lambda,
     ImportItem,
     ModuleImport,
     Spread,
+    ContinueStatement,
+    MatchArm,
+    MatchExpression,
 }
 
 impl SyntaxKind {
@@ -131,7 +135,7 @@ impl SyntaxKind {
             SyntaxKind::Args => "argument list",
             SyntaxKind::Array => "array",
             SyntaxKind::Arrow => "=>",
-            SyntaxKind::As => "as",
+            SyntaxKind::AsKW => "as",
             SyntaxKind::Assignment => "assignment",
             SyntaxKind::At => "@",
             SyntaxKind::Backtick => "`",
@@ -139,7 +143,7 @@ impl SyntaxKind {
             SyntaxKind::BangEq => "!=",
             SyntaxKind::Binary => "binary expression",
             SyntaxKind::Bool => "boolean literal",
-            SyntaxKind::Break => "break",
+            SyntaxKind::BreakKW => "break",
             SyntaxKind::BreakStatement => "break statement",
             SyntaxKind::CaptureList => "capture group",
             SyntaxKind::Capture => "captured variable",
@@ -152,7 +156,8 @@ impl SyntaxKind {
             SyntaxKind::Conditional => "if expression",
             SyntaxKind::ConditionalAlternate => "else if expression",
             SyntaxKind::ConditionalElse => "else expression",
-            SyntaxKind::Continue => "continue",
+            SyntaxKind::ContinueKW => "continue",
+            SyntaxKind::ContinueStatement => "continue statement",
             SyntaxKind::DestructureAssignment => "destructuring assignment",
             SyntaxKind::Destructuring => "destructuring",
             SyntaxKind::DocComment => "doc comment",
@@ -162,15 +167,15 @@ impl SyntaxKind {
             SyntaxKind::DotsEq => "..=",
             SyntaxKind::DoubleQuote => "\"",
             SyntaxKind::Ellipsis => "...",
-            SyntaxKind::Else => "else",
+            SyntaxKind::ElseKW => "else",
             SyntaxKind::End => "end of file",
-            SyntaxKind::Enum => "enum",
+            SyntaxKind::EnumKW => "enum",
             SyntaxKind::Eq => "=",
             SyntaxKind::EqEq => "==",
             SyntaxKind::Error => "error",
             SyntaxKind::FieldAccess => "field access",
             SyntaxKind::Float => "float literal",
-            SyntaxKind::For => "for",
+            SyntaxKind::ForKW => "for",
             SyntaxKind::ForLoop => "for loop",
             SyntaxKind::FuncCall => "function call",
             SyntaxKind::Gt => ">",
@@ -180,17 +185,17 @@ impl SyntaxKind {
             SyntaxKind::Hat => "^",
             SyntaxKind::HatEq => "^=",
             SyntaxKind::Ident => "identifier",
-            SyntaxKind::If => "if",
-            SyntaxKind::Import => "import",
-            SyntaxKind::In => "in",
+            SyntaxKind::IfKW => "if",
+            SyntaxKind::ImportKW => "import",
+            SyntaxKind::InKW => "in",
             SyntaxKind::IndexAccess => "index access",
             SyntaxKind::Int => "integer literal",
             SyntaxKind::LeftBrace => "{",
             SyntaxKind::LeftBracket => "[",
             SyntaxKind::LeftParen => "(",
-            SyntaxKind::Let => "let",
+            SyntaxKind::LetKW => "let",
             SyntaxKind::LetBinding => "let binding",
-            SyntaxKind::Loop => "loop",
+            SyntaxKind::LoopKW => "loop",
             SyntaxKind::Lt => "<",
             SyntaxKind::LtEq => "<=",
             SyntaxKind::LtLt => "<<",
@@ -200,10 +205,10 @@ impl SyntaxKind {
             SyntaxKind::MinusEq => "-=",
             SyntaxKind::ModuleImport => "module import",
             SyntaxKind::ImportItem => "import item",
-            SyntaxKind::Mut => "mut",
+            SyntaxKind::MutKW => "mut",
             SyntaxKind::Named => "named binding",
             SyntaxKind::NewLine => "newline",
-            SyntaxKind::Param => "parameter",           
+            SyntaxKind::Param => "parameter",
             SyntaxKind::Params => "parameter list",
             SyntaxKind::Parenthesized => "parenthesized expression",
             SyntaxKind::PathAccess => "path",
@@ -213,10 +218,10 @@ impl SyntaxKind {
             SyntaxKind::PipePipe => "||",
             SyntaxKind::Plus => "+",
             SyntaxKind::PlusEq => "+=",
-            SyntaxKind::Pub => "pub",
+            SyntaxKind::PubKW => "pub",
             SyntaxKind::Range => "range",
-            SyntaxKind::Ref => "ref",
-            SyntaxKind::Return => "return",
+            SyntaxKind::RefKW => "ref",
+            SyntaxKind::ReturnKW => "return",
             SyntaxKind::ReturnStatement => "return statement",
             SyntaxKind::RightBrace => "}",
             SyntaxKind::RightBracket => "]",
@@ -234,8 +239,11 @@ impl SyntaxKind {
             SyntaxKind::Unary => "unary expression",
             SyntaxKind::Underscore => "_",
             SyntaxKind::Unit => "()",
-            SyntaxKind::While => "while",
+            SyntaxKind::WhileKW => "while",
             SyntaxKind::WhileLoop => "while loop",
+            SyntaxKind::MatchKW => "match",
+            SyntaxKind::MatchArm => "match arm",
+            SyntaxKind::MatchExpression => "match expression",
         }
     }
 
@@ -274,24 +282,25 @@ impl SyntaxKind {
     pub(crate) fn is_keyword(&self) -> bool {
         matches!(
             self,
-            Self::As
-                | Self::Break
-                | Self::Continue
-                | Self::Else
-                | Self::Enum
-                | Self::For
-                | Self::If
-                | Self::Import
-                | Self::In
-                | Self::Let
+            Self::AsKW
+                | Self::BreakKW
+                | Self::ContinueKW
+                | Self::ElseKW
+                | Self::EnumKW
+                | Self::ForKW
+                | Self::IfKW
+                | Self::ImportKW
+                | Self::InKW
+                | Self::LetKW
                 | Self::LetBinding
-                | Self::Loop
-                | Self::Mut
-                | Self::Ref
-                | Self::Return
+                | Self::LoopKW
+                | Self::MutKW
+                | Self::RefKW
+                | Self::ReturnKW
                 | Self::Unit
-                | Self::While
-                | Self::Pub
+                | Self::WhileKW
+                | Self::PubKW
+                | Self::MatchKW
         )
     }
 }

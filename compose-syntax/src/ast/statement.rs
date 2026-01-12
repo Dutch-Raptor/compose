@@ -11,7 +11,7 @@ pub enum Statement<'a> {
     Assign(Assignment<'a>),
     Break(BreakStatement<'a>),
     Return(ReturnStatement<'a>),
-    Continue(Continue<'a>),
+    Continue(ContinueStatement<'a>),
     ModuleImport(ModuleImport<'a>)
 }
 
@@ -24,7 +24,7 @@ impl<'a> AstNode<'a> for Statement<'a> {
             }
             SyntaxKind::BreakStatement => Some(Statement::Break(BreakStatement::from_untyped(node)?)),
             SyntaxKind::ReturnStatement => Some(Statement::Return(ReturnStatement::from_untyped(node)?)),
-            SyntaxKind::Continue => Some(Statement::Continue(Continue::from_untyped(node)?)),
+            SyntaxKind::ContinueKW => Some(Statement::Continue(ContinueStatement::from_untyped(node)?)),
             SyntaxKind::ModuleImport => Some(Statement::ModuleImport(ModuleImport::from_untyped(node)?)),
             _ => Expr::from_untyped(node).map(Statement::Expr),
         }
@@ -64,5 +64,5 @@ impl<'a> ReturnStatement<'a> {
 }
 
 node! {
-    struct Continue
+    struct ContinueStatement
 }

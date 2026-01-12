@@ -1,6 +1,6 @@
 use crate::kind::SyntaxKind;
 use crate::parser::expressions::code_expression;
-use crate::parser::patterns::pattern;
+use crate::parser::pattern::pattern;
 use crate::parser::statements::code;
 use crate::parser::Parser;
 use crate::set::syntax_set;
@@ -12,7 +12,7 @@ use std::collections::HashSet;
 pub(crate) fn conditional(p: &mut Parser) {
     trace_fn!("parse_conditional");
     let m = p.marker();
-    p.assert(SyntaxKind::If);
+    p.assert(SyntaxKind::IfKW);
 
     condition(p);
 
@@ -21,11 +21,11 @@ pub(crate) fn conditional(p: &mut Parser) {
         return;
     }
 
-    while p.at(SyntaxKind::Else) {
+    while p.at(SyntaxKind::ElseKW) {
         trace_fn!("parse_else_maybe_if");
         let else_marker = p.marker();
-        p.assert(SyntaxKind::Else);
-        if p.eat_if(SyntaxKind::If) {
+        p.assert(SyntaxKind::ElseKW);
+        if p.eat_if(SyntaxKind::IfKW) {
             trace_fn!("parse_else_if");
             condition(p);
 
@@ -51,7 +51,7 @@ pub(crate) fn conditional(p: &mut Parser) {
 pub fn while_loop(p: &mut Parser) {
     trace_fn!("parse_while_loop");
     let m = p.marker();
-    p.assert(SyntaxKind::While);
+    p.assert(SyntaxKind::WhileKW);
 
     condition(p);
 
@@ -62,7 +62,7 @@ pub fn while_loop(p: &mut Parser) {
 pub fn for_loop(p: &mut Parser) {
     trace_fn!("parse_for_loop");
     let m = p.marker();
-    p.assert(SyntaxKind::For);
+    p.assert(SyntaxKind::ForKW);
 
     let left_paren_marker = p.marker();
 
@@ -75,7 +75,7 @@ pub fn for_loop(p: &mut Parser) {
 
     pattern(p, true, &mut HashSet::new(), None);
 
-    p.expect(SyntaxKind::In);
+    p.expect(SyntaxKind::InKW);
 
     // parse the iterable
     code_expression(p);
@@ -132,10 +132,10 @@ fn parse_control_flow_block(p: &mut Parser, flow: ControlFlow) -> bool {
             // the left brace isnt missing, something very unexpected is happening
             // recover until the end of the entire statement if possible
             // then give up
-            p.recover_until(syntax_set!(RightBrace, End, Else));
+            p.recover_until(syntax_set!(RightBrace, End, ElseKW));
             p.eat_if(SyntaxKind::RightBrace);
             // eat elses as well
-            while p.eat_if(SyntaxKind::Else) {
+            while p.eat_if(SyntaxKind::ElseKW) {
                 p.recover_until(syntax_set!(RightBrace, End));
             }
 
@@ -196,7 +196,7 @@ mod tests {
             }
             "#,
             WhileLoop [
-                While("while")
+                WhileKW("while")
                 Condition [
                     LeftParen("(")
                     Bool("true")
@@ -223,7 +223,7 @@ mod tests {
             }
             "#,
             Conditional [
-                If("if")
+                IfKW("if")
                 Condition [
                     LeftParen("(")
                     Bool("true")
@@ -241,7 +241,7 @@ mod tests {
                 do_thing();
             "#,
             Conditional [
-                If("if")
+                IfKW("if")
                 Condition [ ... ]
                 CodeBlock [
                     Error(E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES)
@@ -266,7 +266,7 @@ mod tests {
             }
             "#,
             Conditional [
-                If("if")
+                IfKW("if")
                 Condition [
                     LeftParen("(")
                     Ident("cond1")
@@ -274,8 +274,8 @@ mod tests {
                 ]
                 CodeBlock [...]
                 ConditionalAlternate [
-                    Else("else")
-                    If("if")
+                    ElseKW("else")
+                    IfKW("if")
                     Condition [
                         LeftParen("(")
                         Ident("cond2")
@@ -284,7 +284,7 @@ mod tests {
                     CodeBlock [...]
                 ]
                 ConditionalElse [
-                    Else("else")
+                    ElseKW("else")
                     CodeBlock [...]
                 ]
             ]

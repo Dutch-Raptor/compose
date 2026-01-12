@@ -1,12 +1,12 @@
-use crate::IterValue;
 use crate::diag::StrResult;
-use compose_library::diag::{At, SourceResult, bail};
+use crate::IterValue;
+use compose_library::diag::{bail, At, SourceResult};
+use compose_library::support::eval_predicate;
 use compose_library::vm::Vm;
-use compose_library::{Args, Func, Trace, UntypedRef, Value, ValueIterator};
+use compose_library::{Args, ArrayValue, Func, IntoValue, Trace, UntypedRef, Value, ValueIterator};
 use std::iter;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
-use compose_library::support::eval_predicate;
 
 #[derive(Debug, Clone)]
 pub struct TakeIter {
@@ -23,22 +23,22 @@ impl TakeIter {
     }
 }
 
-impl PartialEq for TakeIter {
-    fn eq(&self, other: &Self) -> bool {
-        if self.inner != other.inner {
-            return false;
-        }
-
-        let take_a = self.take.lock().expect("mutex poisoned");
-        let take_b = other.take.lock().expect("mutex poisoned");
-
-        if *take_a != *take_b {
-            return false;
-        }
-
-        true
-    }
-}
+// impl PartialEq for TakeIter {
+//     fn eq(&self, other: &Self) -> bool {
+//         if self.inner != other.inner {
+//             return false;
+//         }
+//
+//         let take_a = self.take.lock().expect("mutex poisoned");
+//         let take_b = other.take.lock().expect("mutex poisoned");
+//
+//         if *take_a != *take_b {
+//             return false;
+//         }
+//
+//         true
+//     }
+// }
 
 impl Trace for TakeIter {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
@@ -71,24 +71,24 @@ pub struct SkipIter {
     pub(crate) skip: Arc<Mutex<usize>>,
 }
 
-impl PartialEq for SkipIter {
-    fn eq(&self, other: &Self) -> bool {
-        if self.inner != other.inner {
-            return false;
-        }
-
-        {
-            let skip_a = self.skip.lock().expect("mutex poisoned");
-            let skip_b = self.skip.lock().expect("mutex poisoned");
-
-            if *skip_a != *skip_b {
-                return false;
-            }
-        }
-
-        true
-    }
-}
+// impl PartialEq for SkipIter {
+//     fn eq(&self, other: &Self) -> bool {
+//         if self.inner != other.inner {
+//             return false;
+//         }
+//
+//         {
+//             let skip_a = self.skip.lock().expect("mutex poisoned");
+//             let skip_b = self.skip.lock().expect("mutex poisoned");
+//
+//             if *skip_a != *skip_b {
+//                 return false;
+//             }
+//         }
+//
+//         true
+//     }
+// }
 
 impl Trace for SkipIter {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
@@ -110,7 +110,7 @@ impl ValueIterator for SkipIter {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct TakeWhileIter {
     pub(crate) inner: IterValue,
     pub(crate) predicate: Arc<Func>,
@@ -153,7 +153,7 @@ impl ValueIterator for TakeWhileIter {
     // nth method cannot be optimized here, so we just fall back to the default
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct FilterIter {
     pub(crate) inner: IterValue,
     pub(crate) predicate: Arc<Func>,
@@ -169,7 +169,7 @@ impl Trace for FilterIter {
 impl ValueIterator for FilterIter {
     fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
         loop {
-            let item = match self.inner.next(vm, ) {
+            let item = match self.inner.next(vm) {
                 Ok(Some(item)) => item,
                 Ok(None) => return Ok(None),
                 Err(err) => return Err(err),
@@ -186,7 +186,7 @@ impl ValueIterator for FilterIter {
     // Fall back to the default implementation
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct MapIter {
     pub(crate) inner: IterValue,
     pub(crate) map: Arc<Func>,
@@ -231,23 +231,23 @@ impl StepByIter {
     }
 }
 
-impl PartialEq for StepByIter {
-    fn eq(&self, other: &Self) -> bool {
-        if self.step != other.step {
-            return false;
-        }
-
-        if *self.first_step.lock().unwrap() != *other.first_step.lock().unwrap() {
-            return false;
-        }
-
-        if self.inner != other.inner {
-            return false;
-        }
-
-        true
-    }
-}
+// impl PartialEq for StepByIter {
+//     fn eq(&self, other: &Self) -> bool {
+//         if self.step != other.step {
+//             return false;
+//         }
+//
+//         if *self.first_step.lock().unwrap() != *other.first_step.lock().unwrap() {
+//             return false;
+//         }
+//
+//         if self.inner != other.inner {
+//             return false;
+//         }
+//
+//         true
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub struct StepByIter {
@@ -290,5 +290,40 @@ impl ValueIterator for StepByIter {
 impl Trace for StepByIter {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
         self.inner.visit_refs(f);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumerateIter {
+    pub(crate) inner: IterValue,
+    pub(crate) index: Arc<Mutex<usize>>,
+}
+
+impl Trace for EnumerateIter {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        self.inner.visit_refs(f)
+    }
+}
+
+impl ValueIterator for EnumerateIter {
+    fn next(&self, vm: &mut dyn Vm) -> SourceResult<Option<Value>> {
+        self.nth(vm, 0)
+    }
+
+    fn nth(&self, vm: &mut dyn Vm, n: usize) -> SourceResult<Option<Value>> {
+        let mut index = self.index.lock().expect("index poisoned");
+
+        let index_cpy = *index;
+        *index = *index + n + 1; // plus one because n is 0 indexed. (for 0 we do yield an item, so index should be incremented by 1)
+
+        drop(index);
+
+        let Some(inner_value) = self.inner.nth(vm, n)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(
+            ArrayValue::from(vm.heap_mut(), vec![index_cpy.into_value(), inner_value]).into_value(),
+        ))
     }
 }

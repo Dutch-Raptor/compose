@@ -226,7 +226,7 @@ impl_heap_obj!(Array, Array);
 impl_heap_obj!(Map, Map);
 
 heap_enum! {
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone)]
     pub enum HeapItem {
         Value(Value),
         Iter(Iter),

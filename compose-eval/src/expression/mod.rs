@@ -19,6 +19,8 @@ mod array;
 mod range;
 mod map;
 mod index_access;
+mod pattern;
+mod match_expression;
 
 pub use closure::eval_lambda;
 
@@ -47,6 +49,7 @@ impl Eval for Expr<'_> {
             Expr::Map(m) => m.eval(vm),
             Expr::Lambda(l) => l.eval(vm),
             Expr::IndexAccess(i) => i.eval(vm),
+            Expr::MatchExpression(m) => m.eval(vm),
         }?
         .spanned(span)
         .track_tmp_root(vm);

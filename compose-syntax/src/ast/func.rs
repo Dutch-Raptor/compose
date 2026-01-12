@@ -1,6 +1,7 @@
-use crate::ast::{AstNode, Expr, Ident, Statement, node};
+use crate::ast::{node, AstNode, Expr, Ident, Statement};
 use crate::kind::SyntaxKind;
 use crate::{Span, SyntaxNode};
+use crate::ast::pattern::Pattern;
 
 node! {
     struct Lambda
@@ -43,24 +44,24 @@ impl<'a> Capture<'a> {
     }
 
     pub fn is_ref(self) -> bool {
-        self.0.children().any(|n| n.kind() == SyntaxKind::Ref)
+        self.0.children().any(|n| n.kind() == SyntaxKind::RefKW)
     }
 
     pub fn ref_span(self) -> Option<Span> {
         self.0
             .children()
-            .find(|n| n.kind() == SyntaxKind::Ref)
+            .find(|n| n.kind() == SyntaxKind::RefKW)
             .map(|n| n.span())
     }
 
     pub fn is_mut(self) -> bool {
-        self.0.children().any(|n| n.kind() == SyntaxKind::Mut)
+        self.0.children().any(|n| n.kind() == SyntaxKind::MutKW)
     }
 
     pub fn mut_span(self) -> Option<Span> {
         self.0
             .children()
-            .find(|n| n.kind() == SyntaxKind::Mut)
+            .find(|n| n.kind() == SyntaxKind::MutKW)
             .map(|n| n.span())
     }
 }
@@ -85,24 +86,24 @@ impl<'a> Param<'a> {
     }
 
     pub fn is_ref(self) -> bool {
-        self.0.children().any(|n| n.kind() == SyntaxKind::Ref)
+        self.0.children().any(|n| n.kind() == SyntaxKind::RefKW)
     }
 
     pub fn ref_span(self) -> Option<Span> {
         self.0
             .children()
-            .find(|n| n.kind() == SyntaxKind::Ref)
+            .find(|n| n.kind() == SyntaxKind::RefKW)
             .map(|n| n.span())
     }
 
     pub fn is_mut(self) -> bool {
-        self.0.children().any(|n| n.kind() == SyntaxKind::Mut)
+        self.0.children().any(|n| n.kind() == SyntaxKind::MutKW)
     }
 
     pub fn mut_span(self) -> Option<Span> {
         self.0
             .children()
-            .find(|n| n.kind() == SyntaxKind::Mut)
+            .find(|n| n.kind() == SyntaxKind::MutKW)
             .map(|n| n.span())
     }
 }
@@ -137,47 +138,6 @@ impl<'a> AstNode<'a> for ParamKind<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Pattern<'a> {
-    Single(Expr<'a>),
-    PlaceHolder(Underscore<'a>),
-    Destructuring(Destructuring<'a>),
-}
-
-impl<'a> Pattern<'a> {
-    pub fn bindings(self) -> Vec<Ident<'a>> {
-        match self {
-            Pattern::Single(Expr::Ident(i)) => vec![i],
-            Pattern::Destructuring(v) => v.bindings(),
-            _ => vec![],
-        }
-    }
-}
-
-impl<'a> AstNode<'a> for Pattern<'a> {
-    fn from_untyped(node: &'a SyntaxNode) -> Option<Self> {
-        match node.kind() {
-            SyntaxKind::Underscore => Some(Self::PlaceHolder(Underscore(node))),
-            SyntaxKind::Destructuring => Some(Self::Destructuring(Destructuring(node))),
-            _ => node.cast().map(Self::Single),
-        }
-    }
-
-    fn to_untyped(&self) -> &'a SyntaxNode {
-        match self {
-            Self::Single(e) => e.to_untyped(),
-            Self::PlaceHolder(u) => u.to_untyped(),
-            Self::Destructuring(d) => d.to_untyped(),
-        }
-    }
-}
-
-impl Default for Pattern<'_> {
-    fn default() -> Self {
-        Self::Single(Expr::default())
-    }
-}
-
 node! {
     struct Underscore
 }
@@ -203,81 +163,6 @@ impl<'a> Named<'a> {
     }
 }
 
-node! {
-    struct Destructuring
-}
-
-impl<'a> Destructuring<'a> {
-    pub fn items(self) -> impl DoubleEndedIterator<Item = DestructuringItem<'a>> {
-        self.0.children().filter_map(SyntaxNode::cast)
-    }
-
-    pub fn bindings(self) -> Vec<Ident<'a>> {
-        self.items()
-            .flat_map(|binding| match binding {
-                DestructuringItem::Named(named) => named.pattern().bindings(),
-                DestructuringItem::Pattern(pattern) => pattern.bindings(),
-                DestructuringItem::Spread(spread) => {
-                    spread.sink_ident().into_iter().collect()
-                }
-            })
-            .collect()
-    }
-}
-
-pub enum DestructuringItem<'a> {
-    Pattern(Pattern<'a>),
-    Named(Named<'a>),
-    Spread(Spread<'a>),
-}
-
-node! {
-    struct Spread
-}
-
-impl<'a> Spread<'a> {
-    /// The spread expression.
-    ///
-    /// This should only be accessed if this `Spread` is contained in an
-    /// `ArrayItem`, `MapItem`, or `Arg`.
-    pub fn expr(self) -> Expr<'a> {
-        self.0.cast_first()
-    }
-
-    /// The sink identifier, if present.
-    ///
-    /// This should only be accessed if this `Spread` is contained in a
-    /// `Param` or binding `DestructuringItem`.
-    pub fn sink_ident(self) -> Option<Ident<'a>> {
-        self.0.try_cast_first()
-    }
-
-    /// The sink expressions, if present.
-    ///
-    /// This should only be accessed if this `Spread` is contained in a
-    /// `DestructuringItem`.
-    pub fn sink_expr(self) -> Option<Expr<'a>> {
-        self.0.try_cast_first()
-    }
-}
-
-impl<'a> AstNode<'a> for DestructuringItem<'a> {
-    fn from_untyped(node: &'a SyntaxNode) -> Option<Self> {
-        match node.kind() {
-            SyntaxKind::Named => Some(Self::Named(Named::from_untyped(node)?)),
-            SyntaxKind::Spread => Some(Self::Spread(Spread(node))),
-            _ => node.cast().map(Self::Pattern),
-        }
-    }
-
-    fn to_untyped(&self) -> &'a SyntaxNode {
-        match self {
-            Self::Named(n) => n.to_untyped(),
-            Self::Pattern(p) => p.to_untyped(),
-            Self::Spread(s) => s.to_untyped(),
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

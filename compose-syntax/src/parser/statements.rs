@@ -2,7 +2,7 @@ use crate::fix::FixBuilder;
 use crate::kind::SyntaxKind;
 use crate::parser::expressions::{code_expr_prec, code_expression};
 use crate::parser::Parser;
-use crate::parser::{patterns, ExprContext};
+use crate::parser::{pattern, ExprContext};
 use crate::precedence::Precedence;
 use crate::set::{syntax_set, SyntaxSet, ASSIGN_OP};
 use crate::{set, PatchEngine, SyntaxNode};
@@ -17,21 +17,22 @@ use std::collections::HashSet;
 pub(super) fn statement(p: &mut Parser) {
     trace_fn!("parse_statement");
 
-    if p.at(SyntaxKind::Let) || (p.at(SyntaxKind::Pub) && p.peek_at(SyntaxKind::Let)) {
+    if p.at(SyntaxKind::LetKW) || (p.at(SyntaxKind::PubKW) && p.peek_at(SyntaxKind::LetKW)) {
         let_binding(p);
         return;
     }
 
-    if p.at(SyntaxKind::Break) {
+    if p.at(SyntaxKind::BreakKW) {
         break_statement(p);
         return;
     }
 
-    if p.eat_if(SyntaxKind::Continue) {
+    if p.at(SyntaxKind::ContinueKW) {
+        continue_statement(p);
         return;
     }
 
-    if p.at(SyntaxKind::Return) {
+    if p.at(SyntaxKind::ReturnKW) {
         return_statement(p);
         return;
     }
@@ -50,9 +51,17 @@ pub(super) fn statement(p: &mut Parser) {
     }
 }
 
+pub fn continue_statement(p: &mut Parser) {
+    let m = p.marker();
+
+    p.assert(SyntaxKind::ContinueKW);
+
+    p.wrap(m, SyntaxKind::ContinueStatement);
+}
+
 pub fn return_statement(p: &mut Parser) {
     let m = p.marker();
-    p.assert(SyntaxKind::Return);
+    p.assert(SyntaxKind::ReturnKW);
 
     if p.at_set(set::EXPR) {
         code_expression(p);
@@ -63,7 +72,7 @@ pub fn return_statement(p: &mut Parser) {
 
 pub fn break_statement(p: &mut Parser) {
     let m = p.marker();
-    p.assert(SyntaxKind::Break);
+    p.assert(SyntaxKind::BreakKW);
 
     if p.at_set(set::EXPR) {
         code_expression(p);
@@ -75,10 +84,10 @@ pub fn break_statement(p: &mut Parser) {
 pub fn let_binding(p: &mut Parser) {
     trace_fn!("parse_let_binding");
     let m = p.marker();
-    p.eat_if(SyntaxKind::Pub);
-    p.assert(SyntaxKind::Let);
+    p.eat_if(SyntaxKind::PubKW);
+    p.assert(SyntaxKind::LetKW);
 
-    let was_mut = p.eat_if(SyntaxKind::Mut);
+    let was_mut = p.eat_if(SyntaxKind::MutKW);
 
     if !p.at_set(set::PATTERN) {
         let got = p.current();
@@ -101,7 +110,7 @@ pub fn let_binding(p: &mut Parser) {
         // eat tokens until we find an `=` or the end of this statement
         p.recover_until(syntax_set!(Eq, End, NewLine, RightBrace));
     } else {
-        patterns::pattern(p, false, &mut HashSet::new(), None);
+        pattern::pattern(p, false, &mut HashSet::new(), None);
     }
 
     if p.eat_if(SyntaxKind::Eq) {
@@ -174,7 +183,7 @@ mod tests {
     fn test_parse_let_binding() {
         assert_parse_tree!("let x = 1;",
             LetBinding [
-                Let("let")
+                LetKW("let")
                 Ident("x")
                 Eq("=")
                 Int("1")
@@ -186,8 +195,8 @@ mod tests {
     fn test_parse_let_mut_binding() {
         assert_parse_tree!("let mut x = 1;",
             LetBinding [
-                Let("let")
-                Mut("mut")
+                LetKW("let")
+                MutKW("mut")
                 Ident("x")
                 Eq("=")
                 Int("1")
@@ -199,7 +208,7 @@ mod tests {
     fn test_parse_let_binding_uninitialized() {
         assert_parse_tree!("let x;",
             LetBinding [
-                Let("let")
+                LetKW("let")
                 Ident("x")
             ]
         );
@@ -209,7 +218,7 @@ mod tests {
     fn test_parse_let_binding_missing_eq() {
         assert_parse_tree!("let x 1;",
             LetBinding [
-                Let("let")
+                LetKW("let")
                 Ident("x")
                 Error(E0007_MISSING_EQUALS_AFTER_LET_BINDING)
                 Int("1")
@@ -221,8 +230,8 @@ mod tests {
     fn test_parse_let_mut_binding_missing_eq() {
         assert_parse_tree!("let mut x 1;",
             LetBinding [
-                Let("let")
-                Mut("mut")
+                LetKW("let")
+                MutKW("mut")
                 Ident("x")
                 Error(E0007_MISSING_EQUALS_AFTER_LET_BINDING)
                 Int("1")
@@ -259,7 +268,7 @@ mod tests {
         for input in inputs {
             assert_parse_tree!(input,
                 LetBinding [
-                    Let("let")
+                    LetKW("let")
                     Ident("x")
                     Eq("=")
                     Int("1")
@@ -274,7 +283,7 @@ mod tests {
                     ]
                 ]
                 LetBinding [
-                    Let("let")
+                    LetKW("let")
                     Ident("y")
                     Eq("=")
                     Ident("x")
@@ -287,7 +296,7 @@ mod tests {
     fn test_parse_statements_unterminated() {
         assert_parse_tree!("let x = 1 x += x * 2 let y = x",
             LetBinding [
-                Let("let")
+                LetKW("let")
                 Ident("x")
                 Eq("=")
                 Int("1")
@@ -304,7 +313,7 @@ mod tests {
             ]
             Error(E0006_UNTERMINATED_STATEMENT)
             LetBinding [
-                Let("let")
+                LetKW("let")
                 Ident("y")
                 Eq("=")
                 Ident("x")

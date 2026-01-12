@@ -68,10 +68,10 @@ pub fn write_diagnostics(
 
         diagnostic
             .notes
-            .extend(diag.hints.iter().map(|h| format!("help: {h}")));
+            .extend(diag.notes.iter().map(|n| format!("note: {n}")));
         diagnostic
             .notes
-            .extend(diag.notes.iter().map(|n| format!("note: {n}")));
+            .extend(diag.hints.iter().map(|h| format!("help: {h}")));
 
         if let Some(code) = &diag.code {
             diagnostic = diagnostic.with_code(code.code).with_note(eco_format!(
@@ -144,7 +144,7 @@ fn create_label(label: &Label) -> Option<diagnostic::Label<FileId>> {
 /// ```
 #[macro_export]
 #[doc(hidden)]
-macro_rules! __bail {
+macro_rules! bail {
     // For bail!("just a {}", "string")
     (
         $fmt:literal $(, $arg:expr)*
@@ -180,7 +180,7 @@ macro_rules! __bail {
 /// severity `Error`.
 #[macro_export]
 #[doc(hidden)]
-macro_rules! __error {
+macro_rules! error {
     // For bail!("just a {}", "string").
     ($fmt:literal $(, $arg:expr)* $(,)?) => {
         $crate::diag::eco_format!($fmt, $($arg),*).into()
@@ -240,7 +240,7 @@ macro_rules! __error {
 /// ```
 #[macro_export]
 #[doc(hidden)]
-macro_rules! __warning {
+macro_rules! warning {
     (
         $span:expr,
         $fmt:literal $(, $arg:expr)*
@@ -266,9 +266,9 @@ macro_rules! __warning {
 #[rustfmt::skip]
 #[doc(inline)]
 pub use {
-    crate::__bail as bail,
-    crate::__error as error,
-    crate::__warning as warning,
+    bail,
+    error,
+    warning,
     ecow::{eco_format, EcoString},
 };
 use compose_error_codes::ErrorCode;

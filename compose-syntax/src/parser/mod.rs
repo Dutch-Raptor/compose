@@ -1,7 +1,7 @@
 mod control_flow;
 mod expressions;
 mod funcs;
-mod patterns;
+mod pattern;
 mod statements;
 
 use crate::file::FileId;
@@ -280,6 +280,19 @@ impl<'s> Parser<'s> {
         self.last_err().unwrap()
     }
 
+    pub(crate) fn insert_error_at(&mut self, span: Span, message: impl Into<EcoString>) -> &mut SyntaxError {
+        let text = span.range().and_then(|r| self.get_text(r)).unwrap_or_default();
+
+        let error = SyntaxNode::error(
+            SyntaxError::new(message.into(), span),
+            text,
+        );
+        trace_log!("inserting error: {:?}, text: {:?}, span: {:?}", error, text, span);
+        self.nodes.push(error);
+
+        self.last_err().unwrap()
+    }
+
     pub(crate) fn insert_error(&mut self, error: SyntaxError) -> &mut SyntaxError {
         trace_log!("inserting error: {:?}", error);
         let span = error.span;
@@ -508,6 +521,10 @@ impl<'s> Parser<'s> {
 
     pub(crate) fn last_node(&self) -> Option<&SyntaxNode> {
         self.nodes.last()
+    }
+
+    pub(crate) fn last_node_mut(&mut self) -> Option<&mut SyntaxNode> {
+        self.nodes.last_mut()
     }
 
     pub(crate) fn get_text(&self, range: Range<usize>) -> Option<&'s str> {

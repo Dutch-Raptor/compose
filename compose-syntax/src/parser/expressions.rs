@@ -12,6 +12,7 @@ use compose_error_codes::{
 };
 use compose_utils::trace_fn;
 use ecow::eco_format;
+use crate::parser::pattern::match_expr;
 
 pub fn code_expression(p: &mut Parser) {
     code_expr_prec(p, ExprContext::Expr, Precedence::Lowest);
@@ -160,6 +161,7 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
     let m = p.marker();
     match p.current() {
         // `_ = something`
+        SyntaxKind::MatchKW => match_expr(p),
         SyntaxKind::Underscore if !ctx.is_atomic() && p.peek() == SyntaxKind::Eq => {
             p.assert(SyntaxKind::Underscore);
             p.assert(SyntaxKind::Eq);
@@ -177,16 +179,16 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
         }
         SyntaxKind::Hash if p.peek() == SyntaxKind::LeftBrace => map(p),
         SyntaxKind::LeftBracket => array(p),
-        SyntaxKind::If => conditional(p),
-        SyntaxKind::While => while_loop(p),
-        SyntaxKind::For => for_loop(p),
+        SyntaxKind::IfKW => conditional(p),
+        SyntaxKind::WhileKW => while_loop(p),
+        SyntaxKind::ForKW => for_loop(p),
         SyntaxKind::LeftParen if p.peek_at(SyntaxKind::RightParen) => {
             p.assert(SyntaxKind::LeftParen);
             p.assert(SyntaxKind::RightParen);
             p.wrap(m, SyntaxKind::Unit)
         }
         SyntaxKind::LeftParen => { parenthesized(p); },
-        SyntaxKind::Import => import(p),
+        SyntaxKind::ImportKW => import(p),
         // Already fully handled in the lexer
         SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str | SyntaxKind::Ident => p.eat(),
         _ => err_expected_expression(
@@ -204,14 +206,14 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
 
 fn import(p: &mut Parser) {
     let m = p.marker();
-    p.assert(SyntaxKind::Import);
+    p.assert(SyntaxKind::ImportKW);
 
     if !p.at(SyntaxKind::Str) {
         p.insert_error_here("expected a string literal after `import`");
     }
     code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
 
-    if p.eat_if(SyntaxKind::As) {
+    if p.eat_if(SyntaxKind::AsKW) {
        if !p.eat_if(SyntaxKind::Ident) {
            p.insert_error_here("expected an identifier after `as`");
        }
@@ -240,7 +242,7 @@ fn import_item(p: &mut Parser) {
 
     code_expression(p);
 
-    if p.eat_if(SyntaxKind::As) {
+    if p.eat_if(SyntaxKind::AsKW) {
         if !p.eat_if(SyntaxKind::Ident) {
             p.insert_error_here("expected an identifier after `as` in import item");
         }
@@ -473,7 +475,7 @@ mod tests {
         assert_parse_tree!(
             "import \"foo.bar\"",
             ModuleImport [
-                Import("import")
+                ImportKW("import")
                 Str("\"foo.bar\"")
             ]
         );
@@ -484,9 +486,9 @@ mod tests {
         assert_parse_tree!(
             "import \"foo.bar\" as bar",
             ModuleImport [
-                Import("import")
+                ImportKW("import")
                 Str("\"foo.bar\"")
-                As("as")
+                AsKW("as")
                 Ident("bar")
             ]
         )
@@ -497,9 +499,9 @@ mod tests {
         assert_parse_tree!(
             "import \"foo.bar\" as bar { x, y, z }",
             ModuleImport [
-                Import("import")
+                ImportKW("import")
                 Str("\"foo.bar\"")
-                As("as")
+                AsKW("as")
                 Ident("bar")
                 LeftBrace("{")
                 ImportItem [
