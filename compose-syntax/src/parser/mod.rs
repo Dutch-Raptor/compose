@@ -242,7 +242,7 @@ impl<'s> Parser<'s> {
     /// Panics if the current token does not match `kind`. Use for invariant assumptions.
     #[track_caller]
     pub(crate) fn assert(&mut self, kind: SyntaxKind) {
-        assert_eq!(self.current(), kind, "Expected {:?}", kind);
+        assert_eq!(self.current(), kind, "Expected {:?} at {:?}", kind, self.token.node);
         self.eat();
     }
 

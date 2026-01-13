@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn test_map_with_identifier_keys() {
         assert_ast! {
-            "#{ a: 1, b: 2 }",
+            "{ a: 1, b: 2 }",
             map as MapLiteral {
                 map.entries() => [
                     entry as MapEntry {
@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn test_map_with_string_keys() {
         assert_ast! {
-            "#{ \"a\": 1, \"b\": 2 }",
+            "{ \"a\": 1, \"b\": 2 }",
             map as MapLiteral {
                 map.entries() => [
                     entry as MapEntry {
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn test_map_with_shorthand_keys() {
         assert_ast! {
-            "#{ a, b, }",
+            "{ a:, b, }",
             map as MapLiteral {
                 map.entries() => [
                     entry as MapEntry {
