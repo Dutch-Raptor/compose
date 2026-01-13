@@ -1,5 +1,4 @@
 use crate::kind::SyntaxKind;
-use crate::parser::expressions::block;
 use crate::parser::statements::code;
 use crate::parser::{expressions, pattern};
 use crate::parser::{ExprContext, Parser};
@@ -43,13 +42,8 @@ pub fn args(p: &mut Parser) {
     p.wrap(m, SyntaxKind::Args);
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum BlockOrLambda {
-    Block,
-    Lambda,
-}
 
-fn lambda(p: &mut Parser) {
+pub(crate) fn lambda(p: &mut Parser) {
     trace_fn!("parse_lambda");
     let m = p.marker();
 
@@ -106,31 +100,6 @@ fn lambda(p: &mut Parser) {
     p.wrap(m, SyntaxKind::Lambda)
 }
 
-/// Parses a block or lambda
-///
-/// Block syntax: { $(stmt)* }
-/// Lambda syntax { $(|capture_list|)? $(param),* $(,)? => $(stmt)* }
-pub fn block_or_lambda(p: &mut Parser) -> Option<BlockOrLambda> {
-    trace_fn!("parse_block_or_lambda");
-    let mut scanner = p.scanner();
-    scanner.next(); // skip the opening `{`
-    scanner.enter(Delimiter::LeftBrace);
-
-    let contains_arrow = {
-        trace_fn!("parse_block_or_lambda_contains_arrow");
-        scanner
-            .level_contains_kind(SyntaxKind::Arrow)
-            .unwrap_or(false)
-    };
-
-    if contains_arrow {
-        lambda(p);
-        Some(BlockOrLambda::Lambda)
-    } else {
-        block(p);
-        Some(BlockOrLambda::Block)
-    }
-}
 
 fn arg(p: &mut Parser) {
     let m_mods = p.marker();
@@ -149,7 +118,7 @@ fn arg(p: &mut Parser) {
 
         if had_modifiers {
             p[m_mods].convert_to_error("argument modifiers like `ref` and `mut` go before the expression in named arguments")
-                .with_label_message("help: move the modifiers to the right of the `=`");
+                    .with_label_message("help: move the modifiers to the right of the `=`");
         }
 
         expressions::code_expression(p);

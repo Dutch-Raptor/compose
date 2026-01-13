@@ -10,6 +10,7 @@ use ecow::eco_format;
 use std::collections::HashSet;
 use std::mem;
 use itertools::Itertools;
+use compose_error_codes::E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES;
 
 pub fn match_expr(p: &mut Parser) {
     trace_fn!("parse_match");
@@ -107,6 +108,7 @@ fn insert_pattern_bindings_mismatch_error(p: &mut Parser, first_bindings: &mut H
     };
 
     p.insert_error_at(span, "patterns within a match arm have differing bindings")
+        .with_code(&E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES)
         .with_hint("all patterns joined with `|` must bind the same variables, because the arm body must work for every pattern")
         .with_hint(diff_note);
 }
@@ -247,6 +249,7 @@ fn parenthesized_or_destructuring(
 
 #[cfg(test)]
 mod tests {
+    use compose_error_codes::E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES;
     use crate::assert_parse_tree;
 
     #[test]
@@ -282,5 +285,99 @@ mod tests {
                 Int("2")
             ]
         )
+    }
+
+    #[test]
+    fn test_match_expression() {
+        assert_parse_tree!(
+            r#"
+            match ([1, 2, 3]) {
+                [] => "empty",
+                [_, _, ..rest] if condition => 7,
+                3 | 4 | 5 => 8,
+            }
+            "#,
+            MatchExpression [
+                MatchKW("match")
+                LeftParen("(")
+                Array [
+                    LeftBracket("[")
+                    Int("1")
+                    Comma(",")
+                    Int("2")
+                    Comma(",")
+                    Int("3")
+                    RightBracket("]")
+                ]
+                RightParen(")")
+                LeftBrace("{")
+                MatchArm [
+                    Destructuring [
+                        LeftBracket("[")
+                        RightBracket("]")
+                    ]
+                    Arrow("=>")
+                    Str("\"empty\"")
+                ]
+                Comma(",")
+                MatchArm [
+                    Destructuring [
+                        LeftBracket("[")
+                        Underscore("_")
+                        Comma(",")
+                        Underscore("_")
+                        Comma(",")
+                        Spread [
+                            Dots("..")
+                            Ident("rest")
+                        ]
+                        RightBracket("]")
+                    ]
+                    IfKW("if")
+                    Ident("condition")
+                    Arrow("=>")
+                    Int("7")
+                ]
+                Comma(",")
+                MatchArm [
+                    Int("3")
+                    Pipe("|")
+                    Int("4")
+                    Pipe("|")
+                    Int("5")
+                    Arrow("=>")
+                    Int("8")
+                ]
+                Comma(",")
+                RightBrace("}")
+            ]
+        )
+    }
+
+    #[test]
+    fn test_match_expression_different_bindings_within_arm_error() {
+        assert_parse_tree!(
+            r#"
+            match (1) {
+                x | y => x
+            }"#,
+            MatchExpression [
+                MatchKW("match")
+                LeftParen("(")
+                Int("1")
+                RightParen(")")
+                LeftBrace("{")
+                MatchArm [
+                    Ident("x")
+                    Pipe("|")
+                    Ident("y")
+                    Error(E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES)
+                    Arrow("=>")
+                    Ident("x")
+                ]
+                RightBrace("}")
+            ]
+        )
+
     }
 }

@@ -1,18 +1,18 @@
 use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
-use crate::parser::funcs::block_or_lambda;
-use crate::parser::{funcs, statements, ExprContext};
+use crate::parser::funcs::lambda;
+use crate::parser::pattern::match_expr;
+use crate::parser::{ExprContext, funcs, statements};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
-use crate::set::{syntax_set, SyntaxSet, UNARY_OP};
-use crate::{ast, set, Label};
+use crate::set::{SyntaxSet, UNARY_OP, syntax_set};
+use crate::{Label, ast, set};
 use compose_error_codes::{
     E0001_UNCLOSED_DELIMITER, E0002_INVALID_ASSIGNMENT, E0008_EXPECTED_EXPRESSION,
 };
 use compose_utils::trace_fn;
 use ecow::eco_format;
-use crate::parser::pattern::match_expr;
 
 pub fn code_expression(p: &mut Parser) {
     code_expr_prec(p, ExprContext::Expr, Precedence::Lowest);
@@ -168,7 +168,9 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             code_expression(p);
             p.wrap(m, SyntaxKind::DestructureAssignment);
         }
-        SyntaxKind::LeftBrace => { block_or_lambda(p); },
+        SyntaxKind::LeftBrace => {
+            expr_with_braces(p);
+        }
         SyntaxKind::DotsEq | SyntaxKind::Dots => {
             p.eat();
             // for ..= an expression on the rhs is required
@@ -177,7 +179,6 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             }
             p.wrap(m, SyntaxKind::Range);
         }
-        SyntaxKind::Hash if p.peek() == SyntaxKind::LeftBrace => map(p),
         SyntaxKind::LeftBracket => array(p),
         SyntaxKind::IfKW => conditional(p),
         SyntaxKind::WhileKW => while_loop(p),
@@ -187,10 +188,16 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
             p.assert(SyntaxKind::RightParen);
             p.wrap(m, SyntaxKind::Unit)
         }
-        SyntaxKind::LeftParen => { parenthesized(p); },
+        SyntaxKind::LeftParen => {
+            parenthesized(p);
+        }
         SyntaxKind::ImportKW => import(p),
         // Already fully handled in the lexer
-        SyntaxKind::Int | SyntaxKind::Float | SyntaxKind::Bool | SyntaxKind::Str | SyntaxKind::Ident => p.eat(),
+        SyntaxKind::Int
+        | SyntaxKind::Float
+        | SyntaxKind::Bool
+        | SyntaxKind::Str
+        | SyntaxKind::Ident => p.eat(),
         _ => err_expected_expression(
             p,
             Some(syntax_set!(
@@ -204,6 +211,90 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ExprWithBraces {
+    Block,
+    Lambda,
+    MapLiteral,
+    DestructuringAssignment,
+}
+
+/// Parses an expression surrounded by braces.
+///
+/// Block syntax: { $(stmt)* }
+/// Lambda syntax: { $(|capture_list|)? $(param),* $(,)? => $(stmt)* }
+/// Map Literal Syntax: { $(ident,)* $(ident: expr),* }
+///     note: a map literal with just a single ident must contain a `,` to be parsed as a map
+/// Map destructuring reassignment syntax { $(ident $(: ident)?),* } = expr
+///
+/// Disambiguation rules (in order):
+/// - `=>` at top level → lambda
+/// - `}` followed by `=` → destructuring assignment
+/// - top-level `:` → map literal
+/// - otherwise → block
+pub fn expr_with_braces(p: &mut Parser) {
+    trace_fn!("expr_with_braces");
+    debug_assert!(p.at(SyntaxKind::LeftBrace));
+
+    let m = p.marker();
+
+    let mut scanner = p.scanner();
+    scanner
+        .next()
+        .expect("we know the next token is an opening brace"); // enter opening `{`
+    let starting_delim_depth = scanner.delim_depth();
+
+    let mut contains_colon = false;
+
+    let expr_kind = loop {
+        let delim_depth = scanner.delim_depth();
+        let node = match scanner.next() {
+            Ok(Some(node)) => node,
+            Ok(None) if contains_colon => break ExprWithBraces::MapLiteral,
+            Ok(None) => break ExprWithBraces::Block,
+            Err(_) => break ExprWithBraces::Block,
+        };
+        if delim_depth > starting_delim_depth {
+            // within a nested delim, no need to check
+            continue;
+        }
+        if delim_depth < starting_delim_depth {
+            // left the current delim somehow without finding a closing delim
+            p.recover_until_node(&node);
+            p.expect_closing_delimiter(m, SyntaxKind::RightBrace);
+            break ExprWithBraces::Block;
+        }
+
+        match node.kind() {
+            SyntaxKind::Arrow => break ExprWithBraces::Lambda,
+            SyntaxKind::Colon => {
+                contains_colon = true;
+                continue;
+            }
+            // { ... } = expr is unambiguously a destructuring assignment because lambdas and blocks are
+            // not allowed as the lhs of an assignment
+            SyntaxKind::RightBrace if scanner.at(SyntaxKind::Eq) => {
+                break ExprWithBraces::DestructuringAssignment;
+            }
+            SyntaxKind::RightBrace if contains_colon => break ExprWithBraces::MapLiteral,
+            SyntaxKind::RightBrace => break ExprWithBraces::Block,
+            _ => continue,
+        };
+    };
+
+    match expr_kind {
+        ExprWithBraces::Block => block(p),
+        ExprWithBraces::MapLiteral => map(p),
+        ExprWithBraces::Lambda => lambda(p),
+        ExprWithBraces::DestructuringAssignment => destructure_map_assignment(p),
+    };
+}
+
+fn destructure_map_assignment(_p: &mut Parser) {
+    trace_fn!("destructure_map_assignment");
+    unimplemented!("destructure map assignment")
+}
+
 fn import(p: &mut Parser) {
     let m = p.marker();
     p.assert(SyntaxKind::ImportKW);
@@ -214,9 +305,9 @@ fn import(p: &mut Parser) {
     code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
 
     if p.eat_if(SyntaxKind::AsKW) {
-       if !p.eat_if(SyntaxKind::Ident) {
-           p.insert_error_here("expected an identifier after `as`");
-       }
+        if !p.eat_if(SyntaxKind::Ident) {
+            p.insert_error_here("expected an identifier after `as`");
+        }
     }
 
     if p.at(SyntaxKind::LeftBrace) {
@@ -252,10 +343,22 @@ fn import_item(p: &mut Parser) {
 }
 
 fn map(p: &mut Parser) {
+    trace_fn!("parse_map");
     let m = p.marker();
-
-    p.assert(SyntaxKind::Hash);
     p.assert(SyntaxKind::LeftBrace);
+
+    // Empty map literals are denoted by `{ : }` to avoid ambiguity with empty blocks
+    if p.eat_if(SyntaxKind::Colon) {
+        p.eat_if(SyntaxKind::Comma); // { :, } is also allowed
+
+        if !p.eat_if(SyntaxKind::RightBrace) {
+            p.insert_error_here("expected a `}` after the empty map literal")
+                .with_label_message("insert a `}` here");
+        }
+
+        p.wrap(m, SyntaxKind::MapLiteral);
+        return;
+    }
 
     while !p.current().is_terminator() {
         let entry_marker = p.marker();
@@ -263,16 +366,19 @@ fn map(p: &mut Parser) {
         // fallback to identifier as it is the most lenient
 
         if !p.eat_if(SyntaxKind::Colon) {
+            // short-hand notation does not require a colon
             if key_type != MapKeyType::Identifier {
                 p.insert_error_here("expected a colon after the map key")
                     .with_label_message("insert a `:` here")
                     .with_hint("if you meant to use a dynamic expression as a key, wrap it in square brackets")
-                    .with_hint("if you meant to use shorthand syntax for a map entry, only identifiers can be used as keys: `#{ x, y, z }` is equivalent to `#{ x: x, y: y, z: z }`");
+                    .with_hint("if you meant to use shorthand syntax for a map entry, only identifiers can be used as keys: `{ x, y, z }` is equivalent to `{ x: x, y: y, z: z }`");
             }
-
-            // short-hand notation
         } else {
-            code_expression(p);
+            if !p.at_set(set::EXPR) && key_type == MapKeyType::Identifier {
+                // allow a trailing colon after identifier
+            } else {
+                code_expression(p);
+            }
         }
 
         p.wrap(entry_marker, SyntaxKind::MapEntry);
@@ -343,7 +449,7 @@ fn map_key(p: &mut Parser) -> Result<MapKeyType, ()> {
         _ => {
             p.insert_error_here("expected a map key")
                 .with_label_message("expected a key here")
-            .with_note(r#"map keys must be `identifiers`, `"strings"` or dynamic expressions in `[brackets]` (e.g. `[expr]: value`)"#);
+                .with_note(r#"map keys must be `identifiers`, `"strings"` or dynamic expressions in `[brackets]` (e.g. `[expr]: value`)"#);
 
             p.eat();
             Err(())
@@ -1028,9 +1134,8 @@ mod tests {
     #[test]
     fn parse_map_literal() {
         assert_parse_tree!(
-            "#{a: 1, b: 2}",
+            "{a: 1, b: 2}",
             MapLiteral [
-                Hash("#")
                 LeftBrace("{")
                 MapEntry [
                     Ident("a")
@@ -1051,9 +1156,8 @@ mod tests {
     #[test]
     fn parse_map_literal_with_trailing_comma() {
         assert_parse_tree!(
-            "#{a: 1, b: 2,}",
+            "{a: 1, b: 2,}",
             MapLiteral [
-                Hash("#")
                 LeftBrace("{")
                 MapEntry [ ... ]
                 Comma(",")
@@ -1068,9 +1172,8 @@ mod tests {
     #[test]
     fn parse_map_literal_string_keys() {
         assert_parse_tree!(
-            r#"#{"a": 1, "b": 2,}"#,
+            r#"{"a": 1, "b": 2,}"#,
             MapLiteral [
-                Hash("#")
                 LeftBrace("{")
                 MapEntry [
                     Str("\"a\"")
@@ -1092,18 +1195,90 @@ mod tests {
     #[test]
     fn parse_map_literal_shorthand() {
         assert_parse_tree!(
-            "#{a, b}",
+            "{a:, b}",
             MapLiteral [
-                Hash("#")
                 LeftBrace("{")
                 MapEntry [
                     Ident("a")
+                    Colon(":")
                 ]
                 Comma(",")
                 MapEntry [
                     Ident("b")
                 ]
                 RightBrace("}")
+            ]
+        )
+    }
+
+    #[test]
+    fn parse_expr_with_braces() {
+        assert_parse_tree!(
+            "{ x: { x: }, y: { y: { 2 }} => { println(x, { y }) } }()",
+            FuncCall [
+                Lambda [
+                    LeftBrace("{")
+                    Params [
+                        Param [
+                            Named [
+                                Ident("x")
+                                Colon(":")
+                                MapLiteral [
+                                    LeftBrace("{")
+                                    MapEntry [
+                                        Ident("x")
+                                        Colon(":")
+                                    ]
+                                    RightBrace("}")
+                                ]
+                            ]
+                        ]
+                        Comma(",")
+                        Param [
+                            Named [
+                                Ident("y")
+                                Colon(":")
+                                MapLiteral [
+                                    LeftBrace("{")
+                                    MapEntry [
+                                        Ident ("y")
+                                        Colon (":")
+                                        CodeBlock [
+                                            LeftBrace ("{")
+                                            Int ("2")
+                                            RightBrace ("}")
+                                        ]
+                                    ]
+                                    RightBrace ("}")
+                                ]
+                            ]
+                        ]
+                    ]
+                    Arrow ("=>")
+                    CodeBlock [
+                        LeftBrace ("{")
+                        FuncCall [
+                            Ident ("println")
+                            Args [
+                                LeftParen ("(")
+                                Ident ("x")
+                                Comma (",")
+                                CodeBlock [
+                                    LeftBrace ("{")
+                                    Ident ("y")
+                                    RightBrace ("}")
+                                ]
+                                RightParen (")")
+                            ]
+                        ]
+                        RightBrace ("}")
+                    ]
+                    RightBrace ("}")
+                ]
+                Args [
+                    LeftParen("(")
+                    RightParen(")")
+                ]
             ]
         )
     }

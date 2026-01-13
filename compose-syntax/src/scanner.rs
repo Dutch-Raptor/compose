@@ -1,3 +1,4 @@
+use crate::set::SyntaxSet;
 use crate::{Lexer, SyntaxKind, SyntaxNode};
 use ecow::{EcoString, eco_format};
 
@@ -56,7 +57,20 @@ pub struct Scanner<'a> {
     delimiters: Vec<Delimiter>,
 }
 
-impl<'a> Scanner<'a> {}
+pub enum ScanResult {
+    /// The current token is a match
+    Match,
+    /// The current token is not a match, but the scanner should continue scanning.
+    Continue,
+    /// The scanner should stop scanning.
+    BreakScan,
+}
+
+impl ScanResult {
+    pub fn from_bool(b: bool) -> Self {
+        if b { Self::Match } else { Self::Continue }
+    }
+}
 
 impl<'a> Scanner<'a> {
     pub fn new(lexer: Lexer<'a>) -> Self {
@@ -64,6 +78,14 @@ impl<'a> Scanner<'a> {
             lexer,
             delimiters: Vec::new(),
         }
+    }
+
+    pub fn delimiters(&self) -> &[Delimiter] {
+        &self.delimiters
+    }
+
+    pub fn delim_depth(&self) -> usize {
+        self.delimiters.len()
     }
 
     /// jump to a specific offset in the containing lexer
@@ -94,19 +116,47 @@ impl<'a> Scanner<'a> {
         Ok(())
     }
 
-    /// Iterates through the current level of delimiters (does not enter nested delims) and checks if
+    pub fn at(&self, syntax_kind: SyntaxKind) -> bool {
+        let (kind, _) = self.lexer.clone().next();
+        kind == syntax_kind
+    }
+
+    /// Iterates through the current level of delimiters (does not check within delims) and checks if
     /// the given `kind` is contained within
     pub fn level_contains_kind(&mut self, expected_kind: SyntaxKind) -> Result<bool, EcoString> {
-        self.find_in_matching_delims(expected_kind).map(|opt| opt.is_some())
+        self.find_in_matching_delims(expected_kind)
+            .map(|opt| opt.is_some())
     }
+
+    /// Iterates through the current level of delimiters (does not check within nested delims) and checks if
+    /// any of the given `kind`s within the syntax set is contained within
+    pub fn level_contains_set(&mut self, syntax_set: SyntaxSet) -> Result<bool, EcoString> {
+        self.find_set_in_matching_delims(syntax_set)
+            .map(|opt| opt.is_some())
+    }
+
     pub(crate) fn find_in_matching_delims(
         &mut self,
         expected_kind: SyntaxKind,
     ) -> Result<Option<SyntaxNode>, EcoString> {
+        self.find_set_in_matching_delims(SyntaxSet::new().add(expected_kind))
+    }
+
+    pub(crate) fn find_set_in_matching_delims(
+        &mut self,
+        expected_kinds: SyntaxSet,
+    ) -> Result<Option<SyntaxNode>, EcoString> {
         let current_level = self.delimiters.len();
 
         self.scan_until(|delim_stack, node| {
-            delim_stack.len() == current_level && node.kind() == expected_kind
+            if delim_stack.len() < current_level {
+                return ScanResult::BreakScan;
+            }
+            if delim_stack.len() == current_level && expected_kinds.contains(node.kind()) {
+                ScanResult::Match
+            } else {
+                ScanResult::Continue
+            }
         })
     }
 
@@ -115,34 +165,38 @@ impl<'a> Scanner<'a> {
         let current_level = self.delimiters.len();
         debug_assert!(current_level > 0, "open a delimiter before calling this");
         let exit_level = current_level - 1;
-        self.scan_until(|delim_stack, _| delim_stack.len() == exit_level)
+        self.scan_until(|delim_stack, _| ScanResult::from_bool(delim_stack.len() == exit_level))
     }
 
     /// Scans until the predicate yields true. Returns the yielded node if any
     pub fn scan_until(
         &mut self,
-        predicate: impl Fn(&[Delimiter], &SyntaxNode) -> bool,
+        predicate: impl Fn(&[Delimiter], &SyntaxNode) -> ScanResult,
     ) -> Result<Option<SyntaxNode>, EcoString> {
-        while let Some(node) = self.next() {
-            if let Some(delimiter) = Delimiter::from_kind(node.kind()) {
-                if delimiter.is_opening() {
-                    self.enter(delimiter);
-                }
-                if delimiter.is_closing() {
-                    self.exit(delimiter)?;
-                }
-            }
-            if predicate(&self.delimiters, &node) {
-                return Ok(Some(node));
+        while let Some(node) = self.next()? {
+            match predicate(&self.delimiters, &node) {
+                ScanResult::Match => return Ok(Some(node)),
+                ScanResult::Continue => continue,
+                ScanResult::BreakScan => break,
             }
         }
         Ok(None)
     }
 
-    pub fn next(&mut self) -> Option<SyntaxNode> {
+    pub fn next(&mut self) -> Result<Option<SyntaxNode>, EcoString> {
         match self.lexer.next() {
-            (SyntaxKind::End, _) => None,
-            (_, node) => Some(node),
+            (SyntaxKind::End, _) => Ok(None),
+            (_, node) => {
+                if let Some(delimiter) = Delimiter::from_kind(node.kind()) {
+                    if delimiter.is_opening() {
+                        self.enter(delimiter);
+                    }
+                    if delimiter.is_closing() {
+                        self.exit(delimiter)?;
+                    }
+                }
+                Ok(Some(node))
+            }
         }
     }
 }
@@ -206,7 +260,7 @@ mod tests {
         let closing_delim = s.matching_closing_delim().unwrap().unwrap();
         assert_eq!(closing_delim.kind(), SyntaxKind::RightParen);
         // check it is the right `)`
-        assert_eq!(s.next().unwrap().kind(), SyntaxKind::Ellipsis);
-        assert_eq!(s.next().unwrap().kind(), SyntaxKind::Ident);
+        assert_eq!(s.next().unwrap().unwrap().kind(), SyntaxKind::Ellipsis);
+        assert_eq!(s.next().unwrap().unwrap().kind(), SyntaxKind::Ident);
     }
 }
