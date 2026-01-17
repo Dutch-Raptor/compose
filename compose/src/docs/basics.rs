@@ -46,7 +46,7 @@ compose_doc!(
 
     ```compose
     let x;
-    if (true) {
+    if true {
         x = 1;
     } else {
         x = 2;
@@ -56,7 +56,7 @@ compose_doc!(
 
     > However, in this instance we might use the fact that `if` is an expression to assign the intended value to x directly.
     > ```compose
-    > let x = if (true) { 1; } else { 2; };
+    > let x = if true { 1; } else { 2; };
     > assert::eq(x, 1);
     > ```
 

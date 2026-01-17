@@ -326,6 +326,7 @@ fn keyword(ident: &str) -> Option<SyntaxKind> {
         "true" => SyntaxKind::Bool,
         "while" => SyntaxKind::WhileKW,
         "match" => SyntaxKind::MatchKW,
+        "is" => SyntaxKind::IsKW,
         _ => return None,
     })
 }

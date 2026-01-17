@@ -1,19 +1,19 @@
-use crate::diag::{At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult, error, warning};
+use crate::diag::{error, warning, At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult};
 use crate::{IntoValue, Trace};
 use crate::{Library, NativeFuncData, NativeType, Sink, Type, Value};
 use compose_error_codes::{
     E0004_MUTATE_IMMUTABLE_VARIABLE, E0011_UNBOUND_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE,
 };
-use compose_library::diag::{StrResult, bail};
+use compose_library::diag::{bail, StrResult};
 use compose_library::{Func, NativeFunc, UntypedRef};
 use compose_syntax::{Label, Span};
-use ecow::{EcoString, eco_format, eco_vec};
-use indexmap::IndexMap;
+use compose_utils::trace_log;
+use ecow::{eco_format, eco_vec, EcoString};
 use indexmap::map::Entry;
+use indexmap::IndexMap;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::iter;
 use std::sync::LazyLock;
 use strsim::jaro_winkler;
 use tap::Pipe;
@@ -22,21 +22,24 @@ pub trait NativeScope {
     fn scope() -> &'static Scope;
 }
 
-pub static EMPTY_SCOPE: LazyLock<Scope> = LazyLock::new(Scope::new);
+pub static EMPTY_SCOPE: LazyLock<Scope> = LazyLock::new(Scope::new_lexical);
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct Scopes<'a> {
-    /// The current scope.
-    pub top: Scope,
     /// The rest of the scopes.
     pub stack: Vec<Scope>,
     pub lib: Option<&'a Library>,
 }
 
+impl Default for Scopes<'_> {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
 impl Debug for Scopes<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Scopes")
-            .field("top", &self.top)
             .field("stack", &self.stack)
             .finish()
     }
@@ -45,23 +48,103 @@ impl Debug for Scopes<'_> {
 impl<'a> Scopes<'a> {
     pub fn new(lib: Option<&'a Library>) -> Self {
         Self {
-            top: Scope::new(),
-            stack: Vec::new(),
+            stack: vec![Scope::new_lexical()],
             lib,
         }
     }
 
-    pub fn enter(&mut self) {
-        self.stack.push(std::mem::take(&mut self.top));
+    pub fn top_lexical(&self) -> &Scope {
+        self.stack
+            .iter()
+            .rev()
+            .find(|s| s.kind() == ScopeKind::Lexical)
+            .expect("At least one lexical scope must be present")
     }
 
-    pub fn exit(&mut self) {
-        self.top = self.stack.pop().expect("Scope stack underflow");
+    pub fn top_lexical_mut(&mut self) -> &mut Scope {
+        self.stack
+            .iter_mut()
+            .rev()
+            .find(|s| s.kind() == ScopeKind::Lexical)
+            .expect("At least one lexical scope must be present")
+    }
+
+    pub fn top_flow(&self) -> Option<&Scope> {
+        match self.stack.last() {
+            Some(s) if s.kind() == ScopeKind::Flow => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn top_flow_mut(&mut self) -> Option<&mut Scope> {
+        match self.stack.last_mut() {
+            Some(s) if s.kind() == ScopeKind::Flow => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn clear_top_lexical(&mut self) {
+        let position_from_end = self
+            .stack
+            .iter()
+            .rev()
+            .position(|s| s.kind() == ScopeKind::Lexical)
+            .expect("At least one lexical scope must be present");
+
+        let top_lexical_pos = self.stack.len() - position_from_end - 1;
+        self.stack.truncate(top_lexical_pos + 1); // clear any flow scopes above it
+
+        self.stack
+            .last_mut()
+            .expect("At least one lexical scope must be present")
+            .map
+            .clear();
+    }
+
+    pub fn enter_lexical(&mut self) {
+        self.stack.push(Scope::new_lexical());
+        trace_log!("entered_lexical");
+    }
+
+    #[track_caller]
+    pub fn exit_lexical(&mut self) {
+        let position_from_end = self
+            .stack
+            .iter()
+            .rev()
+            .position(|s| s.kind() == ScopeKind::Lexical)
+            .expect("At least one lexical scope must be present");
+        let position = self.stack.len() - position_from_end - 1;
+        self.stack.truncate(position);
+        // check that there is still a lexical scope present
+        self.stack
+            .iter()
+            .rev()
+            .find(|s| s.kind() == ScopeKind::Lexical)
+            .expect("At least one lexical scope must be present");
+        trace_log!("exited_lexical");
+    }
+
+    pub fn enter_flow(&mut self) {
+        self.stack.push(Scope::new_flow());
+    }
+
+    #[track_caller]
+    pub fn exit_flow(&mut self) -> Scope {
+        match self.stack.pop() {
+            Some(s) if s.kind() == ScopeKind::Flow => s,
+            Some(s) => panic!(
+                "At least one flow scope must be present: {:?}, {:?}",
+                s, self.stack
+            ),
+            None => panic!("At least one scope must be present"),
+        }
     }
 
     pub fn get(&self, name: &str) -> Result<&Binding, VariableAccessError> {
-        iter::once(&self.top)
-            .chain(self.stack.iter().rev())
+        self.stack
+            .iter()
+            .rev()
             .chain(self.lib.iter().map(|lib| lib.global.scope()))
             .find_map(|scope| scope.get(name))
             .ok_or_else(|| self.unbound_error(name.into()))
@@ -74,8 +157,9 @@ impl<'a> Scopes<'a> {
         // So we call `get(name)?` here to handle errors, then search mutably afterward.
         let _ = self.get(name)?;
 
-        iter::once(&mut self.top)
-            .chain(self.stack.iter_mut().rev())
+        self.stack
+            .iter_mut()
+            .rev()
             .find_map(|scope| scope.get_mut(name))
             .ok_or_else(
                 || match self.lib.and_then(|base| base.global.scope().get(name)) {
@@ -93,8 +177,9 @@ impl<'a> Scopes<'a> {
     }
 
     fn unbound_error(&self, name: EcoString) -> VariableAccessError {
-        let all_idents = iter::once(&self.top)
-            .chain(&self.stack)
+        let all_idents = self
+            .stack
+            .iter()
             .chain(self.lib.iter().map(|lib| lib.global.scope()))
             .flat_map(|scope| scope.map.keys());
 
@@ -194,14 +279,24 @@ impl<T> At<T> for Result<T, UnBoundError> {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ScopeKind {
+    /// A flow scope tracks temporary variables created within expressions.
+    /// For example, `x is Int y && y > 0` introduces a temporary variable `y`
+    /// that is only valid within this expression.
+    Flow,
+    #[default]
+    Lexical,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Scope {
+    kind: ScopeKind,
     map: IndexMap<EcoString, Binding>,
 }
 
 impl Trace for Scopes<'_> {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
-        self.top.visit_refs(f);
         for scope in self.stack.iter() {
             scope.visit_refs(f);
         }
@@ -265,11 +360,25 @@ impl Scope {
     pub fn bindings(&self) -> &IndexMap<EcoString, Binding> {
         &self.map
     }
+
+    pub fn kind(&self) -> ScopeKind {
+        self.kind
+    }
 }
 
 impl Scope {
-    pub fn new() -> Self {
+    pub fn new_lexical() -> Self {
         Default::default()
+    }
+
+    /// A flow scope tracks temporary variables created within expressions.
+    /// For example, `x is Int y && y > 0` introduces a temporary variable `y`
+    /// that is only valid within this expression.
+    pub fn new_flow() -> Self {
+        Self {
+            kind: ScopeKind::Flow,
+            ..Default::default()
+        }
     }
 
     pub fn get(&self, name: &str) -> Option<&Binding> {

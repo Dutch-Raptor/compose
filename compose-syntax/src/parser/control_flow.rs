@@ -1,20 +1,21 @@
 use crate::kind::SyntaxKind;
+use crate::parser::Parser;
 use crate::parser::expressions::code_expression;
 use crate::parser::pattern::pattern;
 use crate::parser::statements::code;
-use crate::parser::Parser;
 use crate::set::syntax_set;
-use crate::set;
+use crate::{SyntaxErrorSeverity, set, Label};
 use compose_error_codes::E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES;
 use compose_utils::trace_fn;
 use std::collections::HashSet;
+use ecow::eco_format;
 
 pub(crate) fn conditional(p: &mut Parser) {
     trace_fn!("parse_conditional");
     let m = p.marker();
     p.assert(SyntaxKind::IfKW);
 
-    condition(p);
+    condition(p, "if");
 
     if !parse_control_flow_block(p, ControlFlow::If) {
         p.wrap(m, SyntaxKind::Conditional);
@@ -27,7 +28,7 @@ pub(crate) fn conditional(p: &mut Parser) {
         p.assert(SyntaxKind::ElseKW);
         if p.eat_if(SyntaxKind::IfKW) {
             trace_fn!("parse_else_if");
-            condition(p);
+            condition(p, "else if");
 
             if !parse_control_flow_block(p, ControlFlow::If) {
                 p.wrap(m, SyntaxKind::Conditional);
@@ -53,7 +54,7 @@ pub fn while_loop(p: &mut Parser) {
     let m = p.marker();
     p.assert(SyntaxKind::WhileKW);
 
-    condition(p);
+    condition(p, "while");
 
     parse_control_flow_block(p, ControlFlow::While);
     p.wrap(m, SyntaxKind::WhileLoop);
@@ -89,25 +90,23 @@ pub fn for_loop(p: &mut Parser) {
     p.wrap(m, SyntaxKind::ForLoop);
 }
 
-fn condition(p: &mut Parser) {
+fn condition(p: &mut Parser, control_flow: &str) {
     trace_fn!("parse_condition");
     let m = p.marker();
 
     let wrapped = p.eat_if(SyntaxKind::LeftParen);
-    if !wrapped {
-        p.insert_error_here("condition expressions require parentheses")
-            .with_label_message("Expected an opening `(` before the condition");
-
-        p.recover_until(syntax_set!(LeftBrace));
-
-        // error is not recoverable within the condition, try to recover until after and abort
-        return;
-    }
 
     code_expression(p);
 
     if wrapped {
+        let span = p.current_span();
         p.expect_closing_delimiter(m, SyntaxKind::RightParen);
+
+        p.insert_error_at(p[m].span(), eco_format!("parentheses are not required around {control_flow} conditions"))
+            .with_severity(SyntaxErrorSeverity::Warning)
+            .with_label(Label::primary(span, "remove these parentheses"));
+
+        p.recover_until(syntax_set!(LeftBrace));
     }
 
     p.wrap(m, SyntaxKind::Condition);

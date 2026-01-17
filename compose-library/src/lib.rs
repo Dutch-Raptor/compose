@@ -8,8 +8,6 @@ pub mod repr;
 mod engine;
 mod gc;
 mod vm;
-mod modules;
-
 pub use engine::*;
 pub use foundations::*;
 pub use gc::*;
@@ -41,7 +39,7 @@ pub struct Routines {
 
 
 pub fn library() -> Library {
-    let mut global = Scope::new();
+    let mut global = Scope::new_lexical();
 
     global.define_func::<assert>();
     global.define_func::<panic>();
@@ -52,6 +50,8 @@ pub fn library() -> Library {
     global.define_type::<IterValue>();
     global.define_type::<Func>();
     global.define_type::<Boxed>();
+    global.define_type::<Str>();
+    global.define_type::<MapValue>();
     global.define_type::<ArrayValue>();
     global.define_type::<RangeValue>();
 

@@ -346,6 +346,7 @@ dependencies = [
  "compose-error-codes",
  "compose-library",
  "compose-syntax",
+ "compose-utils",
  "ecow",
  "extension-traits",
  "tap",

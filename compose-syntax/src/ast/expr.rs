@@ -4,7 +4,7 @@ use crate::ast::control_flow::Conditional;
 use crate::ast::map::MapLiteral;
 use crate::ast::range::Range;
 use crate::ast::unary::Unary;
-use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, IndexAccess, Int, Lambda, Parenthesized, WhileLoop};
+use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, IndexAccess, Int, IsExpression, Lambda, Parenthesized, WhileLoop};
 use crate::ast::{Bool, CodeBlock, FieldAccess, FuncCall, LetBinding, PathAccess, Str};
 use crate::ast::match_expression::MatchExpression;
 use crate::kind::SyntaxKind;
@@ -43,6 +43,7 @@ pub enum Expr<'a> {
     Lambda(Lambda<'a>),
     IndexAccess(IndexAccess<'a>),
     MatchExpression(MatchExpression<'a>),
+    IsExpression(IsExpression<'a>),
 }
 
 impl<'a> AstNode<'a> for Expr<'a> {
@@ -72,6 +73,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::Lambda => Some(Self::Lambda(Lambda::from_untyped(node)?)),
             SyntaxKind::IndexAccess => Some(Self::IndexAccess(IndexAccess::from_untyped(node)?)),
             SyntaxKind::MatchExpression => Some(Self::MatchExpression(MatchExpression::from_untyped(node)?)),
+            SyntaxKind::IsExpression => Some(Self::IsExpression(IsExpression::from_untyped(node)?)),
             _ => None,
         }
     }
@@ -100,6 +102,7 @@ impl<'a> AstNode<'a> for Expr<'a> {
             Self::Lambda(lambda) => lambda.to_untyped(),
             Self::IndexAccess(index_access) => index_access.to_untyped(),
             Self::MatchExpression(match_expression) => match_expression.to_untyped(),
+            Self::IsExpression(is_expression) => is_expression.to_untyped(),
         }
     }
 }

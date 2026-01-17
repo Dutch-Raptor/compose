@@ -96,15 +96,15 @@ impl<'b> RenderData<'b> {
         Ok(())
     }
 
-    pub fn line(&self, index: usize) -> Cow<str> {
+    pub fn line(&self, index: usize) -> Cow<'_, str> {
         trimmed(self.buf.line(index)).into()
     }
 
-    pub fn last_line(&self) -> Cow<str> {
+    pub fn last_line(&self) -> Cow<'_, str> {
         self.line(self.buf.len_lines() - 1)
     }
 
-    pub fn current_line(&self) -> Cow<str> {
+    pub fn current_line(&self) -> Cow<'_, str> {
         self.line(self.focus.ln)
     }
 }

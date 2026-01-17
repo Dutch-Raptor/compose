@@ -1,11 +1,11 @@
 use crate::kind::SyntaxKind;
 use crate::parser::statements::code;
-use crate::parser::{expressions, pattern};
 use crate::parser::{ExprContext, Parser};
+use crate::parser::{expressions, pattern};
 use crate::precedence::Precedence;
 use crate::scanner::Delimiter;
 use crate::set;
-use crate::set::{syntax_set, ARG_RECOVER};
+use crate::set::{ARG_RECOVER, syntax_set};
 use compose_error_codes::E0009_ARGS_MISSING_COMMAS;
 use compose_utils::trace_fn;
 use std::collections::HashSet;
@@ -36,12 +36,18 @@ pub fn args(p: &mut Parser) {
 
     if p.at(SyntaxKind::LeftBrace) {
         // trailing lambda
-        lambda(p);
+        let mut scanner = p.scanner();
+        scanner.next().expect("we know there is an opening `{`");
+        if scanner
+            .level_contains_kind(SyntaxKind::Arrow)
+            .unwrap_or(false)
+        {
+            lambda(p);
+        }
     }
 
     p.wrap(m, SyntaxKind::Args);
 }
-
 
 pub(crate) fn lambda(p: &mut Parser) {
     trace_fn!("parse_lambda");
@@ -99,7 +105,6 @@ pub(crate) fn lambda(p: &mut Parser) {
 
     p.wrap(m, SyntaxKind::Lambda)
 }
-
 
 fn arg(p: &mut Parser) {
     let m_mods = p.marker();

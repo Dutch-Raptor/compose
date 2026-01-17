@@ -5,6 +5,7 @@ pub enum Precedence {
     Range,       // .. or ..=
     LogicalOr,   // ||
     LogicalAnd,  // &&
+    Is,          // `<expr> is <pattern>`
     Equals,      // ==
     LessGreater, // > or <
     BitwiseOr,   // |

@@ -9,7 +9,7 @@ impl Eval for CodeBlock<'_> {
 
         let statements = self.statements();
 
-        vm.in_scope(|vm| {
+        vm.in_lexical_scope(|vm| {
             for statement in statements {
                 result = statement.eval(vm)?;
                 if vm.flow.is_some() {

@@ -1,6 +1,6 @@
-use crate::vm::{Machine, Tracked};
+use crate::vm::{Machine};
 use crate::{Eval, Evaluated};
-use compose_library::diag::{SourceResult};
+use compose_library::diag::SourceResult;
 use compose_syntax::ast::{AstNode, Expr};
 
 mod assignment;
@@ -50,9 +50,9 @@ impl Eval for Expr<'_> {
             Expr::Lambda(l) => l.eval(vm),
             Expr::IndexAccess(i) => i.eval(vm),
             Expr::MatchExpression(m) => m.eval(vm),
+            Expr::IsExpression(i) => i.eval(vm),
         }?
-        .spanned(span)
-        .track_tmp_root(vm);
+        .spanned(span);
 
         Ok(v)
     }

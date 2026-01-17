@@ -3,15 +3,14 @@ use crate::expression::pattern::{PatternContext, PatternMatchResult};
 use crate::vm::{ErrorMode, Machine};
 use crate::{Eval, Evaluated};
 use compose_library::diag::{At, SourceResult, bail};
-use compose_library::ops::Comparison;
-use compose_library::repr::Repr;
-use compose_library::{BindingKind, IntoValue, Value, Visibility, Vm};
+use compose_library::{BindingKind, Visibility};
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 
-impl<'a> Eval for ast::Ident<'a> {
+impl Eval for ast::Ident<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
         let span = self.span();
+
         let binding = vm.frames.top.scopes.get(&self).at(span)?;
 
         let mutable = binding.is_mutable();
@@ -75,7 +74,7 @@ mod tests {
     use super::*;
     use crate::test::{TestWorld, assert_eval, assert_eval_with_vm, eval_code_with_vm};
     use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
-    use compose_library::{BindingKind, UnitValue};
+    use compose_library::{BindingKind, UnitValue, Value};
 
     #[test]
     fn test_let_binding() {
