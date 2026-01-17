@@ -1,7 +1,7 @@
 use crate::vm::Machine;
 use crate::{Eval, Evaluated, ValueEvaluatedExtensions};
-use compose_library::diag::{bail, At, SourceResult};
-use compose_library::{ops, Value};
+use compose_library::diag::{At, SourceResult, bail};
+use compose_library::{Value, ops};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
 
@@ -26,6 +26,11 @@ impl Eval for ast::Binary<'_> {
             ),
         };
 
+        // The lhs expression might introduce flow bindings used in rhs,
+        // we make sure to run in a flow scope that last at least as long
+        // as this entire binary expression
+        let vm = &mut vm.in_flow_scope_guard();
+
         let l = self.lhs();
         let lhs = l.eval(vm)?;
 
@@ -37,7 +42,9 @@ impl Eval for ast::Binary<'_> {
         let r = self.rhs();
         let rhs = r.eval(vm)?;
 
-        Ok(op(&lhs.value, &rhs.value, &vm.heap).at(self.span())?.mutable())
+        Ok(op(&lhs.value, &rhs.value, &vm.heap)
+            .at(self.span())?
+            .mutable())
     }
 }
 

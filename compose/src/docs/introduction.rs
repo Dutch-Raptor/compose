@@ -176,7 +176,7 @@ compose_doc! {
 
     ```compose
     let a = 15;
-    let x = if (a > 10) {
+    let x = if a > 10 {
         "big";
     } else {
         "small";

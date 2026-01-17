@@ -132,12 +132,12 @@ impl<R> Editor<R> {
     }
 
     /// Get the current line.
-    pub fn curr_ln(&self) -> Cow<str> {
+    pub fn curr_ln(&self) -> Cow<'_, str> {
         Cow::from(trimmed(self.buf.line(self.focus.ln)))
     }
 
     /// Get the current selection of text.
-    pub fn curr_sel(&self) -> Option<Cow<str>> {
+    pub fn curr_sel(&self) -> Option<Cow<'_, str>> {
         if let Some(anchor) = self.anchor {
             let anchor_idx = self.rope_idx(anchor, 0);
             let focus_idx = self.rope_idx(self.focus, 0);

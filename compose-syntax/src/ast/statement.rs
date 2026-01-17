@@ -24,7 +24,7 @@ impl<'a> AstNode<'a> for Statement<'a> {
             }
             SyntaxKind::BreakStatement => Some(Statement::Break(BreakStatement::from_untyped(node)?)),
             SyntaxKind::ReturnStatement => Some(Statement::Return(ReturnStatement::from_untyped(node)?)),
-            SyntaxKind::ContinueKW => Some(Statement::Continue(ContinueStatement::from_untyped(node)?)),
+            SyntaxKind::ContinueStatement => Some(Statement::Continue(ContinueStatement::from_untyped(node)?)),
             SyntaxKind::ModuleImport => Some(Statement::ModuleImport(ModuleImport::from_untyped(node)?)),
             _ => Expr::from_untyped(node).map(Statement::Expr),
         }

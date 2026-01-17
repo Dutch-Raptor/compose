@@ -12,22 +12,22 @@ use std::collections::HashMap;
 
 impl Eval for ast::Lambda<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
-        let guard = vm.temp_root_guard();
+        let vm = &mut vm.temp_root_guard();
 
         let mut defaults = Vec::new();
         for param in self.params().children() {
-            if let ast::ParamKind::Named(named) = param.kind() {
-                defaults.push(named.expr().eval(guard.vm)?.value);
+            if let ParamKind::Named(named) = param.kind() {
+                defaults.push(named.expr().eval(vm)?.value);
             }
         }
 
         let captured = {
             let mut errors = EcoVec::new();
-            let mut scope = Scope::new();
+            let mut scope = Scope::new_lexical();
             for capture in self.captures().children() {
                 let span = capture.binding().span();
                 let name = capture.binding().get();
-                let binding = match guard.vm.get(&capture.binding()).cloned() {
+                let binding = match vm.get(&capture.binding()).cloned() {
                     Ok(v) => v,
                     Err(e) => {
                         let VariableAccessError::Unbound(unbound) = e else {
@@ -48,7 +48,7 @@ impl Eval for ast::Lambda<'_> {
                     }
                 };
 
-                let value = match validate_capture(capture, &binding, guard.vm) {
+                let value = match validate_capture(capture, &binding, vm) {
                     Ok(v) => v,
                     Err(e) => {
                         errors.extend(e.into_iter());
@@ -74,8 +74,8 @@ impl Eval for ast::Lambda<'_> {
 
         let unresolved_captures = {
             let mut visitor = CapturesVisitor::new(
-                &guard.vm.frames.top.scopes,
-                Some(guard.vm.engine.world.library()),
+                &vm.frames.top.scopes,
+                Some(vm.engine.world.library()),
                 &captured,
             );
             visitor.visit_lambda(self);
@@ -95,7 +95,7 @@ impl Eval for ast::Lambda<'_> {
             unresolved_captures,
         };
 
-        if !guard.vm.context.closure_capture.should_defer() {
+        if !vm.context.closure_capture.should_defer() {
             closure.resolve_captures()?
         }
 
@@ -171,7 +171,7 @@ fn define(
 
 //noinspection RsUnnecessaryQualifications - False Positive
 pub fn eval_lambda(closure: &Closure, vm: &mut Machine, args: Args) -> SourceResult<Value> {
-    let guard = vm.temp_root_guard();
+    let vm = &mut vm.temp_root_guard();
     let ast_closure = closure
         .node
         .cast::<ast::Lambda>()
@@ -180,10 +180,9 @@ pub fn eval_lambda(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRes
     let statements = ast_closure.statements();
 
     // Make sure a gc round is aware that the args are reachable
-    guard.vm.track_tmp_root(&args);
+    vm.track_tmp_root(&args);
 
-    let result = guard
-        .vm
+    let result = vm
         .with_frame(move |vm| {
             let mut args = args;
             if let Some(Spanned { value, span }) = &closure.name {
@@ -240,9 +239,9 @@ pub fn eval_lambda(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRes
 
             SourceResult::Ok(output)
         })
-        .track_tmp_root(guard.vm);
+        .track_tmp_root(vm);
 
-    guard.vm.maybe_gc();
+    vm.maybe_gc();
 
     result
 }
@@ -260,17 +259,17 @@ pub struct CapturesVisitor<'a> {
 
 impl<'a> CapturesVisitor<'a> {
     pub fn new(external: &'a Scopes<'a>, library: Option<&'a Library>, existing: &Scope) -> Self {
-        let mut inst = Self {
+        let mut visitor = Self {
             external,
             internal: Scopes::new(library),
             captures: HashMap::new(),
         };
 
         for (k, v) in existing.bindings() {
-            inst.internal.top.bind(k.clone(), v.clone());
+            visitor.internal.top_lexical_mut().bind(k.clone(), v.clone());
         }
 
-        inst
+        visitor
     }
     pub(crate) fn visit_lambda(&mut self, closure: ast::Lambda<'a>) {
         for param in closure.params().children() {
@@ -323,11 +322,11 @@ impl<'a> CapturesVisitor<'a> {
         match expr {
             Expr::Ident(ident) => self.capture(ident),
             Expr::CodeBlock(_) => {
-                self.internal.enter();
+                self.internal.enter_lexical();
                 for child in node.children() {
                     self.visit(child);
                 }
-                self.internal.exit();
+                self.internal.exit_lexical();
             }
             Expr::FieldAccess(access) => {
                 self.visit(access.target().to_untyped());
@@ -353,14 +352,14 @@ impl<'a> CapturesVisitor<'a> {
                 // Created in outer scope
                 self.visit(for_loop.iterable().to_untyped());
 
-                self.internal.enter();
+                self.internal.enter_lexical();
                 let pattern = for_loop.binding();
                 for ident in pattern.bindings() {
                     self.bind(ident);
                 }
 
                 self.visit(for_loop.body().to_untyped());
-                self.internal.exit();
+                self.internal.exit_lexical();
             }
 
             _ => {
@@ -373,7 +372,7 @@ impl<'a> CapturesVisitor<'a> {
     }
 
     fn bind(&mut self, ident: Ident) {
-        self.internal.top.bind(
+        self.internal.top_lexical_mut().bind(
             ident.get().clone(),
             Binding::new(Value::unit(), ident.span()),
         );
@@ -469,13 +468,13 @@ mod tests {
     #[test]
     fn test_captures_visitor() {
         let mut scopes = Scopes::new(None);
-        scopes.top.define("f", 0i64);
-        scopes.top.define("x", 0i64);
-        scopes.top.define("y", 0i64);
-        scopes.top.define("z", 0i64);
+        scopes.top_lexical_mut().define("f", 0i64);
+        scopes.top_lexical_mut().define("x", 0i64);
+        scopes.top_lexical_mut().define("y", 0i64);
+        scopes.top_lexical_mut().define("z", 0i64);
         let s = &scopes;
 
-        let mut existing = Scope::new();
+        let mut existing = Scope::new_lexical();
         existing.define("a", 0i64);
         existing.define("b", 0i64);
         existing.define("c", 0i64);

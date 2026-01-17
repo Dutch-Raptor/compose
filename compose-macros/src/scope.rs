@@ -52,7 +52,7 @@ pub fn scope(_: TokenStream, item: syn::Item) -> Result<TokenStream> {
         impl #foundations::NativeScope for #self_ty {
             fn scope() -> &'static #foundations::Scope {
                 static SCOPE: ::std::sync::LazyLock<#foundations::Scope> = ::std::sync::LazyLock::new(|| {
-                    let mut scope = #foundations::Scope::new();
+                    let mut scope = #foundations::Scope::new_lexical();
                     #(#definitions;)*
                     scope
                 });

@@ -1,13 +1,15 @@
-use crate::{Eval, Machine};
+use crate::{Eval, Evaluated, Machine};
 use compose_error_codes::E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS;
 use compose_library::diag::{At, SourceDiagnostic, SourceResult, Spanned};
 use compose_library::ops::Comparison;
 use compose_library::{
-    ArrayValue, BindingKind, DebugRepr, IntoValue, Value, Visibility, Vm, bail, error,
+    bail, error, ArrayValue, Binding, BindingKind, DebugRepr, IntoValue, Type, Value, Visibility,
+    Vm,
 };
 use compose_syntax::ast;
-use compose_syntax::ast::{AstNode, DestructuringItem, Expr, LiteralPattern, Pattern};
-use ecow::{EcoString, EcoVec, eco_format};
+use compose_syntax::ast::{AstNode, DestructuringItem, Expr, Ident, LiteralPattern, Pattern};
+use compose_utils::trace_fn;
+use ecow::{eco_format, EcoString, EcoVec};
 use std::cmp::PartialEq;
 use std::fmt::Display;
 
@@ -20,9 +22,62 @@ impl Eval for LiteralPattern<'_> {
     }
 }
 
+impl Eval for ast::IsExpression<'_> {
+    fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
+        trace_fn!("eval_is_expression");
+        let vm = &mut vm.in_flow_scope_guard();
+        let expr = self.expr();
+        let value = expr.eval(vm)?.value;
+
+        let pat = self.pattern();
+
+        let matched = match destructure_into_flow(vm, value, pat)? {
+            PatternMatchResult::NotMatched(_) => false,
+            PatternMatchResult::Matched => true,
+        };
+
+        Ok(Evaluated::immutable(matched.into_value()))
+    }
+}
+
+pub fn destructure_into_flow(
+    vm: &mut Machine,
+    value: Value,
+    pat: Pattern,
+) -> SourceResult<PatternMatchResult> {
+    destructure_impl(
+        vm,
+        pat,
+        value,
+        PatternContext::FlowBinding,
+        MatchPath::new(),
+        &mut |vm, expr, value| {
+            match expr {
+                Expr::Ident(ident) => {
+                    let name = ident.get();
+                    let spanned = value
+                        .named(Spanned::new(name.clone(), ident.span()))
+                        // Now that the names have been added, make sure any deferred errors are resolved
+                        .resolved()?;
+
+                    vm.scopes_mut()
+                        .top_flow_mut()
+                        .expect("running in a flow")
+                        .try_bind(name.clone(), Binding::new(spanned, expr.span()))
+                        .at(expr.span())?;
+
+                    Ok(())
+                }
+                _ => bail!(expr.span(), "cannot destructure pattern",),
+            }
+        },
+    )
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MatchPathSegment {
     ArrayIndex(usize),
+    #[expect(unused)]
     MapKey(EcoString),
 }
 
@@ -36,10 +91,6 @@ impl MatchPath {
         Self {
             segments: EcoVec::new(),
         }
-    }
-
-    pub fn len(&self) -> usize {
-        self.segments.len()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -80,9 +131,9 @@ pub enum PatternMatchResult {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PatternContext {
-    Match,
     LetBinding,
     ForLoopBinding,
+    FlowBinding,
 }
 
 pub fn destructure_pattern(
@@ -93,6 +144,7 @@ pub fn destructure_pattern(
     binding_kind: BindingKind,
     visibility: Visibility,
 ) -> SourceResult<PatternMatchResult> {
+    trace_fn!("eval_destructure_pattern");
     destructure_impl(
         vm,
         pattern,
@@ -116,7 +168,7 @@ pub fn destructure_pattern(
     )
 }
 
-fn destructure_impl(
+pub fn destructure_impl(
     vm: &mut Machine,
     pattern: Pattern,
     value: Value,
@@ -124,9 +176,46 @@ fn destructure_impl(
     match_path: MatchPath,
     bind: &mut impl Fn(&mut Machine, Expr, Value) -> SourceResult<()>,
 ) -> SourceResult<PatternMatchResult> {
+    trace_fn!("eval_destructure_impl");
     match pattern {
         Pattern::Single(expr) => {
+            if let Some(ident) = expr.cast::<Ident>()
+                && let Some(expected_ty) = get_type(vm, ident)
+            {
+                if &value.ty() != expected_ty {
+                    return Ok(PatternMatchResult::NotMatched(
+                        error!(ident.span(), "Type pattern does not match";
+                    note: "expected `{}`, found `{}`", expected_ty, value.ty()),
+                    ));
+                }
+            }
+
             bind(vm, expr, value)?;
+            Ok(PatternMatchResult::Matched)
+        }
+        Pattern::TypedBindingPattern(typed_binding) => {
+            let ty_ident = typed_binding.ty();
+
+            let expected_ty = get_type(vm, ty_ident);
+            let Some(expected_ty) = expected_ty else {
+                bail!(typed_binding.ty().span(), "Type in typed pattern does not exist";)
+            };
+
+            if &value.ty() != expected_ty {
+                return Ok(PatternMatchResult::NotMatched(
+                    error!(ty_ident.span(), "Type pattern does not match";
+                    note: "expected `{}`, found `{}`", expected_ty, value.ty()),
+                ));
+            }
+
+            bind(
+                vm,
+                typed_binding
+                    .binding()
+                    .cast()
+                    .expect("an ident is a valid expression"),
+                value,
+            )?;
             Ok(PatternMatchResult::Matched)
         }
         Pattern::PlaceHolder(_) => Ok(PatternMatchResult::Matched), // A placeholder means we discard the value, no need to bind
@@ -159,6 +248,21 @@ fn destructure_impl(
 
             Ok(PatternMatchResult::Matched)
         }
+    }
+}
+
+fn get_type<'a>(vm: &mut Machine<'a>, ty_ident: Ident) -> Option<&'a Type> {
+    match vm
+        .engine
+        .world
+        .library()
+        .global
+        .scope()
+        .get(ty_ident.get())
+        .map(|b| b.read())?
+    {
+        Value::Type(t) => Some(t),
+        _ => None,
     }
 }
 

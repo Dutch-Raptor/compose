@@ -1,20 +1,20 @@
 mod stack;
 
-//noinspection RsUnusedImport - false positive, actually used
 use crate::expression::eval_lambda;
 use crate::vm::stack::{StackFrames, TrackMarker};
-use compose_library::diag::{At, SourceDiagnostic, SourceResult, error};
+use compose_library::diag::{error, At, SourceDiagnostic, SourceResult};
 use compose_library::{
     Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink,
     SyntaxContext, Trace, UntypedRef, Value, VariableAccessError, Visibility, Vm, World,
 };
 use compose_syntax::ast::AstNode;
-use compose_syntax::{Span, ast};
+use compose_syntax::{ast, Span};
+use compose_utils::{defer, trace_fn};
 use ecow::EcoString;
 pub use stack::Tracked;
 pub use stack::TrackedContainer;
 use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
+use std::ops::{DerefMut};
 
 pub struct Machine<'a> {
     pub frames: StackFrames<'a>,
@@ -54,11 +54,122 @@ impl<'a> Machine<'a> {
         &mut self.engine.sink
     }
 
-    pub(crate) fn in_scope<T>(&mut self, f: impl FnOnce(&mut Machine<'a>) -> T) -> T {
-        self.frames.top.scopes.enter();
+    /// Executes `f` inside a new **lexical scope**.
+    ///
+    /// A lexical scope controls name bindings and shadowing. A fresh lexical
+    /// scope is pushed before `f` is executed and is always popped afterwards,
+    /// even if `f` introduces new bindings.
+    ///
+    /// # Scope behavior
+    /// - Always creates a new lexical scope
+    /// - Scope is exited immediately after `f` returns
+    pub(crate) fn in_lexical_scope<T>(&mut self, f: impl FnOnce(&mut Machine<'a>) -> T) -> T {
+        trace_fn!("in_lexical_scope");
+        self.frames.top.scopes.enter_lexical();
         let result = f(self);
-        self.frames.top.scopes.exit();
+        self.frames.top.scopes.exit_lexical();
         result
+    }
+
+    /// Executes `f` within a **flow scope**.
+    ///
+    /// A flow scope tracks temporary variables created within expressions.
+    /// For example `x is Int y && y > 0` introduces a temporary variable `y`
+    /// that is only valid within this expression.
+    ///
+    /// # Scope behaviour
+    /// - Reuses the current flow scope if one exists
+    /// - Otherwise creates a temporary flow scope
+    /// - The flow scope is exited only if this function created it
+    pub fn in_flow_scope<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let top_was_flow = self.scopes().top_flow().is_some();
+        if !top_was_flow {
+            self.scopes_mut().enter_flow();
+        }
+
+        let result = f(self);
+        if !top_was_flow {
+            self.scopes_mut().exit_flow();
+        }
+
+        result
+    }
+
+    /// Enters a **flow scope** and returns a guard that exits it when dropped.
+    ///
+    /// A flow scope tracks temporary variables created within expressions.
+    /// For example `x is Int y && y > 0` introduces a temporary variable `y`
+    /// that is only valid within this expression.
+    ///
+    /// If a flow scope is already active, it is reused and the guard becomes
+    /// a no-op when dropped. Otherwise, a new flow scope is created and will be
+    /// exited when the guard is dropped.
+    ///
+    /// This is the guard-based equivalent of [`in_flow_scope`], useful when
+    /// control flow makes closure-based APIs inconvenient.
+    ///
+    /// # Drop behaviour
+    /// - Scope exit is guaranteed when the guard is dropped
+    /// - Safe to use with early returns or error propagation
+    #[must_use]
+    pub fn in_flow_scope_guard(&mut self) -> impl DerefMut<Target = Self> {
+        let _trace_guard = ::compose_utils::TraceFnGuard::new("in_flow_scope_guard", None);
+        let top_was_flow = self.scopes().top_flow().is_some();
+        if !top_was_flow {
+            self.scopes_mut().enter_flow();
+        }
+
+        defer(self, move |vm| {
+            if !top_was_flow {
+                vm.scopes_mut().exit_flow();
+            }
+            drop(_trace_guard);
+        })
+    }
+
+    /// Enters a new **lexical scope** and returns a guard that exits it on drop.
+    ///
+    /// Lexical scopes control variable bindings and shadowing. This always
+    /// creates a fresh lexical scope and guarantees that it is exited when
+    /// the guard is dropped.
+    ///
+    /// This is the guard-based alternative to [`in_lexical_scope`].
+    ///
+    /// # Drop behaviour
+    /// - Always exits the lexical scope on drop
+    /// - Safe across early returns and error paths
+    #[must_use]
+    pub fn lexical_scope_guard(&mut self) -> impl DerefMut<Target = Self> {
+        let _trace_guard = ::compose_utils::TraceFnGuard::new("lexical_scope_guard", None);
+        self.scopes_mut().enter_lexical();
+        defer(self, move |vm| {
+            vm.scopes_mut().exit_lexical();
+            drop(_trace_guard);
+        })
+    }
+
+    /// Enters a **new flow scope**, unconditionally, and returns a guard.
+    ///
+    /// A flow scope tracks temporary variables created within expressions.
+    /// For example `x is Int y && y > 0` introduces a temporary variable `y`
+    /// that is only valid within this expression.
+    ///
+    /// Unlike [`in_flow_scope_guard`], this function always creates a fresh
+    /// flow scope, even if one is already active. This is useful when a
+    /// construct requires an isolated flow environment (e.g. match expressions).
+    ///
+    /// # Drop behaviour
+    /// - Always exits the flow scope on drop
+    /// - Caller location is tracked for debugging
+    #[track_caller]
+    #[must_use]
+    pub fn new_flow_scope_guard(&mut self) -> impl DerefMut<Target = Self> {
+        let _trace_guard = ::compose_utils::TraceFnGuard::new("new_flow_scope_guard", None);
+        self.scopes_mut().enter_flow();
+        defer(self, move |vm| {
+            vm.scopes_mut().exit_flow();
+            drop(_trace_guard);
+        })
     }
 
     pub fn world(&self) -> &dyn World {
@@ -203,6 +314,15 @@ impl<'a> Machine<'a> {
         result
     }
 
+    pub fn temp_root_guard(&mut self) -> impl DerefMut<Target = Self> {
+        let marker = self.temp_root_marker();
+        // trace_log!("pushing temp roots: {:?}", marker);
+        defer(self, move |vm| {
+            // trace_log!("popping temp roots: {:?}", marker);
+            vm.pop_temp_roots(marker)
+        })
+    }
+
     pub fn define(
         &mut self,
         var: ast::Ident,
@@ -220,17 +340,17 @@ impl<'a> Machine<'a> {
 
     pub fn try_bind(&mut self, name: EcoString, binding: Binding) -> SourceResult<&mut Binding> {
         let span = binding.span();
-        self.frames.top.scopes.top.try_bind(name, binding).at(span)
+        self.scopes_mut().top_lexical_mut().try_bind(name, binding).at(span)
     }
 
     pub fn bind(&mut self, name: EcoString, binding: Binding) -> &mut Binding {
-        self.frames.top.scopes.top.bind(name, binding)
+        self.scopes_mut().top_lexical_mut().bind(name, binding)
     }
 
-    fn scopes(&self) -> &Scopes<'a> {
+    pub(crate) fn scopes(&self) -> &Scopes<'a> {
         &self.frames.top.scopes
     }
-    fn scopes_mut(&mut self) -> &mut Scopes<'a> {
+    pub(crate) fn scopes_mut(&mut self) -> &mut Scopes<'a> {
         &mut self.frames.top.scopes
     }
 
@@ -243,37 +363,7 @@ impl<'a> Machine<'a> {
     }
 }
 
-pub struct TempRootGuard<'a, 'b> {
-    pub marker: TrackMarker,
-    pub vm: &'b mut Machine<'a>,
-}
-
-impl<'a, 'b> Drop for TempRootGuard<'a, 'b> {
-    fn drop(&mut self) {
-        self.vm.pop_temp_roots(self.marker);
-    }
-}
-
-impl<'a> Machine<'a> {
-    pub fn temp_root_guard<'b>(&'b mut self) -> TempRootGuard<'a, 'b> {
-        let marker = self.temp_root_marker();
-        TempRootGuard { marker, vm: self }
-    }
-}
-
-impl<'a, 'b> Deref for TempRootGuard<'a, 'b> {
-    type Target = Machine<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        self.vm
-    }
-}
-
-impl<'a, 'b> DerefMut for TempRootGuard<'a, 'b> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.vm
-    }
-}
+impl<'a> Machine<'a> {}
 
 pub fn routines() -> Routines {
     Routines {}

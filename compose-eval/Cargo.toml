@@ -7,6 +7,7 @@ edition = "2024"
 compose-library = { workspace = true }
 compose-syntax = { workspace = true }
 compose-error-codes = { workspace = true }
+compose-utils = { workspace = true }
 ecow = { workspace = true }
 extension-traits = { workspace = true }
-tap = {workspace = true}
+tap = { workspace = true }

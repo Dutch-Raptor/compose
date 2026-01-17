@@ -217,7 +217,6 @@ macro_rules! impl_heap_obj {
     };
 }
 
-pub(crate) use impl_heap_obj;
 use crate::diag::StrResult;
 
 impl_heap_obj!(Value, Value);

@@ -223,7 +223,7 @@ fn pattern_leaf<'s>(
         let node = &mut p[m];
         if node.kind() != SyntaxKind::Ident {
             let span = node.span();
-            p.insert_error(SyntaxError::new("expected a pattern", span));
+            p.insert_error(SyntaxError::new("expected an identifier", span));
             return;
         }
         if !seen.insert(text) {
@@ -232,6 +232,10 @@ fn pattern_leaf<'s>(
                 binding = dupe.unwrap_or("binding")
             ));
         }
+    }
+
+    if p.eat_if(SyntaxKind::Ident) {
+        p.wrap(m, SyntaxKind::TypedBindingPattern)
     }
 }
 

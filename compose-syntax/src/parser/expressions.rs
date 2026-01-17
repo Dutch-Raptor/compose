@@ -2,7 +2,7 @@ use crate::ast::{AssignOp, BinOp};
 use crate::kind::SyntaxKind;
 use crate::parser::control_flow::{conditional, for_loop, while_loop};
 use crate::parser::funcs::lambda;
-use crate::parser::pattern::match_expr;
+use crate::parser::pattern::{match_expr, pattern};
 use crate::parser::{ExprContext, funcs, statements};
 use crate::parser::{Marker, Parser};
 use crate::precedence::{Precedence, PrecedenceTrait};
@@ -13,6 +13,7 @@ use compose_error_codes::{
 };
 use compose_utils::trace_fn;
 use ecow::eco_format;
+use std::collections::HashSet;
 
 pub fn code_expression(p: &mut Parser) {
     code_expr_prec(p, ExprContext::Expr, Precedence::Lowest);
@@ -33,7 +34,9 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
 
     loop {
         trace_fn!("parse_code_expr_prec loop", "{:?}", p.current());
-        if p.at_set(syntax_set!(LeftParen, LeftBrace)) {
+
+        // Simple function call `foo(args)`
+        if p.at(SyntaxKind::LeftParen) {
             if Precedence::Call < min_prec {
                 break;
             }
@@ -42,10 +45,37 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
             continue;
         }
 
+        // maybe a trailing lambda? `foo { args => ... }`
+        if p.at(SyntaxKind::LeftBrace) {
+            let mut scanner = p.scanner();
+            scanner
+                .next()
+                .expect("we know the next token is an opening brace"); // enter opening `{`
+            if scanner
+                .level_contains_kind(SyntaxKind::Arrow)
+                .unwrap_or(false)
+            {
+                if Precedence::Call < min_prec {
+                    break;
+                }
+                funcs::args(p);
+                p.wrap(m, SyntaxKind::FuncCall);
+                continue;
+            }
+        }
+
         let at_field_or_index = p.at(SyntaxKind::Dot) || p.at(SyntaxKind::LeftBracket);
 
         if ctx.is_atomic() && !at_field_or_index {
             break;
+        }
+
+        if p.eat_if(SyntaxKind::IsKW) {
+            if Precedence::Is < min_prec {
+                break;
+            }
+            pattern(p, false, &mut HashSet::new(), None);
+            p.wrap(m, SyntaxKind::IsExpression)
         }
 
         // handle path access `a::b::c`

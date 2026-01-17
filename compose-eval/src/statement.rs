@@ -1,27 +1,32 @@
-use crate::vm::FlowEvent;
-use crate::{eval, Eval, EvalConfig, Evaluated, Machine};
-use compose_library::diag::{bail, error, SourceResult, Trace, TracePoint, Warned};
+use crate::vm::{FlowEvent, Tracked};
+use crate::{Eval, EvalConfig, Evaluated, Machine, eval};
+use compose_library::diag::{SourceResult, Trace, TracePoint, Warned, bail, error};
 use compose_library::{Binding, IntoValue, Module};
 use compose_syntax::ast::{AstNode, BreakStatement};
-use compose_syntax::{ast, FileId};
-use ecow::{eco_vec, EcoString};
+use compose_syntax::{FileId, ast};
+use ecow::{EcoString, eco_vec};
 use std::path::PathBuf;
 
 impl Eval for ast::Statement<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
-        // trace_log!("eval statement: {:#?}", self);
-        let guard = vm.temp_root_guard();
-        let result = match self {
-            ast::Statement::Expr(e) => e.eval(guard.vm),
-            ast::Statement::Let(l) => l.eval(guard.vm),
-            ast::Statement::Assign(a) => a.eval(guard.vm),
-            ast::Statement::Break(b) => b.eval(guard.vm),
-            ast::Statement::Return(r) => r.eval(guard.vm),
-            ast::Statement::Continue(c) => c.eval(guard.vm),
-            ast::Statement::ModuleImport(i) => i.eval(guard.vm),
+        // temp root guard should be maintained while doing GC to not clean the return value
+        let vm = &mut vm.temp_root_guard();
+        let result = {
+            // Flow scope can be dropped after evaluating the statement, this way it can be GCd
+            let vm = &mut vm.new_flow_scope_guard();
+            match self {
+                ast::Statement::Expr(e) => e.eval(vm),
+                ast::Statement::Let(l) => l.eval(vm),
+                ast::Statement::Assign(a) => a.eval(vm),
+                ast::Statement::Break(b) => b.eval(vm),
+                ast::Statement::Return(r) => r.eval(vm),
+                ast::Statement::Continue(c) => c.eval(vm),
+                ast::Statement::ModuleImport(i) => i.eval(vm),
+            }
+            .map(|v| v.track_tmp_root(vm))
         };
 
-        guard.vm.maybe_gc();
+        vm.maybe_gc();
         result
     }
 }
@@ -82,11 +87,14 @@ impl Eval for ast::ModuleImport<'_> {
                 let as_path = PathBuf::from(source.as_str());
                 let stem = match as_path.file_stem() {
                     Some(stem) => stem,
-                    None => bail!(self.source_span(), "could not resolve module name from path")
+                    None => bail!(
+                        self.source_span(),
+                        "could not resolve module name from path"
+                    ),
                 };
                 EcoString::from(stem.to_string_lossy().as_ref())
             }
-            Some(name) => name.get().to_owned()
+            Some(name) => name.get().to_owned(),
         };
 
         let id = FileId::new(path);
@@ -98,15 +106,16 @@ impl Eval for ast::ModuleImport<'_> {
             ))
         })?;
 
-        let module = vm.with_frame(|vm| {
-            let Warned { value, warnings } = eval(&source, vm, &EvalConfig::default());
-            value?;
-            vm.sink_mut().warnings.extend(warnings);
+        let module = vm
+            .with_frame(|vm| {
+                let Warned { value, warnings } = eval(&source, vm, &EvalConfig::default());
+                value?;
+                vm.sink_mut().warnings.extend(warnings);
 
-
-            let module = Module::new(name.clone(), vm.frames.top.scopes.top.clone());
-            SourceResult::Ok(module.into_value())
-        }).trace(|| TracePoint::Import, self.source_span())?;
+                let module = Module::new(name.clone(), vm.scopes().top_lexical().clone());
+                SourceResult::Ok(module.into_value())
+            })
+            .trace(|| TracePoint::Import, self.source_span())?;
 
         vm.try_bind(name, Binding::new(module, self.span()))?;
 

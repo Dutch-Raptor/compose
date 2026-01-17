@@ -69,15 +69,8 @@ impl Value {
     pub fn pipe(self, vm: &mut dyn Vm, transform: Func) -> SourceResult<Self> {
         vm.call_func(&transform, Args::new(transform.span, iter::once(self)))
     }
-}
 
-impl Value {
-    pub fn is_box(&self) -> bool {
-        matches!(self, Value::Box(_))
-    }
-}
-
-impl Value {
+    #[func]
     pub fn ty(&self) -> Type {
         match self {
             Value::Int(_) => Type::of::<i64>(),
@@ -94,6 +87,15 @@ impl Value {
             Value::Module(_) => Type::of::<Module>(),
         }
     }
+}
+
+impl Value {
+    pub fn is_box(&self) -> bool {
+        matches!(self, Value::Box(_))
+    }
+}
+
+impl Value {
 
     pub fn unit() -> Value {
         Value::Unit(UnitValue)

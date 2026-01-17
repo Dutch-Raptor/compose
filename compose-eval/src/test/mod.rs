@@ -19,6 +19,7 @@ use tap::pipe::Pipe;
 mod iterators;
 #[cfg(test)]
 mod snippets;
+mod flow_variables;
 
 pub struct TestWorld {
     sources: Mutex<HashMap<FileId, Source>>,

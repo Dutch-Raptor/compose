@@ -1,21 +1,22 @@
-use crate::ast::{AstNode, Expr, Ident, Named, Underscore, Unit};
-use crate::{SyntaxKind, SyntaxNode};
 use crate::ast::macros::node;
+use crate::ast::{AstNode, Expr, Ident, Named, Underscore, Unit};
+use crate::{Span, SyntaxKind, SyntaxNode};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Pattern<'a> {
     Single(Expr<'a>),
     PlaceHolder(Underscore<'a>),
     Destructuring(Destructuring<'a>),
-    LiteralPattern(LiteralPattern<'a>)
+    LiteralPattern(LiteralPattern<'a>),
+    TypedBindingPattern(TypedBindingPattern<'a>),
 }
-
 
 impl<'a> Pattern<'a> {
     pub fn bindings(self) -> Vec<Ident<'a>> {
         match self {
             Pattern::Single(Expr::Ident(i)) => vec![i],
             Pattern::Destructuring(v) => v.bindings(),
+            Pattern::TypedBindingPattern(typed) => vec![typed.binding()],
             _ => vec![],
         }
     }
@@ -28,12 +29,13 @@ impl<'a> AstNode<'a> for Pattern<'a> {
             SyntaxKind::Destructuring => {
                 Some(Self::Destructuring(Destructuring::from_untyped(node)?))
             }
-            _ => {
-                match LiteralPattern::from_untyped(node) {
-                    Some(lit) => Some(Self::LiteralPattern(lit)),
-                    None => node.cast().map(Self::Single),
-                }
-            }
+            SyntaxKind::TypedBindingPattern => Some(Self::TypedBindingPattern(
+                TypedBindingPattern::from_untyped(node)?,
+            )),
+            _ => match LiteralPattern::from_untyped(node) {
+                Some(lit) => Some(Self::LiteralPattern(lit)),
+                None => node.cast().map(Self::Single),
+            },
         }
     }
 
@@ -43,6 +45,7 @@ impl<'a> AstNode<'a> for Pattern<'a> {
             Self::PlaceHolder(u) => u.to_untyped(),
             Self::Destructuring(d) => d.to_untyped(),
             Self::LiteralPattern(lit) => lit.to_untyped(),
+            Self::TypedBindingPattern(typed_binding) => typed_binding.to_untyped(),
         }
     }
 }
@@ -52,7 +55,6 @@ impl Default for Pattern<'_> {
         Self::Single(Expr::default())
     }
 }
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum LiteralPattern<'a> {
@@ -110,6 +112,20 @@ impl<'a> Destructuring<'a> {
     }
 }
 
+node! {
+    struct TypedBindingPattern
+}
+
+impl<'a> TypedBindingPattern<'a> {
+    pub fn ty(self) -> Ident<'a> {
+        self.0.cast_first()
+    }
+
+    pub fn binding(self) -> Ident<'a> {
+        self.0.cast_last()
+    }
+}
+
 pub enum DestructuringItem<'a> {
     Pattern(Pattern<'a>),
     Named(Named<'a>),
@@ -157,5 +173,23 @@ impl<'a> AstNode<'a> for DestructuringItem<'a> {
             Self::Pattern(p) => p.to_untyped(),
             Self::Spread(s) => s.to_untyped(),
         }
+    }
+}
+
+node! {
+    struct IsExpression
+}
+
+impl<'a> IsExpression<'a> {
+    pub fn expr(self) -> Expr<'a> {
+        self.0.cast_first()
+    }
+
+    pub fn pattern(self) -> Pattern<'a> {
+        self.0.cast_last()
+    }
+
+    pub fn is_span(self) -> Span {
+        self.0.children().find_map(|n| (n.kind() == SyntaxKind::IsKW).then(|| n.span())).expect("IsExpression must contain an `is` keyword")
     }
 }

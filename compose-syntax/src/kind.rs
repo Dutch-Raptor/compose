@@ -116,6 +116,9 @@ pub enum SyntaxKind {
     ContinueStatement,
     MatchArm,
     MatchExpression,
+    IsKW,
+    TypedBindingPattern,
+    IsExpression,
 }
 
 impl SyntaxKind {
@@ -127,8 +130,7 @@ impl SyntaxKind {
     }
 
     pub(crate) fn descriptive_name(&self) -> &'static str {
-        match self {
-            SyntaxKind::Amp => "&",
+        match self { SyntaxKind::Amp => "&",
             SyntaxKind::AmpAmp => "&&",
             SyntaxKind::AmpersandEq => "&=",
             SyntaxKind::Apostrophe => "'",
@@ -190,6 +192,8 @@ impl SyntaxKind {
             SyntaxKind::InKW => "in",
             SyntaxKind::IndexAccess => "index access",
             SyntaxKind::Int => "integer literal",
+            SyntaxKind::IsKW => "is",
+            SyntaxKind::IsExpression => "is expression",
             SyntaxKind::LeftBrace => "{",
             SyntaxKind::LeftBracket => "[",
             SyntaxKind::LeftParen => "(",
@@ -244,6 +248,7 @@ impl SyntaxKind {
             SyntaxKind::MatchKW => "match",
             SyntaxKind::MatchArm => "match arm",
             SyntaxKind::MatchExpression => "match expression",
+            SyntaxKind::TypedBindingPattern => "type binding pattern",
         }
     }
 
