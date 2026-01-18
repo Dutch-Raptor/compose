@@ -74,7 +74,7 @@ pub fn code_expr_prec(p: &mut Parser, ctx: ExprContext, min_prec: Precedence) {
             if Precedence::Is < min_prec {
                 break;
             }
-            pattern(p, false, &mut HashSet::new(), None);
+            pattern(p, false, &mut HashSet::new());
             p.wrap(m, SyntaxKind::IsExpression)
         }
 

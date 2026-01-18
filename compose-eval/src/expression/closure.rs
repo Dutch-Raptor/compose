@@ -9,6 +9,7 @@ use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind, Pattern};
 use compose_syntax::{ast, Label, Span, SyntaxNode};
 use ecow::{EcoString, EcoVec};
 use std::collections::HashMap;
+use crate::expression::pattern::{destructure_pattern, PatternContext, PatternMatchResult};
 
 impl Eval for ast::Lambda<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -199,11 +200,26 @@ pub fn eval_lambda(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRes
             let mut defaults = closure.defaults.iter();
             for p in params.children() {
                 match p.kind() {
-                    ast::ParamKind::Pos(pattern) => match pattern {
-                        Pattern::Single(Expr::Ident(ident)) => {
-                            define(vm, ident, args.expect(&ident)?, p)?;
+                    ast::ParamKind::Pos(pattern) => {
+                        match pattern {
+                            Pattern::Single(Expr::Ident(ident)) => {
+                                define(vm, ident, args.expect(&ident)?, p)?;
+                            }
+                            pattern => {
+                                let Some(v) = args.eat()? else {
+                                   bail!(pattern.span(), "missing argument for this parameter");
+                                };
+                                let binding_kind = match p.is_mut() {
+                                    false => BindingKind::Param,
+                                    true => BindingKind::ParamMut,
+                                };
+                                
+                                match destructure_pattern(vm, pattern, v, PatternContext::Parameter, binding_kind, Visibility::Private)? {
+                                    PatternMatchResult::NotMatched(err) => bail!(err),
+                                    PatternMatchResult::Matched => {},
+                                }
+                            }
                         }
-                        pattern => bail!(pattern.span(), "Patterns not supported in closures yet"),
                     },
                     ast::ParamKind::Named(named) => {
                         let name = named.name();

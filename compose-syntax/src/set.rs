@@ -99,6 +99,7 @@ pub const PATTERN_LEAF: SyntaxSet = syntax_set![
 pub const LITERAL: SyntaxSet = syntax_set![Int, Float, Str, Bool];
 
 pub const PATTERN: SyntaxSet = syntax_set![
+    LeftBrace,
     LeftParen,
     LeftBracket,
     Underscore,
