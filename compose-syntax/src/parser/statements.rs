@@ -110,7 +110,7 @@ pub fn let_binding(p: &mut Parser) {
         // eat tokens until we find an `=` or the end of this statement
         p.recover_until(syntax_set!(Eq, End, NewLine, RightBrace));
     } else {
-        pattern::pattern(p, false, &mut HashSet::new(), None);
+        pattern::pattern(p, false, &mut HashSet::new());
     }
 
     if p.eat_if(SyntaxKind::Eq) {

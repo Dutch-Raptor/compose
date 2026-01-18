@@ -227,7 +227,7 @@ fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
     let was_at_pat = p.at_set(set::PATTERN);
     let pat_m = p.marker();
 
-    pattern::pattern(p, false, seen, Some("parameter"));
+    pattern::pattern(p, false, seen);
 
     // Parse named params like `a: 1`
     if p.eat_if(SyntaxKind::Colon) {

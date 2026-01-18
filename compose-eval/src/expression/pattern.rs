@@ -1,17 +1,21 @@
 use crate::{Eval, Evaluated, Machine};
-use compose_error_codes::E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS;
+use compose_error_codes::{
+    E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS,
+};
 use compose_library::diag::{At, SourceDiagnostic, SourceResult, Spanned};
 use compose_library::ops::Comparison;
 use compose_library::{
-    bail, error, ArrayValue, Binding, BindingKind, DebugRepr, IntoValue, Type, Value, Visibility,
-    Vm,
+    ArrayValue, Binding, BindingKind, DebugRepr, IntoValue, MapValue, Type, Value, Visibility, Vm,
+    bail, error,
 };
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, DestructuringItem, Expr, Ident, LiteralPattern, Pattern};
 use compose_utils::trace_fn;
-use ecow::{eco_format, EcoString, EcoVec};
+use ecow::{EcoString, EcoVec, eco_format};
 use std::cmp::PartialEq;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
+use tap::Tap;
 
 impl Eval for LiteralPattern<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<crate::Evaluated> {
@@ -134,6 +138,7 @@ pub enum PatternContext {
     LetBinding,
     ForLoopBinding,
     FlowBinding,
+    Parameter,
 }
 
 pub fn destructure_pattern(
@@ -221,7 +226,7 @@ pub fn destructure_impl(
         Pattern::PlaceHolder(_) => Ok(PatternMatchResult::Matched), // A placeholder means we discard the value, no need to bind
         Pattern::Destructuring(destruct) => match value {
             Value::Array(value) => destructure_array(vm, destruct, value, ctx, match_path, bind),
-            Value::Map(value) => destructure_map(vm, destruct, value, ctx, bind),
+            Value::Map(value) => destructure_map(vm, destruct, value, ctx, match_path, bind),
             _ => bail!(pattern.span(), "cannot destructure {}", value.ty()),
         },
         Pattern::LiteralPattern(lit) if ctx == PatternContext::LetBinding => bail!(
@@ -353,11 +358,117 @@ fn destructure_array(
 fn destructure_map(
     vm: &mut Machine,
     destruct: ast::Destructuring,
-    value: compose_library::MapValue,
+    value: MapValue,
     ctx: PatternContext,
+    match_path: MatchPath,
     bind: &mut impl Fn(&mut Machine, Expr, Value) -> SourceResult<()>,
 ) -> SourceResult<PatternMatchResult> {
-    unimplemented!("destructuring maps")
+    let map = value.heap_ref().get_unwrap(&vm.heap).clone();
+
+    let mut used = HashSet::new();
+    let mut spread = None;
+
+    for p in destruct.items() {
+        match p {
+            DestructuringItem::Named(named) => {
+                let name = named.name().get();
+                used.insert(name.as_str());
+
+                let Some(v) = map.get(name) else {
+                    return Ok(PatternMatchResult::NotMatched(
+                        error!(named.name().span(), "key not found in map";),
+                    ));
+                };
+
+                let matched =
+                    destructure_impl(vm, named.pattern(), v.clone(), ctx, MatchPath::new(), bind)?;
+                if let PatternMatchResult::NotMatched(err) = matched {
+                    return Ok(PatternMatchResult::NotMatched(err));
+                }
+            }
+            DestructuringItem::Pattern(Pattern::Single(Expr::Ident(ident))) => {
+                used.insert(ident.get().as_str());
+                let Some(v) = map.get(ident.get()) else {
+                    return Ok(PatternMatchResult::NotMatched(
+                        error!(ident.span(), "key not found in map";),
+                    ));
+                };
+
+                bind(vm, Expr::Ident(ident.clone()), v.clone())?;
+            }
+            DestructuringItem::Spread(s) => {
+                spread = Some(s);
+            }
+            DestructuringItem::Pattern(_) => {
+                return Ok(PatternMatchResult::NotMatched(error!(
+                    destruct.span(),
+                    "cannot destructure an unnamed pattern from a map"
+                )));
+            }
+        }
+    }
+
+    if let Some(spread) = spread
+        && spread.sink_expr().is_some()
+    {
+        let map = HashMap::from_iter(
+            map.iter()
+                .filter(|(k, _)| !used.contains(k.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone())),
+        );
+        let value = MapValue::from(vm.heap_mut(), map).into_value();
+        bind(vm, spread.sink_expr().unwrap(), value)?;
+    }
+
+    if spread.is_none() && used.len() != map.len() {
+        let key_hint = {
+            let missing_keys = map
+                .keys()
+                .filter(|k| !used.contains(k.as_str()))
+                .map(|k| k.as_str())
+                .collect::<Vec<_>>()
+                .tap_mut(|v| v.sort_unstable());
+            format_keyset(&missing_keys)
+        };
+        let mut err = error!(
+            destruct.span(),
+            "map destructuring does not cover all keys";
+            label_message: "missing keys: {key_hint}";
+            hint: "add `..` to ignore the remaining keys";
+            hint: "or use `..name` to bind them into a map";
+            code: &E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS,
+        );
+
+        if !match_path.is_empty() {
+            err.note(eco_format!(
+                "while matching the pattern at path {}",
+                match_path
+            ))
+        }
+
+        return Ok(PatternMatchResult::NotMatched(err));
+    }
+
+    Ok(PatternMatchResult::Matched)
+}
+
+/// Returns a string describing a keyset. lists the first 3 keys, and lists the count of remaining keys.
+fn format_keyset(missing_keys: &[&str]) -> EcoString {
+    const LISTED_KEYS_NUM: usize = 3;
+    let named_keys = missing_keys
+        .iter()
+        .take(LISTED_KEYS_NUM)
+        .copied()
+        .collect::<Vec<_>>()
+        .join(", ");
+    let rest_len = missing_keys.len().saturating_sub(LISTED_KEYS_NUM);
+
+    let more = if rest_len > 0 {
+        &eco_format!(", and {rest_len} more")
+    } else {
+        ""
+    };
+    eco_format!("{}{}", named_keys, more)
 }
 
 /// Returns a diagnostic indicating that the number of elements in the array does not match the number of elements in the destructuring pattern.
@@ -410,4 +521,141 @@ fn wrong_number_of_elements(
     }
 
     err
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test::{assert_eval, eval_code};
+    use compose_error_codes::{
+        E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS,
+    };
+
+    #[test]
+    fn simple_map_destructuring() {
+        assert_eval(
+            r#"
+            let { a, b } = { a: 1, b: 2 };
+            assert::eq(a, 1);
+            assert::eq(b, 2);
+        "#,
+        );
+    }
+
+    #[test]
+    fn simple_array_destructuring() {
+        assert_eval(
+            r#"
+            let [a, b] = [1, 2];
+            assert::eq(a, 1);
+            assert::eq(b, 2);
+        "#,
+        );
+    }
+
+    #[test]
+    fn named_map_destructuring() {
+        assert_eval(
+            r#"
+            let { a: x, b: y } = { a: 1, b: 2 };
+            assert::eq(x, 1);
+            assert::eq(y, 2);
+        "#,
+        );
+    }
+
+    #[test]
+    fn nested_named_map_destructuring() {
+        assert_eval(
+            r#"
+            let { a: { x: z } } = { a: { x: 1 } };
+            assert::eq(z, 1);
+        "#,
+        );
+    }
+
+    #[test]
+    fn spread_map_destructuring() {
+        assert_eval(
+            r#"
+            let { a, ..rest } = { a: 1, b: 2 };
+            assert::eq(a, 1);
+            assert::eq(rest.get("b"), 2);
+        "#,
+        );
+    }
+
+    #[test]
+    fn spread_array_destructuring() {
+        assert_eval(
+            r#"
+            let [a, ..rest] = [1, 2];
+            assert::eq(a, 1);
+            assert::eq(rest, [2]);
+        "#,
+        );
+    }
+
+    #[test]
+    fn literal_pattern() {
+        assert_eval(
+            r#"
+            assert([1, 2] is [1, _]);
+        "#,
+        );
+    }
+
+    #[test]
+    fn destructuring_with_type_pattern() {
+        assert_eval(
+            r#"
+            let [Int a] = [1];
+            assert::eq(a, 1);
+        "#,
+        );
+    }
+
+    #[test]
+    fn map_error_with_unmapped_keys() {
+        eval_code(
+            r#"
+            let { a } = { a: 1, c: 2 };
+        "#,
+        )
+        .assert_errors(&[E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS]);
+    }
+
+    #[test]
+    fn map_error_with_nonexistent_key() {
+        // TODO: Add error code for nonexistent key
+        assert_eq!(
+            eval_code(
+                r#"
+            let { a } = { b: 1 };
+        "#,
+            )
+            .get_errors()
+            .len(),
+            1
+        )
+    }
+
+    #[test]
+    fn array_error_with_uncovered_elements() {
+        eval_code(
+            r#"
+            let [a] = [1, 2];
+        "#,
+        )
+        .assert_errors(&[E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS]);
+    }
+
+    #[test]
+    fn array_error_with_overcovered_elements() {
+        eval_code(
+            r#"
+            let [a, b] = [1];
+        "#,
+        )
+        .assert_errors(&[E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS]);
+    }
 }

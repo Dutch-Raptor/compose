@@ -1,16 +1,16 @@
 use crate::kind::SyntaxKind;
-use crate::parser::Parser;
 use crate::parser::expressions::code_expression;
-use crate::parser::{ExprContext, expressions};
+use crate::parser::Parser;
+use crate::parser::{expressions, ExprContext};
 use crate::precedence::Precedence;
 use crate::set::syntax_set;
-use crate::{SyntaxError, set};
+use crate::set;
+use compose_error_codes::E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES;
 use compose_utils::trace_fn;
 use ecow::eco_format;
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::mem;
-use itertools::Itertools;
-use compose_error_codes::E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES;
 
 pub fn match_expr(p: &mut Parser) {
     trace_fn!("parse_match");
@@ -42,13 +42,17 @@ pub fn match_expr(p: &mut Parser) {
 
         // patterns
         let mut first_bindings = HashSet::new();
-        pattern(p, false, &mut first_bindings, None);
+        pattern(p, false, &mut first_bindings);
         while p.eat_if(SyntaxKind::Pipe) {
             let mut current_bindings = HashSet::new();
-            pattern(p, false, &mut current_bindings, None);
+            pattern(p, false, &mut current_bindings);
 
             if current_bindings != first_bindings {
-                insert_pattern_bindings_mismatch_error(p, &mut first_bindings, &mut current_bindings);
+                insert_pattern_bindings_mismatch_error(
+                    p,
+                    &mut first_bindings,
+                    &mut current_bindings,
+                );
             }
         }
 
@@ -82,29 +86,29 @@ pub fn match_expr(p: &mut Parser) {
     p.wrap(m, SyntaxKind::MatchExpression)
 }
 
-fn insert_pattern_bindings_mismatch_error(p: &mut Parser, first_bindings: &mut HashSet<&str>, current_bindings: &mut HashSet<&str>) {
+fn insert_pattern_bindings_mismatch_error(
+    p: &mut Parser,
+    first_bindings: &mut HashSet<&str>,
+    current_bindings: &mut HashSet<&str>,
+) {
     let span = p.last_node().unwrap().span();
 
-    let mut introduced = current_bindings
-        .difference(&first_bindings)
-        .peekable();
-    let mut missing = first_bindings
-        .difference(&current_bindings)
-        .peekable();
+    let mut introduced = current_bindings.difference(&first_bindings).peekable();
+    let mut missing = first_bindings.difference(&current_bindings).peekable();
 
     let mut diff_note = eco_format!("pattern bindings mismatch");
 
     if missing.peek().is_some() {
         diff_note.push_str(&eco_format!(
-                        "\n  - not bound here: `{}`",
-                        missing.join("`, `")
-                    ))
+            "\n  - not bound here: `{}`",
+            missing.join("`, `")
+        ))
     }
     if introduced.peek().is_some() {
         diff_note.push_str(&eco_format!(
-                        "\n  - bound only here: `{}`",
-                        introduced.join("`, `")
-                    ));
+            "\n  - bound only here: `{}`",
+            introduced.join("`, `")
+        ));
     };
 
     p.insert_error_at(span, "patterns within a match arm have differing bindings")
@@ -118,7 +122,6 @@ pub fn pattern<'s>(
     p: &mut Parser<'s>,
     reassignment: bool,
     seen: &mut HashSet<&'s str>,
-    dupe: Option<&'s str>,
 ) {
     trace_fn!("parse_pattern");
     match p.current() {
@@ -133,9 +136,36 @@ pub fn pattern<'s>(
 
         SyntaxKind::Underscore => p.eat(),
         SyntaxKind::LeftBracket => destructure_array(p, seen),
-        _ => pattern_leaf(p, reassignment, seen, dupe),
+        SyntaxKind::LeftBrace => destructure_map(p, seen),
+        _ => pattern_leaf(p, seen, reassignment),
     }
 }
+
+fn destructure_map<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
+    trace_fn!("parse_destructure_map");
+    let m = p.marker();
+    p.assert(SyntaxKind::LeftBrace);
+    
+    let mut sink = false;
+    while !p.current().is_terminator() {
+        if !p.at_set(set::DESTRUCTURING_ITEM) {
+            p.unexpected("expected a destructuring item", None);
+            continue;
+        }
+        
+        destructuring_item(p, seen, &mut sink);
+
+        if !p.current().is_terminator() {
+            p.expect_or_recover(SyntaxKind::Comma, syntax_set!(RightBrace));
+        }
+    }
+
+    p.expect_closing_delimiter(m, SyntaxKind::RightBrace);
+
+    p.wrap(m, SyntaxKind::Destructuring);
+}
+
+
 
 fn destructure_array<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
     trace_fn!("parse_destructure_array");
@@ -168,7 +198,7 @@ fn destructuring_item<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, sink:
     if p.eat_if(SyntaxKind::Dots) {
         // sink
         if p.at_set(set::PATTERN_LEAF) {
-            pattern_leaf(p, false, seen, None);
+            pattern_leaf(p, seen, false);
         }
         p.wrap(m, SyntaxKind::Spread);
         if mem::replace(sink, true) {
@@ -178,10 +208,10 @@ fn destructuring_item<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, sink:
     }
 
     // parse normal array element or map key
-    pattern(p, false, seen, None);
+    pattern(p, false, seen);
 
     if p.eat_if(SyntaxKind::Colon) {
-        pattern(p, true, seen, None);
+        pattern(p, true, seen);
 
         if p[m].kind() != SyntaxKind::Ident {
             p[m].expected("identifier after `:` in destructuring pattern")
@@ -191,12 +221,7 @@ fn destructuring_item<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, sink:
     }
 }
 
-fn pattern_leaf<'s>(
-    p: &mut Parser<'s>,
-    reassignment: bool,
-    seen: &mut HashSet<&'s str>,
-    dupe: Option<&'s str>,
-) {
+fn pattern_leaf<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, reassignment: bool) {
     trace_fn!("parse_pattern_leaf");
     if p.current().is_keyword() {
         p.token.node.expected("pattern");
@@ -212,30 +237,27 @@ fn pattern_leaf<'s>(
     }
 
     let m = p.marker();
-    let text = p.current_text();
+    let mut binding_text = p.current_text();
 
     // Parse a full atomic expression, even though we only care about an identifier.
     // This way the entire expression can be marked as an error if it is not.
     expressions::code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
 
-    // If the pattern is not a reassignment, it can only be an identifier
-    if !reassignment {
-        let node = &mut p[m];
-        if node.kind() != SyntaxKind::Ident {
-            let span = node.span();
-            p.insert_error(SyntaxError::new("expected an identifier", span));
-            return;
-        }
-        if !seen.insert(text) {
-            node.convert_to_error(eco_format!(
-                "duplicate {binding}: {text}",
-                binding = dupe.unwrap_or("binding")
-            ));
-        }
+    let mut span = p.last_node().expect("was just parsed").span();
+
+    let at_typed_binding = p.at(SyntaxKind::Ident);
+
+    if at_typed_binding {
+        binding_text = p.current_text();
+        span = p.current_span();
+
+        p.expect(SyntaxKind::Ident);
+        p.wrap(m, SyntaxKind::TypedBindingPattern);
     }
 
-    if p.eat_if(SyntaxKind::Ident) {
-        p.wrap(m, SyntaxKind::TypedBindingPattern)
+    if !seen.insert(binding_text) && reassignment {
+        p.insert_error_at(span, "duplicate binding")
+            .with_label_message("this binding already appears in this pattern");
     }
 }
 
@@ -253,8 +275,8 @@ fn parenthesized_or_destructuring(
 
 #[cfg(test)]
 mod tests {
-    use compose_error_codes::E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES;
     use crate::assert_parse_tree;
+    use compose_error_codes::E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES;
 
     #[test]
     fn test_destructuring_underscore() {
@@ -382,6 +404,5 @@ mod tests {
                 RightBrace("}")
             ]
         )
-
     }
 }

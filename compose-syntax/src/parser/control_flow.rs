@@ -69,7 +69,7 @@ pub fn for_loop(p: &mut Parser) {
 
     let wrapped = p.eat_if(SyntaxKind::LeftParen);
 
-    pattern(p, true, &mut HashSet::new(), None);
+    pattern(p, true, &mut HashSet::new());
 
     p.expect(SyntaxKind::InKW);
 
