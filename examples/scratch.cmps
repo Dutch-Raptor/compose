@@ -1,7 +1,6 @@
-if (2 == 2) {
-    /*...*/
-} else if (2 == 3) {
-    /*...*/
-} else {
-    /*...*/
-}
+match (5) {
+    x if x < 5 => println("x is small"),
+    x if x > 10 => println("x is pretty big"),
+    x if x > 15 => println("x is big"),
+    x => println("x is ok"),
+};

@@ -465,7 +465,7 @@ impl NodesTester {
 ///     FuncCall [
 ///         Ident("f")
 ///         Args [
-///             Error(compose_error_codes::E0001_UNCLOSED_DELIMITER)
+///             LeftParen("(")
 ///             Ident("a")
 ///             Comma(",")
 ///             Ident("b")
@@ -477,6 +477,7 @@ impl NodesTester {
 ///                 Plus("+")
 ///                 Int("2")
 ///             ]
+///             Error(compose_error_codes::E0001_UNCLOSED_DELIMITER)
 ///         ]
 ///     ]
 /// );
