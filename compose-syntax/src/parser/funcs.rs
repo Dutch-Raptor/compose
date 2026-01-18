@@ -399,7 +399,7 @@ mod tests {
             FuncCall [
                 Ident("f")
                 Args [
-                    Error(E0001_UNCLOSED_DELIMITER)
+                    LeftParen("(")
                     Ident("a")
                     Comma(",")
                     Ident("b")
@@ -411,6 +411,7 @@ mod tests {
                         Plus("+")
                         Int("2")
                     ]
+                    Error(E0001_UNCLOSED_DELIMITER)
                 ]
             ]
         );

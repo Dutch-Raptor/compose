@@ -569,14 +569,17 @@ pub(in crate::parser) fn err_unclosed_delim(
         closing_delim_label = None;
     } else {
         closing_delim_label = Some(eco_format!(
-            "expected closing `{}`, but found `{}` instead",
+            "expected closing `{}`, but found `{}`",
             expected_closing.descriptive_name(),
             p.current_text()
         ));
     }
+
     let closing_span = p.current_span();
-    p[open_marker]
-        .convert_to_error("unclosed delimiter")
+    let open_span = p[open_marker].span();
+
+    let err = p
+        .insert_error_at(open_span, "unclosed delimiter")
         .with_code(&E0001_UNCLOSED_DELIMITER)
         // label on the opening delimiter
         .with_label_message(eco_format!(
@@ -593,10 +596,7 @@ pub(in crate::parser) fn err_unclosed_delim(
         ));
 
     if let Some(closing_delim_label) = closing_delim_label {
-        p.last_err()
-            .expect("was just inserted")
-            // label on (or near) the closing delimiter
-            .with_label(Label::primary(closing_span, closing_delim_label));
+        err.with_label(Label::primary(closing_span, closing_delim_label));
     }
 }
 
@@ -708,7 +708,7 @@ mod tests {
             )
         "#,
             CodeBlock [
-                Error(E0001_UNCLOSED_DELIMITER)
+                LeftBrace("{")
                 FuncCall [
                     Ident("println")
                     Args [ LeftParen("(") Str("\"hello\"") RightParen(")") ]
@@ -717,6 +717,7 @@ mod tests {
                     Ident("do_other_stuff")
                     Args [ LeftParen("(") RightParen(")") ]
                 ]
+                Error(E0001_UNCLOSED_DELIMITER)
                 RightParen(")")
             ]
         );
