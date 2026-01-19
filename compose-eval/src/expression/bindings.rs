@@ -61,11 +61,11 @@ impl<'a> Eval for ast::LetBinding<'a> {
             binding_kind,
             visibility,
         )?;
-        if let PatternMatchResult::NotMatched(err) = matched {
-            bail!(err);
-        }
 
-        Ok(Evaluated::unit())
+        match matched {
+            PatternMatchResult::NotMatched(err) => bail!(err),
+            PatternMatchResult::Matched => Ok(Evaluated::unit()),
+        }
     }
 }
 

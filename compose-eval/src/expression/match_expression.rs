@@ -12,19 +12,19 @@ impl Eval for MatchExpression<'_> {
         let vm = &mut vm.new_flow_scope_guard();
         let value = self.expr().eval(vm)?.value;
 
-        'arms: for arm in self.match_arms() {
+        for arm in self.match_arms() {
             trace_fn!("eval_match_arm");
             let vm_in_arm_flow_scope = &mut vm.new_flow_scope_guard();
 
             if !try_patterns(&value, vm_in_arm_flow_scope, arm.patterns())? {
-                continue 'arms;
+                continue;
             }
 
             if let Some(guard) = arm.guard() {
                 match guard.eval(vm_in_arm_flow_scope)?.value {
                     Value::Bool(true) => {} // matched, carry on evaluating the arm
                     // Continue matching arms if the guard evaluates to false.
-                    Value::Bool(false) => continue 'arms,
+                    Value::Bool(false) => continue,
                     other => {
                         bail!(guard.span(), "match guard must evaluate to a boolean";
                         label_message: "guard evaluated to `{}`", other.repr(&mut **vm_in_arm_flow_scope);
@@ -36,7 +36,6 @@ impl Eval for MatchExpression<'_> {
 
             let result = arm.expr().eval(vm_in_arm_flow_scope)?;
 
-            // exit scope
             return Ok(result);
         }
 

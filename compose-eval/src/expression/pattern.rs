@@ -1,17 +1,17 @@
 use crate::{Eval, Evaluated, Machine};
-use compose_error_codes::{
-    E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS,
-};
+use compose_error_codes::{E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS, E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE};
 use compose_library::diag::{At, SourceDiagnostic, SourceResult, Spanned};
 use compose_library::ops::Comparison;
 use compose_library::{
-    ArrayValue, Binding, BindingKind, DebugRepr, IntoValue, MapValue, Type, Value, Visibility, Vm,
-    bail, error,
+    bail, error, ArrayValue, Binding, BindingKind, DebugRepr, IntoValue, MapValue, Type, Value,
+    Visibility, Vm,
 };
-use compose_syntax::ast;
-use compose_syntax::ast::{AstNode, DestructuringItem, Expr, Ident, LiteralPattern, Pattern};
+use compose_syntax::ast::{
+    AstNode, DestructuringItem, Expr, Ident, LiteralPattern, Pattern,
+};
+use compose_syntax::{ast, Span};
 use compose_utils::trace_fn;
-use ecow::{EcoString, EcoVec, eco_format};
+use ecow::{eco_format, EcoString, EcoVec};
 use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -81,7 +81,6 @@ pub fn destructure_into_flow(
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MatchPathSegment {
     ArrayIndex(usize),
-    #[expect(unused)]
     MapKey(EcoString),
 }
 
@@ -365,33 +364,45 @@ fn destructure_map(
 ) -> SourceResult<PatternMatchResult> {
     let map = value.heap_ref().get_unwrap(&vm.heap).clone();
 
-    let mut used = HashSet::new();
+    let mut used: HashSet<&str> = HashSet::new();
     let mut spread = None;
 
     for p in destruct.items() {
         match p {
             DestructuringItem::Named(named) => {
                 let name = named.name().get();
-                used.insert(name.as_str());
+                used.insert(name);
 
                 let Some(v) = map.get(name) else {
-                    return Ok(PatternMatchResult::NotMatched(
-                        error!(named.name().span(), "key not found in map";),
-                    ));
+                    return Ok(PatternMatchResult::NotMatched(missing_key_err(
+                        name,
+                        named.span(),
+                        &match_path,
+                    )));
                 };
 
-                let matched =
-                    destructure_impl(vm, named.pattern(), v.clone(), ctx, MatchPath::new(), bind)?;
+                let matched = destructure_impl(
+                    vm,
+                    named.pattern(),
+                    v.clone(),
+                    ctx,
+                    match_path
+                        .clone()
+                        .with_segment(MatchPathSegment::MapKey(name.clone())),
+                    bind,
+                )?;
                 if let PatternMatchResult::NotMatched(err) = matched {
                     return Ok(PatternMatchResult::NotMatched(err));
                 }
             }
             DestructuringItem::Pattern(Pattern::Single(Expr::Ident(ident))) => {
-                used.insert(ident.get().as_str());
+                used.insert(ident.get());
                 let Some(v) = map.get(ident.get()) else {
-                    return Ok(PatternMatchResult::NotMatched(
-                        error!(ident.span(), "key not found in map";),
-                    ));
+                    return Ok(PatternMatchResult::NotMatched(missing_key_err(
+                        ident.get(),
+                        ident.span(),
+                        &match_path,
+                    )));
                 };
 
                 bind(vm, Expr::Ident(ident.clone()), v.clone())?;
@@ -400,10 +411,19 @@ fn destructure_map(
                 spread = Some(s);
             }
             DestructuringItem::Pattern(_) => {
-                return Ok(PatternMatchResult::NotMatched(error!(
+                let mut err = error!(
                     destruct.span(),
                     "cannot destructure an unnamed pattern from a map"
-                )));
+                );
+
+                if !match_path.is_empty() {
+                    err.note(eco_format!(
+                        "while matching the pattern at path {}",
+                        match_path
+                    ))
+                }
+
+                return Ok(PatternMatchResult::NotMatched(err));
             }
         }
     }
@@ -433,7 +453,7 @@ fn destructure_map(
         let mut err = error!(
             destruct.span(),
             "map destructuring does not cover all keys";
-            label_message: "missing keys: {key_hint}";
+            label_message: "unmatched keys: {key_hint}";
             hint: "add `..` to ignore the remaining keys";
             hint: "or use `..name` to bind them into a map";
             code: &E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS,
@@ -450,6 +470,23 @@ fn destructure_map(
     }
 
     Ok(PatternMatchResult::Matched)
+}
+
+fn missing_key_err(name: &str, span: Span, match_path: &MatchPath) -> SourceDiagnostic {
+    let mut err = error!(
+        span, "missing key in map pattern";
+        label_message: "key `{}` is not present in the map", name;
+        code: &E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE;
+    );
+
+    if !match_path.is_empty() {
+        err.note(eco_format!(
+            "while matching the pattern at path {}",
+            match_path
+        ))
+    }
+
+    err
 }
 
 /// Returns a string describing a keyset. lists the first 3 keys, and lists the count of remaining keys.
@@ -526,9 +563,7 @@ fn wrong_number_of_elements(
 #[cfg(test)]
 mod tests {
     use crate::test::{assert_eval, eval_code};
-    use compose_error_codes::{
-        E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS,
-    };
+    use compose_error_codes::{E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS, E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE};
 
     #[test]
     fn simple_map_destructuring() {
@@ -627,16 +662,11 @@ mod tests {
     #[test]
     fn map_error_with_nonexistent_key() {
         // TODO: Add error code for nonexistent key
-        assert_eq!(
             eval_code(
                 r#"
             let { a } = { b: 1 };
         "#,
-            )
-            .get_errors()
-            .len(),
-            1
-        )
+            ).assert_errors(&[E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE]);
     }
 
     #[test]
