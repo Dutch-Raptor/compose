@@ -1,3 +1,4 @@
-let { a } = { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8 };
-assert::eq(a, 1);
-assert::eq(b, 2);
+let map = { a: 1 };
+if map is { a, b } {
+    println(a, b);
+}
