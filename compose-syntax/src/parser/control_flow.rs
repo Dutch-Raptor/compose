@@ -1,21 +1,20 @@
 use crate::kind::SyntaxKind;
-use crate::parser::Parser;
 use crate::parser::expressions::code_expression;
 use crate::parser::pattern::pattern;
 use crate::parser::statements::code;
+use crate::parser::Parser;
 use crate::set::syntax_set;
-use crate::{SyntaxErrorSeverity, set, Label};
+use crate::set;
 use compose_error_codes::E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES;
 use compose_utils::trace_fn;
 use std::collections::HashSet;
-use ecow::eco_format;
 
 pub(crate) fn conditional(p: &mut Parser) {
     trace_fn!("parse_conditional");
     let m = p.marker();
     p.assert(SyntaxKind::IfKW);
 
-    condition(p, "if");
+    condition(p);
 
     if !parse_control_flow_block(p, ControlFlow::If) {
         p.wrap(m, SyntaxKind::Conditional);
@@ -28,7 +27,7 @@ pub(crate) fn conditional(p: &mut Parser) {
         p.assert(SyntaxKind::ElseKW);
         if p.eat_if(SyntaxKind::IfKW) {
             trace_fn!("parse_else_if");
-            condition(p, "else if");
+            condition(p);
 
             if !parse_control_flow_block(p, ControlFlow::If) {
                 p.wrap(m, SyntaxKind::Conditional);
@@ -54,7 +53,7 @@ pub fn while_loop(p: &mut Parser) {
     let m = p.marker();
     p.assert(SyntaxKind::WhileKW);
 
-    condition(p, "while");
+    condition(p);
 
     parse_control_flow_block(p, ControlFlow::While);
     p.wrap(m, SyntaxKind::WhileLoop);
@@ -65,11 +64,14 @@ pub fn for_loop(p: &mut Parser) {
     let m = p.marker();
     p.assert(SyntaxKind::ForKW);
 
-    let open_paren_marker = p.marker();
-
     let wrapped = p.eat_if(SyntaxKind::LeftParen);
 
-    pattern(p, true, &mut HashSet::new());
+    if !wrapped {
+        p.insert_error_here("for loop patterns require parentheses")
+            .with_label_message("Expected an opening `(` after the `for` keyword");
+    }
+
+    pattern(p, true, false, &mut HashSet::new());
 
     p.expect(SyntaxKind::InKW);
 
@@ -77,12 +79,7 @@ pub fn for_loop(p: &mut Parser) {
     code_expression(p);
 
     if wrapped {
-        let span = p.current_span();
-        if p.expect_closing_delimiter(m, SyntaxKind::RightParen) {
-            p.insert_error_at(p[open_paren_marker].span(), eco_format!("parentheses are not required around for expressions"))
-                .with_severity(SyntaxErrorSeverity::Warning)
-                .with_label(Label::primary(span, "remove these parentheses"));
-        }
+        p.expect_closing_delimiter(m, SyntaxKind::RightParen);
     }
 
     parse_control_flow_block(p, ControlFlow::For);
@@ -90,22 +87,25 @@ pub fn for_loop(p: &mut Parser) {
     p.wrap(m, SyntaxKind::ForLoop);
 }
 
-fn condition(p: &mut Parser, control_flow: &str) {
+fn condition(p: &mut Parser) {
     trace_fn!("parse_condition");
     let m = p.marker();
 
     let wrapped = p.eat_if(SyntaxKind::LeftParen);
+    if !wrapped {
+        p.insert_error_here("condition expressions require parentheses")
+            .with_label_message("Expected an opening `(` before the condition");
+
+        p.recover_until(syntax_set!(LeftBrace));
+
+        // error is not recoverable within the condition, try to recover until after and abort
+        return;
+    }
 
     code_expression(p);
 
     if wrapped {
-        let span = p.current_span();
         p.expect_closing_delimiter(m, SyntaxKind::RightParen);
-
-        p.insert_error_at(p[m].span(), eco_format!("parentheses are not required around {control_flow} conditions"))
-            .with_severity(SyntaxErrorSeverity::Warning)
-            .with_label(Label::primary(span, "remove these parentheses"));
-
     }
 
     p.wrap(m, SyntaxKind::Condition);
@@ -189,14 +189,16 @@ mod tests {
     fn test_parse_while() {
         assert_parse_tree!(
             r#"
-            while true {
+            while (true) {
                 do_thing();
             }
             "#,
             WhileLoop [
                 WhileKW("while")
                 Condition [
+                    LeftParen("(")
                     Bool("true")
+                    RightParen(")")
                 ]
                 CodeBlock [
                     LeftBrace("{")
@@ -214,14 +216,16 @@ mod tests {
     fn test_parse_if() {
         assert_parse_tree!(
             r#"
-            if true {
+            if (true) {
                 do_thing();
             }
             "#,
             Conditional [
                 IfKW("if")
                 Condition [
+                    LeftParen("(")
                     Bool("true")
+                    RightParen(")")
                 ]
                 CodeBlock [...]
             ]
@@ -231,7 +235,7 @@ mod tests {
     #[test]
     fn test_if_missing_braces_reports_error() {
         assert_parse_tree!(r#"
-            if true
+            if (true)
                 do_thing();
             "#,
             Conditional [
@@ -251,9 +255,9 @@ mod tests {
     #[test]
     fn test_if_else_if_else_chain() {
         assert_parse_tree!(r#"
-            if cond1 {
+            if (cond1) {
                 do_one();
-            } else if cond2 {
+            } else if (cond2) {
                 do_two();
             } else {
                 do_fallback();
@@ -262,14 +266,18 @@ mod tests {
             Conditional [
                 IfKW("if")
                 Condition [
+                    LeftParen("(")
                     Ident("cond1")
+                    RightParen(")")
                 ]
                 CodeBlock [...]
                 ConditionalAlternate [
                     ElseKW("else")
                     IfKW("if")
                     Condition [
+                        LeftParen("(")
                         Ident("cond2")
+                        RightParen(")")
                     ]
                     CodeBlock [...]
                 ]
@@ -281,3 +289,4 @@ mod tests {
         );
     }
 }
+

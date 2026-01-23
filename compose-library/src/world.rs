@@ -5,21 +5,71 @@ use compose_syntax::{FileId, Source, Span};
 use std::io::{Read, Write};
 use std::ops::Range;
 
+/**
+Defines how Compose interacts with the outside world.
+
+[`World`] is an abstraction layer between the Compose runtime and its external environment.
+
+It is responsible for:
+
+- Loading source files and defining the program entrypoint.
+- Providing access to a standard library.
+- Provide I/O primitives for stdout.
+
+This trait allows Compose to be embedded in different environments
+(e.g. CLI tools, editors, tests, or sandboxes) without hard-coding
+filesystem or I/O behaviour.
+*/
 pub trait World {
-    /// The entrypoint file of the program to execute
+    /// Returns the [`FileId`] of the entrypoint of the program.
     fn entry_point(&self) -> FileId;
 
+    /// Returns the Source identified by the given [`FileId`]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source cannot be located or loaded.
     fn source(&self, file_id: FileId) -> FileResult<Source>;
 
+    /// Returns a reference to the standard library available to the program.
     fn library(&self) -> &Library;
 
-    fn write(&self, f: &dyn Fn(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()>;
-    fn read(&self, f: &dyn Fn(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()>;
+    /// Provides write access to the program's output stream.
+    ///
+    /// The provided closure is given exclusive access to a writer
+    /// for the duration of the call.
+    fn write(
+        &self,
+        f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>,
+    ) -> std::io::Result<()>;
 
+    /// Provides read access to the program's input stream.
+    ///
+    /// The provided closure is given exclusive access to the reader
+    /// for the duration of the call.
+    fn read(&self, f: &mut dyn FnMut(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()>;
+
+    /// Provides read and write access to the programs input and output stream.
+    ///
+    /// The provided closure is given exclusive access to the reader and writer
+    /// for the duration of the call.
+    fn with_io(
+        &self,
+        f: &mut dyn FnMut(&mut dyn Read, &mut dyn Write) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
+        self.read(&mut |r| self.write(&mut |w| f(r, w)))
+    }
+
+    /// Returns a human-readable name for the given file identifier.
+    ///
+    /// By default, this is derived from the file's path.
     fn name(&self, id: FileId) -> String {
         id.path().0.display().to_string()
     }
 
+    /// Attempts to retrieve the source associated with the given span.
+    ///
+    /// This is primarily used for diagnostics and error reporting.
     fn related_source(&self, span: Span) -> Option<Source> {
         self.source(span.id()?).ok()
     }
@@ -29,13 +79,15 @@ pub struct SyntaxContext<'a> {
     pub world: &'a dyn World,
 }
 
-
 impl<'a> Files<'a> for &dyn World {
     type FileId = FileId;
     type Name = String;
     type Source = Source;
 
-    fn name(&'a self, id: Self::FileId) -> Result<Self::Name, compose_codespan_reporting::files::Error> {
+    fn name(
+        &'a self,
+        id: Self::FileId,
+    ) -> Result<Self::Name, compose_codespan_reporting::files::Error> {
         Ok(World::name(*self, id))
     }
 

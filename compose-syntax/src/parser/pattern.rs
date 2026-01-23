@@ -42,10 +42,10 @@ pub fn match_expr(p: &mut Parser) {
 
         // patterns
         let mut first_bindings = HashSet::new();
-        pattern(p, false, &mut first_bindings);
+        pattern(p, false, false, &mut first_bindings);
         while p.eat_if(SyntaxKind::Pipe) {
             let mut current_bindings = HashSet::new();
-            pattern(p, false, &mut current_bindings);
+            pattern(p, false, false, &mut current_bindings);
 
             if current_bindings != first_bindings {
                 insert_pattern_bindings_mismatch_error(
@@ -121,6 +121,7 @@ fn insert_pattern_bindings_mismatch_error(
 pub fn pattern<'s>(
     p: &mut Parser<'s>,
     reassignment: bool,
+    in_typed_pattern: bool,
     seen: &mut HashSet<&'s str>,
 ) {
     trace_fn!("parse_pattern");
@@ -137,7 +138,7 @@ pub fn pattern<'s>(
         SyntaxKind::Underscore => p.eat(),
         SyntaxKind::LeftBracket => destructure_array(p, seen),
         SyntaxKind::LeftBrace => destructure_map(p, seen),
-        _ => pattern_leaf(p, seen, reassignment),
+        _ => pattern_leaf(p, seen, reassignment, in_typed_pattern),
     }
 }
 
@@ -198,7 +199,7 @@ fn destructuring_item<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, sink:
     if p.eat_if(SyntaxKind::Dots) {
         // sink
         if p.at_set(set::PATTERN_LEAF) {
-            pattern_leaf(p, seen, false);
+            pattern_leaf(p, seen, false, false);
         }
         p.wrap(m, SyntaxKind::Spread);
         if mem::replace(sink, true) {
@@ -208,10 +209,10 @@ fn destructuring_item<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, sink:
     }
 
     // parse normal array element or map key
-    pattern(p, false, seen);
+    pattern(p, false, false, seen);
 
     if p.eat_if(SyntaxKind::Colon) {
-        pattern(p, true, seen);
+        pattern(p, true, false, seen);
 
         if p[m].kind() != SyntaxKind::Ident {
             p[m].expected("identifier after `:` in destructuring pattern")
@@ -221,7 +222,7 @@ fn destructuring_item<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, sink:
     }
 }
 
-fn pattern_leaf<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, reassignment: bool) {
+fn pattern_leaf<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, reassignment: bool, in_typed_pattern: bool) {
     trace_fn!("parse_pattern_leaf");
     if p.current().is_keyword() {
         p.token.node.expected("pattern");
@@ -243,16 +244,25 @@ fn pattern_leaf<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, reassignmen
     // This way the entire expression can be marked as an error if it is not.
     expressions::code_expr_prec(p, ExprContext::AtomicExpr, Precedence::Lowest);
 
-    let mut span = p.last_node().expect("was just parsed").span();
+    let last_node = p.last_node().expect("was just parsed");
+    let mut span = last_node.span();
+    let last_kind = last_node.kind();
 
-    let at_typed_binding = p.at(SyntaxKind::Ident);
+    if !reassignment && last_node.kind() != SyntaxKind::Ident {
+        p.insert_error_at(span, "pattern leaf must be an identifier or `_`")
+            .with_label_message("expected this to be an identifier");
+        return;
+    }
+
+    // Do not allow nested typed bindings
+    let at_typed_binding = last_kind == SyntaxKind::Ident && p.at_set(set::PATTERN) && !in_typed_pattern;
 
     if at_typed_binding {
         binding_text = p.current_text();
         span = p.current_span();
 
-        p.expect(SyntaxKind::Ident);
-        p.wrap(m, SyntaxKind::TypedBindingPattern);
+        pattern(p, reassignment, true, seen);
+        p.wrap(m, SyntaxKind::TypedPattern);
     }
 
     if !seen.insert(binding_text) && reassignment {

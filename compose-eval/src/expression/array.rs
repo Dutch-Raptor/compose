@@ -1,7 +1,8 @@
-use crate::{Eval, Evaluated, Machine, ValueEvaluatedExtensions};
+use crate::{Eval, Machine};
 use compose_library::diag::SourceResult;
 use compose_library::{ArrayValue, IntoValue, Value, Vm};
 use compose_syntax::ast;
+use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
 
 impl<'a> Eval for ast::Array<'a> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

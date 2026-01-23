@@ -1,9 +1,10 @@
 use crate::vm::Machine;
-use crate::{Eval, Evaluated, ValueEvaluatedExtensions};
-use compose_library::diag::{At, SourceResult, bail};
-use compose_library::{Value, ops};
+use crate::Eval;
+use compose_library::diag::{bail, At, SourceResult};
+use compose_library::{ops, Value};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
+use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
 
 impl Eval for ast::Binary<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

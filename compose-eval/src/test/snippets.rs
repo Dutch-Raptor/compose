@@ -7,7 +7,7 @@ fn fibonacci() {
         let mut b = 0;
         let mut i = 1;
 
-        while i < 92 {
+        while (i < 92) {
             a += b;
             b = a - b;
             i += 1;
@@ -43,7 +43,7 @@ fn closure_recursion() {
     let input = r#"
         // Recursively clamps a value to <= 0;
         let no_pos = { v =>
-            if v > 0 {
+            if (v > 0) {
                 no_pos(v - 1);
             } else {
                 v;
@@ -61,7 +61,7 @@ fn closure_recursion() {
 fn closure_recursion_2() {
     let input = r#"
         let fact = { n  =>
-            if n == 0 {
+            if (n == 0) {
                 1;
             } else {
                 n * fact(n - 1);

@@ -108,16 +108,16 @@ impl World for TestWorld {
         &self.library
     }
 
-    fn write(&self, f: &dyn Fn(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
+    fn write(&self, f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
         f(&mut std::io::stdout())
     }
 
-    fn read(&self, f: &dyn Fn(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()> {
+    fn read(&self, f: &mut dyn FnMut(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()> {
         f(&mut std::io::stdin())
     }
 }
 
-fn print_diagnostics(
+pub fn print_diagnostics(
     world: &TestWorld,
     errors: &[SourceDiagnostic],
     warnings: &[SourceDiagnostic],
@@ -196,8 +196,9 @@ impl TestResult {
     }
 
     #[track_caller]
-    pub fn assert_errors(self, expected_errors: &[ErrorCode]) -> Self {
+    pub fn assert_errors(self, expected_errors: &[&ErrorCode]) -> Self {
         match &self.value {
+            Ok(_) if expected_errors.is_empty() => {},
             Ok(_) => panic!("expected errors, but got none"),
             Err(errors) => {
                 if expected_errors.is_empty() {
@@ -207,7 +208,7 @@ impl TestResult {
                     .iter()
                     .map(|e| e.code)
                     .zip(expected_errors.iter().map(Some))
-                    .any(|(a, b)| a != b)
+                    .any(|(a, b)| a.as_ref() != b)
                 {
                     print_diagnostics(&self.world, errors, &self.warnings);
                     panic!(
@@ -222,13 +223,13 @@ impl TestResult {
     }
 
     #[track_caller]
-    pub fn assert_warnings(self, expected_warnings: &[ErrorCode]) -> Self {
+    pub fn assert_warnings(self, expected_warnings: &[&ErrorCode]) -> Self {
         if self
             .warnings
             .iter()
             .map(|e| e.code)
             .zip(expected_warnings.iter().map(Some))
-            .any(|(a, b)| a != b)
+            .any(|(a, b)| a.as_ref() != b)
         {
             print_diagnostics(&self.world, &self.warnings, &self.warnings);
             panic!(

@@ -1,4 +1,4 @@
-## E0311 — Match arm patterns bind different variables
+## E0311: Match arm patterns bind different variables
 
 ### Error
 

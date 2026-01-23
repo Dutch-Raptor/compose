@@ -1,6 +1,7 @@
-use crate::{Eval, Evaluated, Machine};
+use crate::{Eval, Machine};
 use compose_library::diag::SourceResult;
 use compose_syntax::ast::CodeBlock;
+use crate::evaluated::Evaluated;
 
 impl Eval for CodeBlock<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

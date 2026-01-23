@@ -1,5 +1,5 @@
-use crate::vm::{Machine};
-use crate::{Eval, Evaluated};
+use crate::vm::Machine;
+use crate::Eval;
 use compose_library::diag::SourceResult;
 use compose_syntax::ast::{AstNode, Expr};
 
@@ -21,8 +21,10 @@ mod map;
 mod index_access;
 mod pattern;
 mod match_expression;
+mod captures_visitor;
 
 pub use closure::eval_lambda;
+use crate::evaluated::Evaluated;
 
 impl Eval for Expr<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -30,7 +32,6 @@ impl Eval for Expr<'_> {
         let v = match self {
             Expr::Int(i) => i.eval(vm),
             Expr::Binary(b) => b.eval(vm),
-            Expr::LetBinding(l) => l.eval(vm),
             Expr::Ident(i) => i.eval(vm),
             Expr::CodeBlock(c) => c.eval(vm),
             Expr::Unit(_) => Ok(Evaluated::unit()),

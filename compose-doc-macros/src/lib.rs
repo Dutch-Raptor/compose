@@ -16,7 +16,7 @@ pub fn compose_doc(input: BoundaryStream) -> BoundaryStream {
 
     // Transform markdown
     let transformed =
-        match compose_doc::transform_markdown(&markdown, &compose_doc::Config::no_color()) {
+        match compose_doc::transform_markdown(&markdown, &compose_doc::Config::no_color().emit_code_as_doc_tests(true)) {
             Ok(t) => t,
             Err(e) => {
                 return syn::Error::new_spanned(&item, format!("{}: {}", e.line, e.message))

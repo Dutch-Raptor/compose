@@ -38,7 +38,7 @@ impl World for DocWorld {
         &self.library
     }
 
-    fn write(&self, f: &dyn Fn(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
+    fn write(&self, f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
         let mut buffer: Vec<u8> = Vec::new();
         f(&mut buffer)?;
         let output = String::from_utf8(buffer).expect("Invalid UTF-8");
@@ -46,7 +46,7 @@ impl World for DocWorld {
         Ok(())
     }
 
-    fn read(&self, f: &dyn Fn(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()> {
+    fn read(&self, f: &mut dyn FnMut(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()> {
         f(&mut std::io::stdin())
     }
 }

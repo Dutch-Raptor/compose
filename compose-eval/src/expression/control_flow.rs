@@ -1,10 +1,11 @@
 use crate::expression::pattern::{destructure_pattern, PatternContext, PatternMatchResult};
 use crate::vm::{FlowEvent, Tracked};
-use crate::{Eval, Evaluated, Machine};
+use crate::{Eval, Machine};
 use compose_library::diag::{At, SourceResult};
 use compose_library::{bail, BindingKind, IterValue, Value, ValueIterator, Visibility};
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
+use crate::evaluated::Evaluated;
 
 impl Eval for ast::Conditional<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

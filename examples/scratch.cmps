@@ -1,4 +1,5 @@
-let map = { a: 1 };
-if map is { a, b } {
-    println(a, b);
+let value = 1;
+
+if value is Int {
+    println(value)
 }
