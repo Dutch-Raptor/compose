@@ -187,7 +187,7 @@ fn rewrite_code_blocks<'a>(
                     "compose" => {
                         let (code, raw) = parse_code_block(parser);
                         if config.emit_code_as_doc_tests {
-                            let rust_code = emit_as_test(&raw, &meta, line);
+                            let rust_code = code_block_as_rust_test(&raw, &meta, line);
                             let eval = eval_code(&code);
                             events.extend(emit_code_block("rust".to_string(), rust_code?));
                             ctx.last_eval = Some(eval);
@@ -212,7 +212,7 @@ fn rewrite_code_blocks<'a>(
     Ok(events)
 }
 
-fn emit_as_test(
+fn code_block_as_rust_test(
     raw: &String,
     meta: &BlockHeader,
     line: usize,
