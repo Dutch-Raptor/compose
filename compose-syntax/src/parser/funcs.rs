@@ -99,6 +99,10 @@ pub(crate) fn lambda(p: &mut Parser) {
 
     p.expect(SyntaxKind::Arrow);
 
+    if p.at(SyntaxKind::RightBrace) {
+        p.insert_error_here("lambda body cannot be empty");
+    }
+
     code(p, syntax_set!(RightBrace));
 
     p.expect_closing_delimiter(m, SyntaxKind::RightBrace);
@@ -227,7 +231,7 @@ fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
     let was_at_pat = p.at_set(set::PATTERN);
     let pat_m = p.marker();
 
-    pattern::pattern(p, false, seen);
+    pattern::pattern(p, false, false, seen);
 
     // Parse named params like `a: 1`
     if p.eat_if(SyntaxKind::Colon) {
@@ -295,13 +299,17 @@ mod tests {
     #[test]
     fn test_parse_closure_discard_param() {
         assert_parse_tree!(
-            "{ _ => }",
+            "{ _ => () }",
             Lambda [
                 LeftBrace("{")
                 Params [
                     Param [ Underscore("_") ]
                 ]
                 Arrow("=>")
+                Unit [
+                    LeftParen("(")
+                    RightParen(")")
+                ]
                 RightBrace("}")
             ]
         );
@@ -310,7 +318,7 @@ mod tests {
     #[test]
     fn test_parse_closure_named_param() {
         assert_parse_tree!(
-            "{a: b => }",
+            "{a: b => () }",
             Lambda [
                 LeftBrace("{")
                 Params [
@@ -319,6 +327,10 @@ mod tests {
                     ]
                 ]
                 Arrow("=>")
+                Unit [
+                    LeftParen("(")
+                    RightParen(")")
+                ]
                 RightBrace("}")
             ]
         );

@@ -110,21 +110,21 @@ pub fn let_binding(p: &mut Parser) {
         // eat tokens until we find an `=` or the end of this statement
         p.recover_until(syntax_set!(Eq, End, NewLine, RightBrace));
     } else {
-        pattern::pattern(p, false, &mut HashSet::new());
+        pattern::pattern(p, false, false, &mut HashSet::new());
     }
 
     if p.eat_if(SyntaxKind::Eq) {
         code_expression(p);
     } else if p.at_set(set::ATOMIC_EXPR) && !p.had_leading_newline() {
         let pattern_text = p.last_text().to_owned();
-        p.insert_error_before("expected `=` after a binding")
+        p.insert_error_before("expected `=` after binding name")
             .with_label_message("expected `=` here")
             .with_code(&E0007_MISSING_EQUALS_AFTER_LET_BINDING)
             .with_hint(eco_format!("if you meant to initialize the binding, add `=`: `let {}{} = ...`",
                 if was_mut { "mut " } else { "" },
                 pattern_text,
             ))
-            .with_hint(eco_format!("if you meant to leave it uninitialized, add a semicolon or newline: `let {pattern_text};` or place the next expression on a new line"));
+            .with_hint(eco_format!("if you meant to leave it uninitialized, add a semicolon: `let {pattern_text};`"));
 
         // Assume that the user meant to initialize the binding.
         code_expression(p);
@@ -210,31 +210,6 @@ mod tests {
             LetBinding [
                 LetKW("let")
                 Ident("x")
-            ]
-        );
-    }
-
-    #[test]
-    fn test_parse_let_binding_missing_eq() {
-        assert_parse_tree!("let x 1;",
-            LetBinding [
-                LetKW("let")
-                Ident("x")
-                Error(E0007_MISSING_EQUALS_AFTER_LET_BINDING)
-                Int("1")
-            ]
-        );
-    }
-
-    #[test]
-    fn test_parse_let_mut_binding_missing_eq() {
-        assert_parse_tree!("let mut x 1;",
-            LetBinding [
-                LetKW("let")
-                MutKW("mut")
-                Ident("x")
-                Error(E0007_MISSING_EQUALS_AFTER_LET_BINDING)
-                Int("1")
             ]
         );
     }

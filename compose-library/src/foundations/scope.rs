@@ -1,16 +1,16 @@
-use crate::diag::{error, warning, At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult};
+use crate::diag::{At, IntoSourceDiagnostic, SourceDiagnostic, SourceResult, error, warning};
 use crate::{IntoValue, Trace};
 use crate::{Library, NativeFuncData, NativeType, Sink, Type, Value};
 use compose_error_codes::{
     E0004_MUTATE_IMMUTABLE_VARIABLE, E0011_UNBOUND_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE,
 };
-use compose_library::diag::{bail, StrResult};
+use compose_library::diag::{StrResult, bail};
 use compose_library::{Func, NativeFunc, UntypedRef};
 use compose_syntax::{Label, Span};
 use compose_utils::trace_log;
-use ecow::{eco_format, eco_vec, EcoString};
-use indexmap::map::Entry;
+use ecow::{EcoString, eco_format, eco_vec};
 use indexmap::IndexMap;
+use indexmap::map::Entry;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -24,25 +24,31 @@ pub trait NativeScope {
 
 pub static EMPTY_SCOPE: LazyLock<Scope> = LazyLock::new(Scope::new_lexical);
 
+/**
+Manages Bindings, Lexical Scopes, and Flow Scopes as well as access to the standard library.
+
+Scopes are organised as a stack of [`Scope`]s. Each scope contains a map of variable names to [`Binding`]s.
+
+# Scope kinds
+
+Compose has two kinds of scopes: lexical and flow. Lexical scopes are used to define long-lived variables
+and work very similarly to scopes in other languages. In general, a lexical scope is created when a block
+is entered, and destroyed when it is exited. Flow scopes are used to define temporary variables that are
+only valid within a particular expression or statement. This shows up in pattern matching like
+`x is Int y && y > 0`, where `y` is a flow variable.
+
+These scope kinds live in a single stack with flow and lexical scopes interleaved.
+New flow bindings are always bound to the top flow `Scope`, and can only be bound when the top scope is a flow scope.
+Lexical bindings are bound to the top lexical `Scope`, but it can be below other flow scopes.
+
+# At least one lexical scope is present
+At least one lexical scope must be present in the stack at all times.
+This 'bottom' scope represents the global scope for a module.
+*/
 #[derive(Clone)]
 pub struct Scopes<'a> {
-    /// The rest of the scopes.
     pub stack: Vec<Scope>,
     pub lib: Option<&'a Library>,
-}
-
-impl Default for Scopes<'_> {
-    fn default() -> Self {
-        Self::new(None)
-    }
-}
-
-impl Debug for Scopes<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Scopes")
-            .field("stack", &self.stack)
-            .finish()
-    }
 }
 
 impl<'a> Scopes<'a> {
@@ -191,6 +197,20 @@ impl<'a> Scopes<'a> {
     }
 }
 
+impl Default for Scopes<'_> {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
+impl Debug for Scopes<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Scopes")
+            .field("stack", &self.stack)
+            .finish()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum VariableAccessError {
     Unbound(UnBoundError),
@@ -290,6 +310,7 @@ pub enum ScopeKind {
 }
 
 #[derive(Debug, Default, Clone)]
+/// Stores Bindings within a scope.
 pub struct Scope {
     kind: ScopeKind,
     map: IndexMap<EcoString, Binding>,

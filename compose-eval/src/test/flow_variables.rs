@@ -24,5 +24,5 @@ fn is_expression_flow_scope_does_not_leak() {
         x; // should not be in scope here
     "#,
     )
-    .assert_errors(&[E0011_UNBOUND_VARIABLE]);
+    .assert_errors(&[&E0011_UNBOUND_VARIABLE]);
 }

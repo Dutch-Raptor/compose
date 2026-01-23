@@ -1,10 +1,10 @@
-use crate::foundations::ops::Comparison;
 use crate::diag::bail;
-use compose_library::{Value, Vm};
+use crate::foundations::ops::Comparison;
 use compose_library::diag::StrResult;
+use compose_library::repr::Repr;
+use compose_library::{Value, Vm};
 use compose_macros::{func, scope};
 use ecow::EcoString;
-use compose_library::repr::Repr;
 
 #[func(scope)]
 pub fn assert(cond: bool, #[named] message: Option<EcoString>) -> StrResult<()> {
@@ -21,8 +21,12 @@ pub fn assert(cond: bool, #[named] message: Option<EcoString>) -> StrResult<()> 
 #[scope]
 impl assert {
     #[func]
-    pub fn eq(vm: &dyn Vm, left: Value, right: Value, #[named] message: Option<EcoString>) -> StrResult<()> {
-        
+    pub fn eq(
+        vm: &dyn Vm,
+        left: Value,
+        right: Value,
+        #[named] message: Option<EcoString>,
+    ) -> StrResult<()> {
         if !left.equals(&right, vm.heap())? {
             let l_repr = left.repr(vm);
             let r_repr = right.repr(vm);
@@ -38,10 +42,16 @@ impl assert {
     }
 
     #[func]
-    pub fn ne(vm: &dyn Vm, left: Value, right: Value) -> StrResult<()> {
+    pub fn ne(
+        vm: &dyn Vm,
+        left: Value,
+        right: Value,
+        #[named] message: Option<EcoString>,
+    ) -> StrResult<()> {
         if left.equals(&right, vm.heap())? {
             bail!(
-                "assertion `left != right` failed\n{:>7} = {left:?}\n{:>7} = {right:?}",
+                "assertion `left != right` failed{}\n{:>7} = {left:?}\n{:>7} = {right:?}",
+                message.map(|msg| format!(": {}", msg)).unwrap_or_default(),
                 "left:",
                 "right:"
             )

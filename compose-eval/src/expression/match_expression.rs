@@ -1,10 +1,11 @@
-use crate::expression::pattern::{PatternMatchResult, destructure_into_flow};
-use crate::{Eval, Evaluated, Machine};
+use crate::expression::pattern::{destructure_into_flow, PatternMatchResult};
+use crate::{Eval, Machine};
 use compose_library::Value;
-use compose_library::diag::{SourceResult, bail};
+use compose_library::diag::{bail, SourceResult};
 use compose_library::repr::Repr;
 use compose_syntax::ast::{AstNode, MatchExpression, Pattern};
 use compose_utils::trace_fn;
+use crate::evaluated::Evaluated;
 
 impl Eval for MatchExpression<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

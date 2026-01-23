@@ -1,15 +1,16 @@
+use crate::expression::captures_visitor::CapturesVisitor;
+use crate::expression::pattern::{destructure_pattern, PatternContext, PatternMatchResult};
 use crate::vm::{FlowEvent, TrackedContainer};
-use crate::{Eval, Evaluated, Machine, ValueEvaluatedExtensions};
+use crate::{Eval, Machine};
 use compose_library::diag::{bail, error, IntoSourceDiagnostic, SourceResult, Spanned};
 use compose_library::{
-    Args, Binding, BindingKind, Closure, Func, IntoValue, Library, Scope, Scopes, Value,
+    Args, Binding, BindingKind, Closure, Func, IntoValue, Scope, Value,
     VariableAccessError, Visibility,
 };
 use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind, Pattern};
-use compose_syntax::{ast, Label, Span, SyntaxNode};
-use ecow::{EcoString, EcoVec};
-use std::collections::HashMap;
-use crate::expression::pattern::{destructure_pattern, PatternContext, PatternMatchResult};
+use compose_syntax::{ast, Label};
+use ecow::EcoVec;
+use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
 
 impl Eval for ast::Lambda<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -200,24 +201,29 @@ pub fn eval_lambda(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRes
             let mut defaults = closure.defaults.iter();
             for p in params.children() {
                 match p.kind() {
-                    ast::ParamKind::Pos(pattern) => {
-                        match pattern {
-                            Pattern::Single(Expr::Ident(ident)) => {
-                                define(vm, ident, args.expect(&ident)?, p)?;
-                            }
-                            pattern => {
-                                let Some(v) = args.eat()? else {
-                                   bail!(pattern.span(), "missing argument for this parameter");
-                                };
-                                let binding_kind = match p.is_mut() {
-                                    false => BindingKind::Param,
-                                    true => BindingKind::ParamMut,
-                                };
-                                
-                                match destructure_pattern(vm, pattern, v, PatternContext::Parameter, binding_kind, Visibility::Private)? {
-                                    PatternMatchResult::NotMatched(err) => bail!(err),
-                                    PatternMatchResult::Matched => {},
-                                }
+                    ast::ParamKind::Pos(pattern) => match pattern {
+                        Pattern::Single(Expr::Ident(ident)) => {
+                            define(vm, ident, args.expect(&ident)?, p)?;
+                        }
+                        pattern => {
+                            let Some(v) = args.eat()? else {
+                                bail!(pattern.span(), "missing argument for this parameter");
+                            };
+                            let binding_kind = match p.is_mut() {
+                                false => BindingKind::Param,
+                                true => BindingKind::ParamMut,
+                            };
+
+                            match destructure_pattern(
+                                vm,
+                                pattern,
+                                v,
+                                PatternContext::Parameter,
+                                binding_kind,
+                                Visibility::Private,
+                            )? {
+                                PatternMatchResult::NotMatched(err) => bail!(err),
+                                PatternMatchResult::Matched => {}
                             }
                         }
                     },
@@ -262,163 +268,9 @@ pub fn eval_lambda(closure: &Closure, vm: &mut Machine, args: Args) -> SourceRes
     result
 }
 
-/// Visits a closure and determines which variables are captured implicitly.
-#[derive(Debug)]
-pub struct CapturesVisitor<'a> {
-    /// The external scope that variables might be captured from.
-    external: &'a Scopes<'a>,
-    /// The internal scope of variables defined within the closure.
-    internal: Scopes<'a>,
-    /// The variables that are captured.
-    captures: HashMap<EcoString, Span>,
-}
-
-impl<'a> CapturesVisitor<'a> {
-    pub fn new(external: &'a Scopes<'a>, library: Option<&'a Library>, existing: &Scope) -> Self {
-        let mut visitor = Self {
-            external,
-            internal: Scopes::new(library),
-            captures: HashMap::new(),
-        };
-
-        for (k, v) in existing.bindings() {
-            visitor.internal.top_lexical_mut().bind(k.clone(), v.clone());
-        }
-
-        visitor
-    }
-    pub(crate) fn visit_lambda(&mut self, closure: ast::Lambda<'a>) {
-        for param in closure.params().children() {
-            match param.kind() {
-                ParamKind::Pos(pat) => {
-                    for ident in pat.bindings() {
-                        self.bind(ident);
-                    }
-                }
-                ParamKind::Named(named) => {
-                    self.bind(named.name());
-                }
-            }
-        }
-
-        for capture in closure.captures().children() {
-            self.visit(capture.to_untyped());
-        }
-
-        for statement in closure.statements() {
-            self.visit(statement.to_untyped());
-        }
-    }
-
-    pub fn visit(&mut self, node: &'a SyntaxNode) {
-        if let Some(ast::Statement::Let(let_binding)) = node.cast() {
-            if let Some(init) = let_binding.initial_value() {
-                self.visit(init.to_untyped())
-            }
-
-            for ident in let_binding.pattern().bindings() {
-                self.bind(ident);
-            }
-            return;
-        }
-
-        let expr = match node.cast::<Expr>() {
-            Some(expr) => expr,
-            None => {
-                if let Some(named) = node.cast::<ast::Named>() {
-                    // Don't capture the name of a named parameter.
-                    self.visit(named.expr().to_untyped());
-                    return;
-                }
-
-                Expr::default()
-            }
-        };
-
-        match expr {
-            Expr::Ident(ident) => self.capture(ident),
-            Expr::CodeBlock(_) => {
-                self.internal.enter_lexical();
-                for child in node.children() {
-                    self.visit(child);
-                }
-                self.internal.exit_lexical();
-            }
-            Expr::FieldAccess(access) => {
-                self.visit(access.target().to_untyped());
-            }
-            Expr::Lambda(closure) => {
-                for param in closure.params().children() {
-                    if let ast::ParamKind::Named(named) = param.kind() {
-                        self.visit(named.expr().to_untyped());
-                    }
-                }
-
-                for capture in closure.captures().children() {
-                    self.visit(capture.to_untyped());
-                }
-
-                // NOTE: For now we do not try to analyse the body of the closure.
-                // This is because the closure might try to recursively call itself
-                // and in simple ast walking, that is really hard to resolve correctly.
-                // Any errors in the body will be caught when the outer body is evaluated.
-            }
-
-            Expr::ForLoop(for_loop) => {
-                // Created in outer scope
-                self.visit(for_loop.iterable().to_untyped());
-
-                self.internal.enter_lexical();
-                let pattern = for_loop.binding();
-                for ident in pattern.bindings() {
-                    self.bind(ident);
-                }
-
-                self.visit(for_loop.body().to_untyped());
-                self.internal.exit_lexical();
-            }
-
-            _ => {
-                // If not an expression or named, just go over all the children
-                for child in node.children() {
-                    self.visit(child);
-                }
-            }
-        }
-    }
-
-    fn bind(&mut self, ident: Ident) {
-        self.internal.top_lexical_mut().bind(
-            ident.get().clone(),
-            Binding::new(Value::unit(), ident.span()),
-        );
-    }
-
-    fn capture(&mut self, ident: Ident<'a>) {
-        if self.internal.get(&ident).is_ok() {
-            // Was defined internally, no need to capture
-            return;
-        }
-
-        // If the value does not exist in the external scope, it is not captured.
-        if self.external.get(&ident).is_ok() {
-            self.captures
-                .entry(ident.get().clone())
-                .or_insert(ident.span());
-        }
-    }
-
-    fn finish(self) -> HashMap<EcoString, Span> {
-        self.captures
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::expression::closure::CapturesVisitor;
     use crate::test::*;
-    use compose_library::{Scope, Scopes};
-    use compose_syntax::{parse, FileId};
 
     #[test]
     fn capturing() {
@@ -464,81 +316,4 @@ mod tests {
         );
     }
 
-    #[track_caller]
-    fn test(scopes: &Scopes, existing_scope: &Scope, text: &str, expected_names: &[&str]) {
-        let mut visitor = CapturesVisitor::new(scopes, None, existing_scope);
-        let nodes = parse(text, FileId::new("test.comp"));
-
-        for node in &nodes {
-            assert!(node.errors().is_empty(), "node has errors: {:#?}", node.errors());
-            visitor.visit(node);
-        }
-
-        let captures = visitor.finish();
-        let mut names: Vec<_> = captures.iter().map(|(k, ..)| k).collect();
-        names.sort();
-
-        assert_eq!(names, expected_names);
-    }
-
-    #[test]
-    fn test_captures_visitor() {
-        let mut scopes = Scopes::new(None);
-        scopes.top_lexical_mut().define("f", 0i64);
-        scopes.top_lexical_mut().define("x", 0i64);
-        scopes.top_lexical_mut().define("y", 0i64);
-        scopes.top_lexical_mut().define("z", 0i64);
-        let s = &scopes;
-
-        let mut existing = Scope::new_lexical();
-        existing.define("a", 0i64);
-        existing.define("b", 0i64);
-        existing.define("c", 0i64);
-        let e = &existing;
-
-        test(s, e, "{ x => x * 2; }", &[]);
-
-        // let binding
-        test(s, e, "let t = x;", &["x"]);
-        test(s, e, "let x = x;", &["x"]);
-        test(s, e, "let x;", &[]);
-        test(s, e, "let x = 2; x + y;", &["y"]);
-        test(s, e, "x + y", &["x", "y"]);
-
-        // assignment
-        test(s, e, "x += y;", &["x", "y"]);
-        test(s, e, "x = y;", &["x", "y"]);
-
-        // closure definition
-        // Closure bodies are ignored
-        test(s, e, "let f = { => x + y; }", &[]);
-        // with capture
-        test(s, e, "let f = { |x| => x + y; }", &["x"]);
-        test(s, e, "let f = { |x| => f(); }", &["x"]);
-        // with params
-        test(s, e, "let f = { x, y, z => f(); }", &[]);
-        // named params
-        test(
-            s,
-            e,
-            "let f = { x: x, y: y, z: z => f(); }",
-            &["x", "y", "z"],
-        );
-
-        // for loop
-        test(s, e, "for (x in y) { x + z; };", &["y", "z"]);
-        test(s, e, "for (x in y) { x; }; x", &["x", "y"]);
-
-        // block
-        test(s, e, "{ x; };", &["x"]);
-        test(s, e, "{ let x; x; };", &[]);
-        test(s, e, "{ let x; x; }; x;", &["x"]);
-
-        // field access
-        test(s, e, "x.y.f(z);", &["x", "z"]);
-
-        // parenthesized
-        test(s, e, "(x + z);", &["x", "z"]);
-        test(s, e, "(({ x => x + y }) + y);", &["y"]);
-    }
 }

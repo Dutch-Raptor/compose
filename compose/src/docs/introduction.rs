@@ -176,7 +176,7 @@ compose_doc! {
 
     ```compose
     let a = 15;
-    let x = if a > 10 {
+    let x = if (a > 10) {
         "big";
     } else {
         "small";
@@ -191,8 +191,8 @@ compose_doc! {
     ```compose
     // let result = {
     //     let mut i = 0;
-    //     while true {
-    //         if i == 5 {
+    //     while (true) {
+    //         if (i == 5) {
     //             break i * 2; // returns 10
     //         };
     //         i = i + 1;
@@ -238,8 +238,8 @@ compose_doc! {
     | Arithmetic         | ✅                 | `1 + 2 * 3`                        |
     | Function call      | ✅                 | `add(1, 2)`                        |
     | Block `{ ... }`    | ✅                 | `{ let x = 2; x + 1 }`             |
-    | `if`/`else`        | ✅                 | `if x > 0 { "yes" } else { "no" }` |
-    | `while` / `for`    | ✅ via `break`     | `while cond { break 5; }`          |
+    | `if`/`else`        | ✅                 | `if (x > 0) { "yes" } else { "no" }` |
+    | `while` / `for`    | ✅ via `break`     | `while (cond) { break 5; }`          |
     | Closure            | ✅                 | `(x) => x + 1`                     |
 
     In Compose, the idea is simple: **if it does something, it probably returns something too.**

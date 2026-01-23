@@ -1,5 +1,6 @@
-use crate::vm::{FlowEvent, Tracked};
-use crate::{Eval, EvalConfig, Evaluated, Machine, eval};
+use crate::evaluated::Evaluated;
+use crate::vm::FlowEvent;
+use crate::{Eval, EvalConfig, Machine, eval};
 use compose_library::diag::{SourceResult, Trace, TracePoint, Warned, bail, error};
 use compose_library::{Binding, IntoValue, Module};
 use compose_syntax::ast::{AstNode, BreakStatement};
@@ -9,8 +10,6 @@ use std::path::PathBuf;
 
 impl Eval for ast::Statement<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
-        // temp root guard should be maintained while doing GC to not clean the return value
-        let vm = &mut vm.temp_root_guard();
         let result = {
             // Flow scope can be dropped after evaluating the statement, this way it can be GCd
             let vm = &mut vm.new_flow_scope_guard();
@@ -23,10 +22,18 @@ impl Eval for ast::Statement<'_> {
                 ast::Statement::Continue(c) => c.eval(vm),
                 ast::Statement::ModuleImport(i) => i.eval(vm),
             }
-            .map(|v| v.track_tmp_root(vm))
         };
 
-        vm.maybe_gc();
+        let vm = &mut vm.temp_root_guard();
+        vm.temp_root_scope(|vm| {
+            if let Ok(result) = &result {
+                vm.track_tmp_root(result.value());
+            }
+
+            vm.maybe_gc();
+            Ok(())
+        })?;
+
         result
     }
 }

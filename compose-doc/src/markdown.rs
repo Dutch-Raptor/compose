@@ -1,6 +1,8 @@
 use crate::block::{BlockHeader, parse_block_header};
 use crate::diag::{At, Error, diagnostics_to_string, line_starts, offset_to_line};
-use crate::realise::{EvalResult, execute_code_block};
+use crate::realise::{
+    EvalResult, eval_code, execute_code_block, parse_expected_errors_and_warnings,
+};
 use compose_error_codes::lookup;
 use compose_library::diag::SourceDiagnostic;
 use pulldown_cmark::{CodeBlockKind, Event, OffsetIter, Options, Parser, Tag};
@@ -8,6 +10,7 @@ use std::iter::Peekable;
 
 pub struct Config {
     pub diag_mode: DiagMode,
+    pub emit_code_as_doc_tests: bool,
 }
 
 impl Config {
@@ -20,6 +23,7 @@ impl Config {
     pub const fn ansi() -> Self {
         Self {
             diag_mode: DiagMode::Ansi,
+            emit_code_as_doc_tests: false,
         }
     }
 
@@ -27,7 +31,13 @@ impl Config {
     pub const fn no_color() -> Self {
         Self {
             diag_mode: DiagMode::NoColor,
+            emit_code_as_doc_tests: false,
         }
+    }
+
+    pub const fn emit_code_as_doc_tests(mut self, emit: bool) -> Self {
+        self.emit_code_as_doc_tests = emit;
+        self
     }
 }
 
@@ -176,10 +186,16 @@ fn rewrite_code_blocks<'a>(
                 match meta.lang.as_str() {
                     "compose" => {
                         let (code, raw) = parse_code_block(parser);
-                        let eval = execute_code_block(&raw, &meta, line)?;
-                        ctx.last_eval = Some(eval);
-
-                        events.extend(emit_code_block(info.to_string(), code));
+                        if config.emit_code_as_doc_tests {
+                            let rust_code = emit_as_test(&raw, &meta, line);
+                            let eval = eval_code(&code);
+                            events.extend(emit_code_block("rust".to_string(), rust_code?));
+                            ctx.last_eval = Some(eval);
+                        } else {
+                            let eval = execute_code_block(&raw, &meta, line)?;
+                            ctx.last_eval = Some(eval);
+                            events.extend(emit_code_block(info.to_string(), code));
+                        }
                     }
                     "output" => {
                         let code = handle_output_block(parser, &ctx, &meta, line, config)?;
@@ -194,6 +210,44 @@ fn rewrite_code_blocks<'a>(
         }
     }
     Ok(events)
+}
+
+fn emit_as_test(
+    raw: &String,
+    meta: &BlockHeader,
+    line: usize,
+) -> Result<String, Error> {
+    let (expected_errors, expected_warnings) = parse_expected_errors_and_warnings(meta, line)?;
+
+    let mut code = String::new();
+    code.push_str("# use ::compose_eval::test::eval_code;\n");
+    code.push_str("# use ::compose_error_codes::*;\n");
+    code.push_str(&format!(
+        "# let expected_errors = [{}];\n",
+        expected_errors
+            .iter()
+            .map(|e| format!("lookup(\"{}\").unwrap()", e.code))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+    code.push_str(&format!(
+        "# let expected_warnings = [{}];\n",
+        expected_warnings
+            .iter()
+            .map(|e| format!("lookup(\"{}\").unwrap()", e.code))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+    code.push_str("# eval_code(r#\"\n");
+    code.push_str(raw);
+    if !raw.ends_with('\n') {
+        code.push('\n');
+    }
+    code.push_str("\"#)\n");
+    code.push_str("# .assert_errors(&expected_errors)\n");
+    code.push_str("# .assert_warnings(&expected_warnings);");
+
+    Ok(code)
 }
 
 /// Parses a code block into a display and raw code
@@ -252,7 +306,12 @@ fn handle_output_block(
     let mut out = String::new();
 
     for warning in &meta.expected_warnings {
-        let diag = find_diag(&eval.warnings, warning, line)?;
+        let Ok(diag) = find_diag(&eval.warnings, warning, line) else {
+            out.push_str(&format!(
+                "#### warning: expected warning code {warning}, but none occurred\n"
+            ));
+            continue;
+        };
         out.push_str(&diagnostics_to_string(
             &eval.world,
             &[],
@@ -262,7 +321,12 @@ fn handle_output_block(
     }
 
     for error in &meta.expected_errors {
-        let diag = find_diag(&eval.errors, error, line)?;
+        let Ok(diag) = find_diag(&eval.errors, error, line) else {
+            out.push_str(&format!(
+                "#### error: expected error code {error}, but none occurred\n"
+            ));
+            continue;
+        };
         out.push_str(&diagnostics_to_string(
             &eval.world,
             &[diag.clone()],

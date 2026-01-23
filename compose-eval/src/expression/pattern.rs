@@ -1,17 +1,16 @@
-use crate::{Eval, Evaluated, Machine};
-use compose_error_codes::{E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS, E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE};
+use crate::evaluated::Evaluated;
+use crate::{Eval, Machine};
+use compose_error_codes::{E0007_MISSING_EQUALS_AFTER_LET_BINDING, E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS, E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE, E0304_TYPE_PATTERNS_NOT_ALLOWED_IN_LET_BINDINGS};
 use compose_library::diag::{At, SourceDiagnostic, SourceResult, Spanned};
 use compose_library::ops::Comparison;
 use compose_library::{
-    bail, error, ArrayValue, Binding, BindingKind, DebugRepr, IntoValue, MapValue, Type, Value,
-    Visibility, Vm,
+    ArrayValue, Binding, BindingKind, DebugRepr, IntoValue, MapValue, Type, Value, Visibility, Vm,
+    bail, error,
 };
-use compose_syntax::ast::{
-    AstNode, DestructuringItem, Expr, Ident, LiteralPattern, Pattern,
-};
-use compose_syntax::{ast, Span};
+use compose_syntax::ast::{AstNode, DestructuringItem, Expr, Ident, LiteralPattern, Pattern};
+use compose_syntax::{Span, ast};
 use compose_utils::trace_fn;
-use ecow::{eco_format, EcoString, EcoVec};
+use ecow::{EcoString, EcoVec, eco_format};
 use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -197,12 +196,39 @@ pub fn destructure_impl(
             bind(vm, expr, value)?;
             Ok(PatternMatchResult::Matched)
         }
-        Pattern::TypedBindingPattern(typed_binding) => {
-            let ty_ident = typed_binding.ty();
+        Pattern::TypedPattern(typed_pattern) if ctx == PatternContext::LetBinding => {
+            // Types in Compose are resolved at runtime, not during parsing.
+            // This means `let x 1` is initially parsed as a typed pattern (`x 1`).
+            // We resolve the ambiguity here:
+            //   - if `x` resolves to a type → disallowed typed pattern
+            //   - otherwise → assume a missing `=` and emit E0007
+            let ty = typed_pattern.ty();
+            let is_type = get_type(vm, ty).is_some();
+            if is_type {
+                let pat_text = typed_pattern.pattern().to_text();
+                let ty_text = ty.get();
+                bail!(
+                    typed_pattern.span(),
+                    "type patterns are not allowed in `let` bindings";
+                    note: "`let {ty_text} {pat_text} = ...` is not a type annotation in Compose";
+                    hint: "use a `match` or `is` expression to check the type of a value";
+                    code: &E0304_TYPE_PATTERNS_NOT_ALLOWED_IN_LET_BINDINGS;
+                );
+            } else {
+                let binding_text = ty.get();
+                bail!(ty.span().after(), "expected `=` after binding name";
+                    label_message: "expected `=` here";
+                    hint: "if you meant to initialise the binding, add `=`: `let {binding_text} = ...;`";
+                    hint: "or, if you meant to leave it uninitialised, add a semicolon `let {binding_text};`";
+                    code: &E0007_MISSING_EQUALS_AFTER_LET_BINDING)
+            }
+        }
+        Pattern::TypedPattern(typed_pattern) => {
+            let ty_ident = typed_pattern.ty();
 
             let expected_ty = get_type(vm, ty_ident);
             let Some(expected_ty) = expected_ty else {
-                bail!(typed_binding.ty().span(), "Type in typed pattern does not exist";)
+                bail!(typed_pattern.ty().span(), "Type in typed pattern does not exist";)
             };
 
             if &value.ty() != expected_ty {
@@ -212,15 +238,7 @@ pub fn destructure_impl(
                 ));
             }
 
-            bind(
-                vm,
-                typed_binding
-                    .binding()
-                    .cast()
-                    .expect("an ident is a valid expression"),
-                value,
-            )?;
-            Ok(PatternMatchResult::Matched)
+            destructure_impl(vm, typed_pattern.pattern(), value, ctx, match_path, bind)
         }
         Pattern::PlaceHolder(_) => Ok(PatternMatchResult::Matched), // A placeholder means we discard the value, no need to bind
         Pattern::Destructuring(destruct) => match value {
@@ -563,7 +581,10 @@ fn wrong_number_of_elements(
 #[cfg(test)]
 mod tests {
     use crate::test::{assert_eval, eval_code};
-    use compose_error_codes::{E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS, E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE};
+    use compose_error_codes::{
+        E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS,
+        E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE,
+    };
 
     #[test]
     fn simple_map_destructuring() {
@@ -640,33 +661,24 @@ mod tests {
     }
 
     #[test]
-    fn destructuring_with_type_pattern() {
-        assert_eval(
-            r#"
-            let [Int a] = [1];
-            assert::eq(a, 1);
-        "#,
-        );
-    }
-
-    #[test]
     fn map_error_with_unmapped_keys() {
         eval_code(
             r#"
             let { a } = { a: 1, c: 2 };
         "#,
         )
-        .assert_errors(&[E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS]);
+        .assert_errors(&[&E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS]);
     }
 
     #[test]
     fn map_error_with_nonexistent_key() {
         // TODO: Add error code for nonexistent key
-            eval_code(
-                r#"
+        eval_code(
+            r#"
             let { a } = { b: 1 };
         "#,
-            ).assert_errors(&[E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE]);
+        )
+        .assert_errors(&[&E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE]);
     }
 
     #[test]
@@ -676,7 +688,7 @@ mod tests {
             let [a] = [1, 2];
         "#,
         )
-        .assert_errors(&[E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS]);
+        .assert_errors(&[&E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS]);
     }
 
     #[test]
@@ -686,6 +698,6 @@ mod tests {
             let [a, b] = [1];
         "#,
         )
-        .assert_errors(&[E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS]);
+        .assert_errors(&[&E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS]);
     }
 }

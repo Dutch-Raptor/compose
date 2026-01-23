@@ -117,7 +117,7 @@ pub enum SyntaxKind {
     MatchArm,
     MatchExpression,
     IsKW,
-    TypedBindingPattern,
+    TypedPattern,
     IsExpression,
 }
 
@@ -248,7 +248,7 @@ impl SyntaxKind {
             SyntaxKind::MatchKW => "match",
             SyntaxKind::MatchArm => "match arm",
             SyntaxKind::MatchExpression => "match expression",
-            SyntaxKind::TypedBindingPattern => "type binding pattern",
+            SyntaxKind::TypedPattern => "type binding pattern",
         }
     }
 

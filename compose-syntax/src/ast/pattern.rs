@@ -8,7 +8,7 @@ pub enum Pattern<'a> {
     PlaceHolder(Underscore<'a>),
     Destructuring(Destructuring<'a>),
     LiteralPattern(LiteralPattern<'a>),
-    TypedBindingPattern(TypedBindingPattern<'a>),
+    TypedPattern(TypedPattern<'a>),
 }
 
 impl<'a> Pattern<'a> {
@@ -16,8 +16,10 @@ impl<'a> Pattern<'a> {
         match self {
             Pattern::Single(Expr::Ident(i)) => vec![i],
             Pattern::Destructuring(v) => v.bindings(),
-            Pattern::TypedBindingPattern(typed) => vec![typed.binding()],
-            _ => vec![],
+            Pattern::TypedPattern(typed) => typed.pattern().bindings(),
+            Pattern::PlaceHolder(_) => vec![],
+            Pattern::LiteralPattern(_) => vec![],
+            Pattern::Single(_) => vec![],
         }
     }
 }
@@ -29,9 +31,7 @@ impl<'a> AstNode<'a> for Pattern<'a> {
             SyntaxKind::Destructuring => {
                 Some(Self::Destructuring(Destructuring::from_untyped(node)?))
             }
-            SyntaxKind::TypedBindingPattern => Some(Self::TypedBindingPattern(
-                TypedBindingPattern::from_untyped(node)?,
-            )),
+            SyntaxKind::TypedPattern => Some(Self::TypedPattern(TypedPattern::from_untyped(node)?)),
             _ => match LiteralPattern::from_untyped(node) {
                 Some(lit) => Some(Self::LiteralPattern(lit)),
                 None => node.cast().map(Self::Single),
@@ -45,7 +45,7 @@ impl<'a> AstNode<'a> for Pattern<'a> {
             Self::PlaceHolder(u) => u.to_untyped(),
             Self::Destructuring(d) => d.to_untyped(),
             Self::LiteralPattern(lit) => lit.to_untyped(),
-            Self::TypedBindingPattern(typed_binding) => typed_binding.to_untyped(),
+            Self::TypedPattern(typed_binding) => typed_binding.to_untyped(),
         }
     }
 }
@@ -113,15 +113,15 @@ impl<'a> Destructuring<'a> {
 }
 
 node! {
-    struct TypedBindingPattern
+    struct TypedPattern
 }
 
-impl<'a> TypedBindingPattern<'a> {
+impl<'a> TypedPattern<'a> {
     pub fn ty(self) -> Ident<'a> {
         self.0.cast_first()
     }
 
-    pub fn binding(self) -> Ident<'a> {
+    pub fn pattern(self) -> Pattern<'a> {
         self.0.cast_last()
     }
 }
@@ -190,6 +190,9 @@ impl<'a> IsExpression<'a> {
     }
 
     pub fn is_span(self) -> Span {
-        self.0.children().find_map(|n| (n.kind() == SyntaxKind::IsKW).then(|| n.span())).expect("IsExpression must contain an `is` keyword")
+        self.0
+            .children()
+            .find_map(|n| (n.kind() == SyntaxKind::IsKW).then(|| n.span()))
+            .expect("IsExpression must contain an `is` keyword")
     }
 }

@@ -5,12 +5,12 @@ compose_doc! {
 ///
 /// Compose provides powerful tools for inspecting and decomposing values using
 /// destructuring, `is` expressions, and `match` expressions. These let you
-/// ergonomically check a value's structure, bind parts of it to variables, and
+/// ergonomically check a value's structure or type, bind parts of it to variables, and
 /// conditionally execute code based on patterns.
 ///
 /// ## Destructuring with `let`
 ///
-/// You can destructure arrays, tuples, and other composite values directly in
+/// You can destructure arrays and other composite values directly in
 /// `let` bindings:
 ///
 /// ```compose
@@ -20,6 +20,11 @@ compose_doc! {
 /// let [first, ..rest] = array;
 /// assert::eq(first, 1);
 /// assert::eq(rest.len(), 2);
+///
+/// let map = { a: 1, b: 2 };
+/// let { a, b } = map;
+/// assert::eq(a, 1);
+/// assert::eq(b, 2);
 /// ```
 ///
 /// Here, `first` is bound to the first element, and `rest` captures the remaining elements.
@@ -31,7 +36,7 @@ compose_doc! {
 ///
 /// ```compose
 /// # let array = [1, "a string", 3];
-/// if array is [_, String s, ..] && s.len() == 8 {
+/// if (array is [_, String s, ..] && s.len() == 8) {
 ///     assert::eq(s, "a string"); // s is accessible within the if body
 /// };
 /// ```

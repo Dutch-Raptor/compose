@@ -12,19 +12,6 @@ static INTERNER: LazyLock<RwLock<FileInterner>> = LazyLock::new(|| {
     })
 });
 
-/// Resets the interner for file ids.
-///
-/// # Warning
-///
-/// This will break existing file ids and cause any reading of paths from invalidated file ids to panic!
-/// Only use this if you know you will not use any of the existing file ids.
-pub fn reset_interner() {
-    *INTERNER.write().unwrap() = FileInterner {
-        from_id: Vec::new(),
-        to_id: HashMap::new(),
-    }
-}
-
 struct FileInterner {
     from_id: Vec<FileRef>,
     to_id: HashMap<FileRef, FileId>,

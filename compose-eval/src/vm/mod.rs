@@ -50,6 +50,38 @@ impl<'a> Vm<'a> for Machine<'a> {
 }
 
 impl<'a> Machine<'a> {
+    pub fn new(world: &'a dyn World) -> Self {
+        Self {
+            frames: StackFrames::new(Some(world.library())),
+            flow: None,
+            engine: Engine {
+                routines: routines(),
+                sink: Sink::default(),
+                world,
+            },
+            context: Default::default(),
+            heap: Heap::new(),
+        }
+    }
+
+    /// Enter a new stack frame to evaluate `f`. This frame does not have access
+    /// to any defined variables in other frames, but does share the same heap.
+    /// This means references passed into this frame can share data.
+    pub fn with_frame<T>(&mut self, f: impl FnOnce(&mut Machine) -> T) -> T {
+        self.frames.enter();
+        let result = f(self);
+        self.frames.exit();
+        result
+    }
+
+    pub fn maybe_gc(&mut self) {
+        let roots = VmRoots {
+            frames: &self.frames,
+            flow: &self.flow,
+        };
+        self.heap.maybe_gc(&roots);
+    }
+    
     pub(crate) fn sink_mut(&mut self) -> &mut Sink {
         &mut self.engine.sink
     }
@@ -139,7 +171,7 @@ impl<'a> Machine<'a> {
     /// - Always exits the lexical scope on drop
     /// - Safe across early returns and error paths
     #[must_use]
-    pub fn lexical_scope_guard(&mut self) -> impl DerefMut<Target = Self> {
+    pub fn new_lexical_scope_guard(&mut self) -> impl DerefMut<Target = Self> {
         let _trace_guard = ::compose_utils::TraceFnGuard::new("lexical_scope_guard", None);
         self.scopes_mut().enter_lexical();
         defer(self, move |vm| {
@@ -184,104 +216,7 @@ impl<'a> Machine<'a> {
             world: self.engine.world,
         }
     }
-}
 
-impl Debug for Machine<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Vm")
-            .field("frames", &self.frames)
-            .field("flow", &self.flow)
-            .field("sink", &self.engine)
-            .field("heap", &self.heap)
-            .finish()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum FlowEvent {
-    Continue(Span),
-    Break(Span, Option<Value>),
-    Return(Span, Option<Value>),
-}
-
-impl Trace for FlowEvent {
-    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
-        match self {
-            FlowEvent::Continue(_) => {}
-            FlowEvent::Break(_, Some(value)) => value.visit_refs(f),
-            FlowEvent::Break(_, None) => {}
-            FlowEvent::Return(_, Some(value)) => value.visit_refs(f),
-            FlowEvent::Return(_, None) => {}
-        }
-    }
-}
-
-impl FlowEvent {
-    pub(crate) fn forbidden(&self) -> SourceDiagnostic {
-        match *self {
-            Self::Break(span, _) => {
-                error!(span, "cannot break outside of a loop")
-            }
-            Self::Return(span, _) => {
-                error!(span, "cannot return outside of a function")
-            }
-            Self::Continue(span) => {
-                error!(span, "cannot continue outside of a loop")
-            }
-        }
-    }
-}
-
-impl<'a> Machine<'a> {
-    pub fn new(world: &'a dyn World) -> Self {
-        Self {
-            frames: StackFrames::new(Some(world.library())),
-            flow: None,
-            engine: Engine {
-                routines: routines(),
-                sink: Sink::default(),
-                world,
-            },
-            context: Default::default(),
-            heap: Heap::new(),
-        }
-    }
-
-    /// Enter a new stack frame to evaluate `f`. This frame does not have access
-    /// to any defined variables in other frames, but does share the same heap.
-    /// This means references passed into this frame can share data.
-    pub fn with_frame<T>(&mut self, f: impl FnOnce(&mut Machine) -> T) -> T {
-        self.frames.enter();
-        let result = f(self);
-        self.frames.exit();
-        result
-    }
-
-    pub fn maybe_gc(&mut self) {
-        let roots = VmRoots {
-            frames: &self.frames,
-            flow: &self.flow,
-        };
-        self.heap.maybe_gc(&roots);
-    }
-}
-
-#[derive(Debug)]
-pub struct VmRoots<'a> {
-    pub frames: &'a StackFrames<'a>,
-    pub flow: &'a Option<FlowEvent>,
-}
-
-impl Trace for VmRoots<'_> {
-    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
-        self.frames.visit_refs(f);
-        if let Some(flow) = self.flow {
-            flow.visit_refs(f);
-        }
-    }
-}
-
-impl<'a> Machine<'a> {
     pub fn track_tmp_root(&mut self, value: &impl Trace) {
         self.frames.top.track(value);
     }
@@ -304,10 +239,10 @@ impl<'a> Machine<'a> {
     }
 
     /// Automatically forgets any tracked values during `f` after f is finished
-    pub fn temp_root_scope(
+    pub fn temp_root_scope<T>(
         &mut self,
-        f: impl FnOnce(&mut Machine<'a>) -> SourceResult<Value>,
-    ) -> SourceResult<Value> {
+        f: impl FnOnce(&mut Machine<'a>) -> SourceResult<T>,
+    ) -> SourceResult<T> {
         let marker = self.temp_root_marker();
         let result = f(self);
         self.pop_temp_roots(marker);
@@ -361,9 +296,85 @@ impl<'a> Machine<'a> {
     pub fn get_mut(&mut self, name: &str) -> Result<&mut Binding, VariableAccessError> {
         self.scopes_mut().get_mut(name)
     }
+
+    /// Run f with closure capture errors deferred.
+    ///
+    /// This makes the caller responsible for either handling or emitting the unresolved errors.
+    pub fn with_closure_capture_errors_mode<T>(
+        &mut self,
+        mode: ErrorMode,
+        f: impl FnOnce(&mut Machine) -> SourceResult<T>,
+    ) -> SourceResult<T> {
+        let old = self.context.closure_capture;
+        self.context.closure_capture = mode;
+        let result = f(self);
+        self.context.closure_capture = old;
+        result
+    }
 }
 
-impl<'a> Machine<'a> {}
+impl Debug for Machine<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Vm")
+            .field("frames", &self.frames)
+            .field("flow", &self.flow)
+            .field("sink", &self.engine)
+            .field("heap", &self.heap)
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FlowEvent {
+    Continue(Span),
+    Break(Span, Option<Value>),
+    Return(Span, Option<Value>),
+}
+
+impl Trace for FlowEvent {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        match self {
+            FlowEvent::Continue(_) => {}
+            FlowEvent::Break(_, Some(value)) => value.visit_refs(f),
+            FlowEvent::Break(_, None) => {}
+            FlowEvent::Return(_, Some(value)) => value.visit_refs(f),
+            FlowEvent::Return(_, None) => {}
+        }
+    }
+}
+
+impl FlowEvent {
+    pub(crate) fn forbidden(&self) -> SourceDiagnostic {
+        match *self {
+            Self::Break(span, _) => {
+                error!(span, "cannot break outside of a loop")
+            }
+            Self::Return(span, _) => {
+                error!(span, "cannot return outside of a function")
+            }
+            Self::Continue(span) => {
+                error!(span, "cannot continue outside of a loop")
+            }
+        }
+    }
+}
+
+
+#[derive(Debug)]
+pub struct VmRoots<'a> {
+    pub frames: &'a StackFrames<'a>,
+    pub flow: &'a Option<FlowEvent>,
+}
+
+impl Trace for VmRoots<'_> {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        self.frames.visit_refs(f);
+        if let Some(flow) = self.flow {
+            flow.visit_refs(f);
+        }
+    }
+}
+
 
 pub fn routines() -> Routines {
     Routines {}
@@ -389,18 +400,4 @@ impl ErrorMode {
 }
 
 impl Machine<'_> {
-    /// Run f with closure capture errors deferred.
-    ///
-    /// This makes the caller responsible for either handling or emitting the unresolved errors.
-    pub fn with_closure_capture_errors_mode<T>(
-        &mut self,
-        mode: ErrorMode,
-        f: impl FnOnce(&mut Machine) -> SourceResult<T>,
-    ) -> SourceResult<T> {
-        let old = self.context.closure_capture;
-        self.context.closure_capture = mode;
-        let result = f(self);
-        self.context.closure_capture = old;
-        result
-    }
 }

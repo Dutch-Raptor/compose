@@ -1,8 +1,9 @@
 use crate::access::Access;
-use crate::{Eval, Evaluated, Machine};
-use compose_library::diag::{At, SourceResult, StrResult, bail};
-use compose_library::{Heap, Value, ops};
+use crate::{Eval, Machine};
+use compose_library::diag::{bail, At, SourceResult, StrResult};
+use compose_library::{ops, Heap, Value};
 use compose_syntax::ast::{AstNode, UnOp, Unary};
+use crate::evaluated::Evaluated;
 
 impl Eval for Unary<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
