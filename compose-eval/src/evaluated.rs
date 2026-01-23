@@ -70,6 +70,7 @@ impl Tracked for Evaluated {
 
 pub trait ValueEvaluatedExtensions {
     fn mutable(self) -> Evaluated;
+    #[expect(unused)]
     fn immutable(self) -> Evaluated;
 }
 
