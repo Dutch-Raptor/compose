@@ -1,0 +1,15 @@
+[package]
+name = "compose-error-codes-doc-tests"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+compose-eval = {workspace = true}
+compose-error-codes = {workspace = true}
+
+[lints]
+workspace = true
+
+[build-dependencies]
+compose-error-codes =  {workspace = true}
+compose-doc = { workspace = true}

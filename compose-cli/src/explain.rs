@@ -15,7 +15,14 @@ pub(crate) fn explain(code: &str) -> Result<(), CliError> {
         Some(code) => {
             let md_text = code.description;
 
-            let explained = match compose_doc::transform_markdown(md_text, &Config::ansi()) {
+            let explained = match compose_doc::transform_markdown(
+                md_text,
+                &Config::new()
+                    .with_ansi()
+                    // make sure that the explain command works even if the explanation is technically not fully accurate
+                    .with_output_block_error_mode(compose_doc::ErrorHandlingMode::Ignore)
+                    .with_code_block_error_mode(compose_doc::ErrorHandlingMode::Ignore),
+            ) {
                 Ok(v) => v,
                 Err(e) => {
                     eprintln!(

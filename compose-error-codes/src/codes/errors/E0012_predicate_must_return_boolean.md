@@ -7,7 +7,7 @@ Methods like `all`, `filter`, `find`, and similar take a **predicate function**:
 ### Example
 
 ```compose error(E0012)
-(1..5).iter().any(x => 3);
+(1..5).iter().any { x => 3 };
 ```
 
 #### Error:
@@ -18,7 +18,7 @@ Methods like `all`, `filter`, `find`, and similar take a **predicate function**:
 ✅ **Fix:**
 
 ```compose
-(1..5).iter().any(x => x == 3);
+(1..5).iter().any { x => x == 3 };
 ```
 
 ---

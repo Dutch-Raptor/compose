@@ -10,6 +10,7 @@ members = [
     "compose-utils",
     "compose",
     "compose-error-codes",
+    "compose-error-codes-doc-tests",
     "compose-doc-macros",
     "compose-doc",
     "compose-codespan-reporting"
@@ -36,6 +37,7 @@ compose-macros = { path = "compose-macros" }
 compose-syntax = { path = "compose-syntax" }
 compose-utils = { path = "compose-utils" }
 compose-error-codes = { path = "compose-error-codes" }
+compose-error-codes-doc-tests = { path = "compose-error-codes-doc-tests" }
 compose-editor = { path = "compose-editor" }
 compose-doc-macros = { path = "compose-doc-macros" }
 compose-doc = { path = "compose-doc" }

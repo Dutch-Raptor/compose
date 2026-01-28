@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-include!(concat!(env!("OUT_DIR"), "/error_codes.rs"));
+include!(concat!(env!("OUT_DIR"), "/Error_Codes"));
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ErrorCode {

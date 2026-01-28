@@ -60,7 +60,7 @@ a // evaluates to ()
 
 Uninitialized variables default to `()`, which is often unintentional. For example:
 
-```compose warning
+```compose
 let total;
 println("Total is", total);
 ```

@@ -2,7 +2,7 @@
 
 This error occurs when a `let` binding uses a *type pattern*, such as:
 
-```compose
+```compose error(E0304)
 let Int x = 1;
 ```
 
@@ -32,7 +32,8 @@ let x = 1;
 If you want to **check the type of a value**, use a `match` expression:
 
 ```compose
-match value {
+# let value = 1;
+match (value) {
     Int x => println(x),
     _ => panic("expected an Int"),
 }
@@ -41,7 +42,8 @@ match value {
 Or use an `is` expression:
 
 ```compose
-if value is Int x {
+# let value = 1;
+if (value is Int x) {
     println(x);
 }
 ```

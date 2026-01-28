@@ -1,4 +1,4 @@
-## Error E0303: missing key in map pattern
+## E0303: missing key in map pattern
 
 ### What this means
 
@@ -11,7 +11,7 @@ If any required key is missing from the value, destructuring fails.
 
 ### Example that triggers this error
 
-```compose
+```compose error(E0303)
 let { a, b } = { a: 1 };
 ```
 
@@ -56,7 +56,7 @@ Patterns can be used in both `match` expressions **and** `is` expressions:
 ```compose
 let map = { a: 1 };
 
-if map is { a, b } {
+if (map is { a, b }) {
     println(a, b);
 }
 ```
@@ -67,7 +67,8 @@ Inside the body of the `if` expression, all pattern bindings (`a` and `b`) are g
 The same pattern can also be used in a `match` expression:
 
 ```compose
-match map {
+# let map = { a: 1 };
+match (map) {
     { a, b } => println(a, b),
     _ => (),
 }

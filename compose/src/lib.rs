@@ -3,32 +3,35 @@
 
 ```rust
 # compose::test::assert_eval(r#"
-println("Hello, world! From Compose!");
+println("'Hello, world' from Compose!");
 # "#);
 ```
 
-**Compose** is a lightweight, expression-oriented programming language designed to be clear, predictable, and structurally robust. Inspired by modern language design principles, Compose aims to offer a seamless blend of expressiveness and simplicity—without the overhead of complex ownership models or verbose syntax.
+A functional flavoured interpreted programming language with rust-like syntax.
 
-Whether you're scripting quick logic or building more sophisticated constructs, Compose is designed to guide you gently, offering:
+Features:
+- Expression focused: blocks and control flow are expressed as expressions.
+- Functions as first class citizens
+- High quality diagnostics
+- Variables are immutable by default
+- Garbage collection
+- Portable: runs on any platform that supports rust
 
-* **Clear syntax**: Minimal punctuation and consistent structure help you focus on *what* you're expressing, not *how* to express it.
-* **Safe references**: Compose uses a `box` system to handle heap-allocated data with clarity and safety. References (`ref`, `ref mut`) are only allowed to refer to boxed values, which helps avoid subtle lifetime bugs.
-* **No move semantics**: All values are either copyable or clone-on-write, simplifying reasoning about variable behavior and reducing surprises.
-* **Robust error reporting**: Compose comes with detailed, context-aware error messages that point you to the real problem—often with suggestions to fix it.
-* **A strong, consistent AST and CST**: Behind the scenes, Compose uses a resilient parser and a fault-tolerant concrete syntax tree, making tooling and analysis more reliable and powerful.
-* **First-class closures**: Functions and closures are fully supported, and closures can capture boxed variables by reference, safely enabling functional patterns.
+**This language is still in development, and APIs are subject to change. Developed as a learning
+project, the language is not intended for production use.**
 
-To learn more, check out the [Overview](docs::C1_Overview) section.
+To learn about the language, see the [language] module.
 
-## Getting Started
-
-- [Docs](docs)
-    - [Overview](docs::C1_Overview)
-    - [Variables and Scopes](docs::C2_Variables_and_Scopes)
-    - [Functions](docs::C4_Functions_and_closures)
+To learn about the implementation, see the [implementation] docs.
 */
-pub mod docs;
+pub mod language;
+pub mod implementation;
 
 pub use compose_eval::{eval, eval_range, test};
 
-pub use compose_error_codes as error_codes;
+#[doc(hidden)]
+pub use compose_syntax as syntax;
+#[doc(hidden)]
+pub use compose_eval as eval;
+#[doc(hidden)]
+pub use compose_library as library;

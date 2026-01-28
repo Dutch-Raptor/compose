@@ -3,7 +3,7 @@
 In Compose, a `let` statement introduces a new variable binding. After the binding pattern (e.g., `count`), the parser expects either:
 
 - an initializer with `=`,
-- or a clear statement terminator: a semicolon (`;`) or a newline.
+- or a semicolon (`;`).
 
 ---
 
@@ -29,13 +29,6 @@ or
 let count; 42
 ```
 
-or
-
-```compose
-let count
-42
-```
-
 ---
 
-This requirement avoids ambiguity between incomplete bindings and separate expressions. Use `=` to initialize, or a semicolon or newline to end the declaration.
+This requirement avoids ambiguity between incomplete bindings and separate expressions. Use `=` to initialise, or a semicolon to end the declaration.

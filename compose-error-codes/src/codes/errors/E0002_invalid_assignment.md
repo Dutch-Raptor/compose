@@ -9,7 +9,8 @@ Assignments like `x = y` are **statements**, not expressions. They cannot be use
 ### Example of erroneous code
 
 ```compose error(E0002)
-let f = (x, a) => (x = a);
+# let x = 1; let a = 2;
+let f = x = a;
 ```
 
 ```output error(E0002)
@@ -29,7 +30,7 @@ Assignment (`x = a`) evaluates to the unit type `()` and **cannot be used where 
 This helps avoid common mistakes, such as confusing assignment with comparison:
 
 ```compose error(E0002)
-if a = b {  } // probably meant `a == b`
+if (a = b) {  } // probably meant `a == b`
 ```
 
 ---
@@ -39,17 +40,20 @@ if a = b {  } // probably meant `a == b`
 #### ✅ If you meant to compare:
 
 ```compose
-let f = (x, a) => (x == a);
+# let x = 1; let a = 2;
+let f = x == a;
 ```
 
 #### ✅ If you meant to assign a value:
 
 ```compose
-let f = (x, a) => { x = a; };
+# let mut x = 1; let a = 2;
+let f = { x = a; };
 ```
 
 #### ✅ Or use `let` for rebinding the variable:
 
 ```compose
-let f = (x, a) => { let x = a; x; };
+# let mut x = 1; let a = 2;
+let f = { let x = a; x; };
 ```

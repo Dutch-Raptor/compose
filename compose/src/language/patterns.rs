@@ -83,5 +83,5 @@ compose_doc! {
 /// - Use `is` for conditional type/structure checks with optional bindings.
 /// - Use `match` for multi-case branching with pattern matching.
 /// - Destructuring can also appear in function parameters for concise, readable code.
-    pub mod Patterns {}
+    pub mod C5_Patterns {}
 }

@@ -1,4 +1,4 @@
-## Error E0302: map destructuring does not cover all keys
+## E0302: map destructuring does not cover all keys
 
 ### What this means
 
@@ -11,7 +11,7 @@ if a map contains keys that are not explicitly destructured, the pattern is reje
 
 ### Example that triggers this error
 
-```compose Error(E0302)
+```compose error(E0302)
 let { a } = { a: 1, b: 2 };
 ```
 

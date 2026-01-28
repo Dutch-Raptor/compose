@@ -19,7 +19,7 @@ compose_doc!(
 
     ```compose error(E0004)
     let x = 5;
-    x = 6; // ❌ Error: cannot assign to immutable variable
+    x = 6;
     ```
 
     ```output error(E0004)
@@ -60,12 +60,12 @@ compose_doc!(
     > assert::eq(x, 1);
     > ```
 
-    Reading an uninitialized variable is allowed, but emits a warning and produces the unit value ()
-    You should avoid relying on this behaviour.
+    Reading an uninitialized variable is allowed and resolves to `()` (the unit value).
+    However, this produces a warning and relying on this behaviour should be avoided.
 
     ```compose warn(W0001)
     let x;
-    assert::eq(x, ()); // ⚠️ Warning: x was used before being assigned a value
+    assert::eq(x, ());
     ```
 
     ```output warn(W0001)
@@ -85,7 +85,7 @@ compose_doc!(
         assert::eq(outer, 10);
         assert::eq(inner, 20);
     };
-    assert::eq(inner, 10); // ❌ Error: `inner` is not visible here
+    assert::eq(inner, 10); // inner is out of scope here
     ```
 
     ```output error(E0011)

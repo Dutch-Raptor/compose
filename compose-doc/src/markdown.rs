@@ -1,42 +1,58 @@
-use crate::block::{BlockHeader, parse_block_header};
-use crate::diag::{At, Error, diagnostics_to_string, line_starts, offset_to_line};
-use crate::realise::{
-    EvalResult, eval_code, execute_code_block, parse_expected_errors_and_warnings,
-};
-use compose_error_codes::lookup;
+use crate::block::{parse_block_header, BlockHeader};
+use crate::diag::{diagnostics_to_string, line_starts, offset_to_line, At, Error};
+use crate::realise::{eval_code, EvalResult};
+use compose_error_codes::{lookup, ErrorCode};
 use compose_library::diag::SourceDiagnostic;
 use pulldown_cmark::{CodeBlockKind, Event, OffsetIter, Options, Parser, Tag};
+use std::cmp::PartialEq;
 use std::iter::Peekable;
 
 pub struct Config {
     pub diag_mode: DiagMode,
-    pub emit_code_as_doc_tests: bool,
+    /// How to handle unexpected warnings and errors in code blocks
+    pub code_block_error_mode: ErrorHandlingMode,
+    /// How to handle warnings and errors in output blocks that don't occur
+    pub output_block_error_mode: ErrorHandlingMode,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
+pub enum ErrorHandlingMode {
+    EmitAsTests,
+    Error,
+    Ignore,
 }
 
 impl Config {
     #[must_use]
     pub const fn new() -> Self {
-        Self::ansi()
-    }
-
-    #[must_use]
-    pub const fn ansi() -> Self {
         Self {
             diag_mode: DiagMode::Ansi,
-            emit_code_as_doc_tests: false,
+            code_block_error_mode: ErrorHandlingMode::Error,
+            output_block_error_mode: ErrorHandlingMode::Error,
         }
     }
 
     #[must_use]
-    pub const fn no_color() -> Self {
-        Self {
-            diag_mode: DiagMode::NoColor,
-            emit_code_as_doc_tests: false,
-        }
+    pub const fn with_ansi(mut self) -> Self {
+        self.diag_mode = DiagMode::Ansi;
+        self
     }
 
-    pub const fn emit_code_as_doc_tests(mut self, emit: bool) -> Self {
-        self.emit_code_as_doc_tests = emit;
+    #[must_use]
+    pub const fn with_no_color(mut self) -> Self {
+        self.diag_mode = DiagMode::NoColor;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_code_block_error_mode(mut self, mode: ErrorHandlingMode) -> Self {
+        self.code_block_error_mode = mode;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_output_block_error_mode(mut self, mode: ErrorHandlingMode) -> Self {
+        self.output_block_error_mode = mode;
         self
     }
 }
@@ -50,6 +66,68 @@ impl Default for Config {
 pub enum DiagMode {
     Ansi,
     NoColor,
+}
+
+pub struct Ir<'a> {
+    events: Vec<DocIr<'a>>,
+}
+
+impl<'a> Ir<'a> {
+    fn new() -> Self {
+        Self { events: Vec::new() }
+    }
+
+    fn push_other(&mut self, event: Event<'a>) {
+        if !matches!(self.events.last(), Some(DocIr::Other(_))) {
+            self.events.push(DocIr::Other(Vec::new()));
+        }
+
+        if let Some(DocIr::Other(events)) = self.events.last_mut() {
+            events.push(event);
+        } else {
+            unreachable!();
+        }
+    }
+
+    fn push_compose_block(&mut self, block: ComposeBlock) {
+        self.events.push(DocIr::ComposeBlock(block));
+    }
+
+    fn push_output_block(&mut self, block: OutputBlock) {
+        self.events.push(DocIr::OutputBlock(block));
+    }
+
+    fn last_compose_block_mut(&mut self) -> Option<&mut ComposeBlock> {
+        self.events.iter_mut().rev().find_map(|v| match v {
+            DocIr::ComposeBlock(block) => Some(block),
+            _ => None,
+        })
+    }
+}
+
+enum DocIr<'a> {
+    ComposeBlock(ComposeBlock),
+    OutputBlock(OutputBlock),
+    Other(Vec<Event<'a>>),
+}
+
+pub struct ComposeBlock {
+    display: String,
+    raw: String,
+    line: usize,
+    header: String,
+    output_uses: Vec<OutputBlockDiags>,
+    eval: EvalResult,
+}
+
+pub struct OutputBlockDiags {
+    pub errors: Vec<&'static ErrorCode>,
+    pub warnings: Vec<&'static ErrorCode>,
+    pub line_number: usize,
+}
+
+pub struct OutputBlock {
+    contents: String,
 }
 
 /// Transforms Markdown by evaluating fenced `compose` code blocks and replacing/validating
@@ -118,7 +196,7 @@ pub enum DiagMode {
 /// ```
 /// "#;
 ///
-/// let rendered = transform_markdown(markdown, &Config::no_color()).unwrap();
+/// let rendered = transform_markdown(markdown, &Config::new().with_no_color()).unwrap();
 /// assert_eq!(rendered.trim(), r#"
 /// ````compose error(E0004)
 /// let a = 4;
@@ -169,13 +247,18 @@ struct BlockContext {
     last_eval: Option<EvalResult>,
 }
 
+/// Performs a two-pass rewrite of the Markdown, replacing `compose` and `output` blocks with
+/// their rendered output.
+///
+/// Depending on configuration options, rust doc tests can be emitted for inclusion in generated
+/// doc comments.
 fn rewrite_code_blocks<'a>(
     line_starts: &[usize],
     parser: &mut Peekable<OffsetIter<'a>>,
     config: &Config,
 ) -> Result<Vec<Event<'a>>, Error> {
     let mut ctx = BlockContext::default();
-    let mut events = Vec::new();
+    let mut ir = Ir::new();
 
     while let Some((event, offset)) = parser.next() {
         match &event {
@@ -186,38 +269,228 @@ fn rewrite_code_blocks<'a>(
                 match meta.lang.as_str() {
                     "compose" => {
                         let (code, raw) = parse_code_block(parser);
-                        if config.emit_code_as_doc_tests {
-                            let rust_code = code_block_as_rust_test(&raw, &meta, line);
-                            let eval = eval_code(&code);
-                            events.extend(emit_code_block("rust".to_string(), rust_code?));
-                            ctx.last_eval = Some(eval);
-                        } else {
-                            let eval = execute_code_block(&raw, &meta, line)?;
-                            ctx.last_eval = Some(eval);
-                            events.extend(emit_code_block(info.to_string(), code));
-                        }
+                        let eval = eval_code(&raw);
+                        ctx.last_eval = Some(eval.clone());
+
+                        ir.push_compose_block(ComposeBlock {
+                            display: code,
+                            raw,
+                            line,
+                            header: info.to_string(),
+                            output_uses: vec![],
+                            eval,
+                        });
                     }
                     "output" => {
-                        let code = handle_output_block(parser, &ctx, &meta, line, config)?;
-                        events.extend(emit_code_block("text".to_string(), code));
+                        let last_compose_block = ir
+                            .last_compose_block_mut()
+                            .ok_or("missing preceding compose block")
+                            .at(line)?;
+
+                        let (output, diags) = parse_output_block(
+                            parser,
+                            &last_compose_block.eval,
+                            &meta,
+                            line,
+                            config,
+                        )?;
+
+                        last_compose_block.output_uses.push(diags);
+
+                        ir.push_output_block(output);
                     }
-                    _ => events.push(event.clone()),
+                    _ => ir.push_other(event.clone()),
                 }
             }
             _ => {
-                events.push(event.clone());
+                ir.push_other(event.clone());
             }
         }
     }
+
+    let mut events = Vec::new();
+    for block in ir.events {
+        match block {
+            DocIr::ComposeBlock(compose_block) => {
+                if config.output_block_error_mode == ErrorHandlingMode::Error {
+                    verify_output_block_errors_and_warnings(&compose_block)?;
+                }
+                match config.code_block_error_mode {
+                    ErrorHandlingMode::EmitAsTests => {
+                        let meta =
+                            parse_block_header(&compose_block.header).at(compose_block.line)?;
+                        let mut rust_test =
+                            code_block_as_rust_test(&compose_block.raw, &meta, compose_block.line)?;
+
+                        if config.output_block_error_mode == ErrorHandlingMode::EmitAsTests {
+                            emit_output_diags_tests(&compose_block.output_uses, &mut rust_test);
+                        }
+
+                        events.extend(emit_code_block("rust".to_string(), rust_test));
+                    }
+                    ErrorHandlingMode::Error => {
+                        let meta =
+                            parse_block_header(&compose_block.header).at(compose_block.line)?;
+                        let (expected_errors, expected_warnings) =
+                            parse_expected_errors_and_warnings(&meta).at(compose_block.line)?;
+                        let eval_result = &compose_block.eval;
+
+                        verify_warnings_and_errors(
+                            &eval_result,
+                            &expected_errors,
+                            &expected_warnings,
+                        )
+                        .at(compose_block.line)?;
+
+                        events.extend(emit_code_block(
+                            compose_block.header.to_string(),
+                            compose_block.display,
+                        ));
+                    }
+                    ErrorHandlingMode::Ignore => {
+                        events.extend(emit_code_block(
+                            compose_block.header.to_string(),
+                            compose_block.display,
+                        ));
+                    }
+                }
+            }
+            DocIr::OutputBlock(output) => {
+                events.extend(emit_code_block("text".to_string(), output.contents));
+            }
+            DocIr::Other(e) => events.extend(e),
+        }
+    }
+
     Ok(events)
 }
 
-fn code_block_as_rust_test(
-    raw: &String,
+/// returns (expected_errors, expected_warnings)
+pub(crate) fn parse_expected_errors_and_warnings(
     meta: &BlockHeader,
-    line: usize,
-) -> Result<String, Error> {
-    let (expected_errors, expected_warnings) = parse_expected_errors_and_warnings(meta, line)?;
+) -> Result<(Vec<&ErrorCode>, Vec<&ErrorCode>), String> {
+    let expected_errors = meta
+        .expected_errors
+        .iter()
+        .map(|code| lookup(code).ok_or_else(|| format!("{code} is not a valid error code")))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let expected_warnings = meta
+        .expected_warnings
+        .iter()
+        .map(|code| lookup(code).ok_or(format!("{code} is not a valid warning code")))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok((expected_errors, expected_warnings))
+}
+
+/// Emits tests for error and warning annotations in output blocks.
+///
+/// Ensures that the interpreter actually raised warnings and errors the output block wants to show
+///
+/// Expects an EvalResult named `result` to be defined.
+fn emit_output_diags_tests(output_diags: &[OutputBlockDiags], rust_test: &mut String) {
+    rust_test.push_str("\n");
+    for output_use in output_diags {
+        for error in &output_use.errors {
+            rust_test.push_str(&format!(
+                "# assert!(result.errors().iter().any(|e| e.code.map(|c| c.code) == Some(\"{error}\")), \"Output block expected error code {error} at line {line}\");\n",
+                error = error.code, line = output_use.line_number));
+        }
+
+        for warning in &output_use.warnings {
+            rust_test.push_str(&format!(
+                "# assert!(result.warnings().iter().any(|e| e.code.map(|c| c.code) == Some(\"{warning}\")), \"Output block expected warning code {warning} at line {line}\");\n",
+                warning = warning.code, line = output_use.line_number));
+        }
+    }
+}
+
+fn verify_output_block_errors_and_warnings(compose_block: &ComposeBlock) -> Result<(), Error> {
+    for output_use in &compose_block.output_uses {
+        for error in &output_use.errors {
+            if !compose_block
+                .eval
+                .errors
+                .iter()
+                .any(|e| e.code.map(|c| c.code) == Some(error.code))
+            {
+                return Err(format!(
+                    "Output block expected error code {error} at line {line}",
+                    error = error.code,
+                    line = output_use.line_number
+                ))
+                .at(output_use.line_number);
+            }
+        }
+
+        for warning in &output_use.warnings {
+            if !compose_block
+                .eval
+                .errors
+                .iter()
+                .any(|w| w.code.map(|c| c.code) == Some(warning.code))
+            {
+                return Err(format!(
+                    "Output block expected warning code {warning} at line {line}",
+                    warning = warning.code,
+                    line = output_use.line_number
+                ))
+                .at(output_use.line_number);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn verify_warnings_and_errors(
+    eval_result: &EvalResult,
+    expected_errors: &[&ErrorCode],
+    expected_warnings: &[&ErrorCode],
+) -> Result<(), String> {
+    if !eval_result
+        .errors
+        .iter()
+        .map(|e| e.code)
+        .zip(expected_errors)
+        .all(|(a, b)| a == Some(b))
+        || eval_result.errors.len() != expected_errors.len()
+    {
+        let errors_str = diagnostics_to_string(
+            &eval_result.world,
+            &eval_result.errors,
+            &[],
+            &Config::new().with_no_color(),
+        );
+        return Err(format!(
+            "expected errors: {expected_errors:?}, got:\n{errors_str}"
+        ));
+    }
+
+    if !eval_result
+        .warnings
+        .iter()
+        .map(|e| e.code)
+        .zip(expected_warnings)
+        .all(|(a, b)| a == Some(b))
+        || eval_result.warnings.len() != expected_warnings.len()
+    {
+        let warnings_str = diagnostics_to_string(
+            &eval_result.world,
+            &[],
+            &eval_result.warnings,
+            &Config::new().with_no_color(),
+        );
+        return Err(format!(
+            "expected warnings: {expected_warnings:?}, got:\n{warnings_str}"
+        ));
+    }
+
+    Ok(())
+}
+
+fn code_block_as_rust_test(raw: &str, meta: &BlockHeader, line: usize) -> Result<String, Error> {
+    let (expected_errors, expected_warnings) = parse_expected_errors_and_warnings(meta).at(line)?;
 
     let mut code = String::new();
     code.push_str("# use ::compose_eval::test::eval_code;\n");
@@ -238,12 +511,12 @@ fn code_block_as_rust_test(
             .collect::<Vec<_>>()
             .join(", ")
     ));
-    code.push_str("# eval_code(r#\"\n");
+    code.push_str("# let result = eval_code(r#\"\n");
     code.push_str(raw);
     if !raw.ends_with('\n') {
         code.push('\n');
     }
-    code.push_str("\"#)\n");
+    code.push_str("# \"#)\n");
     code.push_str("# .assert_errors(&expected_errors)\n");
     code.push_str("# .assert_warnings(&expected_warnings);");
 
@@ -286,60 +559,58 @@ fn parse_code_block(parser: &mut Peekable<OffsetIter<'_>>) -> (String /*display*
     (display, raw)
 }
 
-fn handle_output_block(
+fn parse_output_block(
     parser: &mut Peekable<OffsetIter<'_>>,
-    ctx: &BlockContext,
+    last_eval: &EvalResult,
     meta: &BlockHeader,
     line: usize,
     config: &Config,
-) -> Result<String, Error> {
+) -> Result<(OutputBlock, OutputBlockDiags), Error> {
+    let mut content = String::new();
+
     while let Some((Event::Text(_), _)) = parser.peek() {
         parser.next(); // discard any content in the code block
     }
 
-    let eval = ctx
-        .last_eval
-        .as_ref()
-        .ok_or("missing preceding compose block")
-        .at(line)?;
-
-    let mut out = String::new();
+    let mut diags = OutputBlockDiags {
+        errors: vec![],
+        warnings: vec![],
+        line_number: line,
+    };
 
     for warning in &meta.expected_warnings {
-        let Ok(diag) = find_diag(&eval.warnings, warning, line) else {
-            out.push_str(&format!(
-                "#### warning: expected warning code {warning}, but none occurred\n"
+        if let Ok(diag) = find_diag(&last_eval.warnings, warning, line) {
+            content.push_str(&diagnostics_to_string(
+                &last_eval.world,
+                &[],
+                &[diag.clone()],
+                config,
             ));
-            continue;
-        };
-        out.push_str(&diagnostics_to_string(
-            &eval.world,
-            &[],
-            &[diag.clone()],
-            config,
-        ));
+        }
+
+        diags.warnings.push(lookup(warning).unwrap());
     }
 
     for error in &meta.expected_errors {
-        let Ok(diag) = find_diag(&eval.errors, error, line) else {
-            out.push_str(&format!(
-                "#### error: expected error code {error}, but none occurred\n"
+        if let Ok(diag) = find_diag(&last_eval.errors, error, line) {
+            content.push_str(&diagnostics_to_string(
+                &last_eval.world,
+                &[diag.clone()],
+                &[],
+                config,
             ));
-            continue;
-        };
-        out.push_str(&diagnostics_to_string(
-            &eval.world,
-            &[diag.clone()],
-            &[],
-            config,
-        ));
+        }
+
+        diags.errors.push(lookup(error).unwrap());
     }
 
     if meta.stdout {
-        out.push_str(&eval.stdout);
+        content.push_str(&last_eval.stdout);
     }
 
-    Ok(out)
+    let output = OutputBlock { contents: content };
+
+    Ok((output, diags))
 }
 
 fn find_diag<'a>(

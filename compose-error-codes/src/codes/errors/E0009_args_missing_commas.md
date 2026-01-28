@@ -17,6 +17,8 @@ add(x y z)
 ✅ **Fix:**
 
 ```compose
+# let add = { x, y, z => x + y + z };
+# let x = 1; let y = 2; let z = 3;
 add(x, y, z)
 ```
 
