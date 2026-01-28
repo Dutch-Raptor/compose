@@ -7,8 +7,8 @@ In Compose, the body of an `if` expression must be enclosed in `{}`. Unlike some
 ### Example
 
 ```compose error(E0005)
-if true
-    let a = true;
+if (true)
+    println("it was true");
 ```
 
 ```output error(E0005)
@@ -18,8 +18,8 @@ if true
 ✅ **Fix:**
 
 ```compose
-if true {
-    let a = true;
+if (true) {
+    println("it was true");
 };
 ```
 

@@ -82,7 +82,7 @@ impl<'a> Machine<'a> {
         self.heap.maybe_gc(&roots);
     }
     
-    pub(crate) fn sink_mut(&mut self) -> &mut Sink {
+    pub fn sink_mut(&mut self) -> &mut Sink {
         &mut self.engine.sink
     }
 
@@ -95,7 +95,7 @@ impl<'a> Machine<'a> {
     /// # Scope behavior
     /// - Always creates a new lexical scope
     /// - Scope is exited immediately after `f` returns
-    pub(crate) fn in_lexical_scope<T>(&mut self, f: impl FnOnce(&mut Machine<'a>) -> T) -> T {
+    pub fn in_lexical_scope<T>(&mut self, f: impl FnOnce(&mut Machine<'a>) -> T) -> T {
         trace_fn!("in_lexical_scope");
         self.frames.top.scopes.enter_lexical();
         let result = f(self);
@@ -137,7 +137,7 @@ impl<'a> Machine<'a> {
     /// a no-op when dropped. Otherwise, a new flow scope is created and will be
     /// exited when the guard is dropped.
     ///
-    /// This is the guard-based equivalent of [`in_flow_scope`], useful when
+    /// This is the guard-based equivalent of [`Machine::in_flow_scope`], useful when
     /// control flow makes closure-based APIs inconvenient.
     ///
     /// # Drop behaviour
@@ -165,7 +165,7 @@ impl<'a> Machine<'a> {
     /// creates a fresh lexical scope and guarantees that it is exited when
     /// the guard is dropped.
     ///
-    /// This is the guard-based alternative to [`in_lexical_scope`].
+    /// This is the guard-based alternative to [`Machine::in_lexical_scope`].
     ///
     /// # Drop behaviour
     /// - Always exits the lexical scope on drop
@@ -186,7 +186,7 @@ impl<'a> Machine<'a> {
     /// For example `x is Int y && y > 0` introduces a temporary variable `y`
     /// that is only valid within this expression.
     ///
-    /// Unlike [`in_flow_scope_guard`], this function always creates a fresh
+    /// Unlike [`Machine::in_flow_scope_guard`], this function always creates a fresh
     /// flow scope, even if one is already active. This is useful when a
     /// construct requires an isolated flow environment (e.g. match expressions).
     ///

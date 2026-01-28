@@ -1,5 +1,5 @@
 pub use compose_codespan_reporting;
-use compose_codespan_reporting::term::termcolor::WriteColor;
+use compose_codespan_reporting::term::termcolor::{NoColor, WriteColor};
 use compose_codespan_reporting::{diagnostic, term};
 use compose_syntax::{
     FileId, Fix, FixDisplay, Label, LabelType, PatchEngine, Span, SyntaxError, SyntaxErrorSeverity,
@@ -17,7 +17,7 @@ pub fn write_diagnostics(
     errors: &[SourceDiagnostic],
     warnings: &[SourceDiagnostic],
     writer: &mut dyn WriteColor,
-    config: &term::Config,
+    config: &Config,
 ) -> Result<(), compose_codespan_reporting::files::Error> {
     for diag in warnings.iter().chain(errors) {
         let mut diagnostic = match diag.severity {
@@ -98,6 +98,26 @@ pub fn write_diagnostics(
     Ok(())
 }
 
+pub fn write_diagnostics_to_string(
+    world: &dyn World,
+    errors: &[SourceDiagnostic],
+    warnings: &[SourceDiagnostic],
+) -> String {
+    let mut diags_buffer = vec![];
+    let color_writer = &mut NoColor::new(&mut diags_buffer);
+    let config = Config::default();
+
+    let mut output = String::new();
+
+    write_diagnostics(world, warnings, errors, color_writer, &config)
+        .expect("failed to write diagnostics");
+
+    output.push_str(
+        &String::from_utf8(diags_buffer).expect("failed to convert diagnostics to string"),
+    );
+    output.trim_end().to_string()
+}
+
 fn diag_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId>> {
     let id = diag.span.id()?;
     let range = diag.span.range()?;
@@ -176,7 +196,7 @@ macro_rules! bail {
     };
 }
 
-/// Construct an [`EcoString`], [`HintedString`] or [`SourceDiagnostic`] with
+/// Construct an [`EcoString`] or [`SourceDiagnostic`] with
 /// severity `Error`.
 #[macro_export]
 #[doc(hidden)]
@@ -184,17 +204,6 @@ macro_rules! error {
     // For bail!("just a {}", "string").
     ($fmt:literal $(, $arg:expr)* $(,)?) => {
         $crate::diag::eco_format!($fmt, $($arg),*).into()
-    };
-
-    // For bail!("a hinted {}", "string"; hint: "some hint"; hint: "...")
-    (
-        $fmt:literal $(, $arg:expr)*
-        $(; hint: $hint:literal $(, $hint_arg:expr)*)*
-        $(,)?
-    ) => {
-        $crate::diag::HintedString::new(
-            $crate::diag::eco_format!($fmt, $($arg),*)
-        ) $(.with_hint($crate::diag::eco_format!($hint, $($hint_arg),*)))*
     };
 
     // For bail!(span, ...)
@@ -271,6 +280,7 @@ pub use {
     warning,
     ecow::{eco_format, EcoString},
 };
+use compose_codespan_reporting::term::Config;
 use compose_error_codes::ErrorCode;
 use compose_library::World;
 

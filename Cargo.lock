@@ -261,7 +261,10 @@ version = "0.1.0"
 dependencies = [
  "compose-doc-macros",
  "compose-error-codes",
+ "compose-error-codes-doc-tests",
  "compose-eval",
+ "compose-library",
+ "compose-syntax",
 ]
 
 [[package]]
@@ -337,6 +340,15 @@ name = "compose-error-codes"
 version = "0.1.0"
 dependencies = [
  "walkdir",
+]
+
+[[package]]
+name = "compose-error-codes-doc-tests"
+version = "0.1.0"
+dependencies = [
+ "compose-doc",
+ "compose-error-codes",
+ "compose-eval",
 ]
 
 [[package]]

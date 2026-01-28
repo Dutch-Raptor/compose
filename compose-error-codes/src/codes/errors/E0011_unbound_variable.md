@@ -5,7 +5,7 @@ This error occurs when you try to use a variable that has not been declared in t
 ### Example:
 
 ```compose error(E0011)
-y = 4; // ❌ Error: `y` is unbound
+y = 4;
 ```
 
 ```output error(E0011)

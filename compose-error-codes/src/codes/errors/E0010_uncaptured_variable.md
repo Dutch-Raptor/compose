@@ -10,7 +10,7 @@ In Compose, closures must explicitly declare any variables they use from the out
 ```compose error(E0010)
 let x = 1;
 let y = 2;
-let f = () => x + y;
+let f = { => x + y };
 ```
 
 ```output error(E0010)
@@ -22,7 +22,7 @@ let f = () => x + y;
 ```compose
 # let x = 1;
 # let y = 2;
-let f = |x, y| () => x + y;
+let f = { |x, y| => x + y };
 ```
 
 ---
@@ -43,7 +43,7 @@ Captured variables can be annotated to control how the closure accesses them:
 
 ```compose
 let x = box::new(42);
-let f = |ref x| () => print(*x);
+let f = { |ref x| => print(*x) };
 ```
 
 ---

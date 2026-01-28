@@ -5,71 +5,42 @@ use crate::set::SyntaxSet;
 use crate::span::Span;
 use compose_error_codes::ErrorCode;
 use compose_utils::trace_log;
-use ecow::{eco_vec, EcoString, EcoVec};
+use ecow::{EcoString, EcoVec, eco_vec};
 use std::fmt::{Debug, Formatter};
 use std::ops::Range;
 use std::sync::Arc;
 
+/// A node in the untyped syntax tree.
+///
+/// A node can either be
+/// - a leaf node representing a single token,
+/// - an inner node containing one or more children
+/// - or, an error node containing a syntax error.
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct SyntaxNode(Repr);
 
+// Constructors
 impl SyntaxNode {
-    pub(crate) fn erroneous(&self) -> bool {
-        match &self.0 {
-            Repr::Leaf(_) => false,
-            Repr::Inner(i) => i.erroneous,
-            Repr::Error(e) => e.error.severity == SyntaxErrorSeverity::Error,
-        }
+    pub(crate) fn error(error: SyntaxError, text: impl Into<EcoString>) -> Self {
+        Self(Repr::Error(Arc::new(ErrorNode::new(error, text))))
     }
-    pub fn errors(&self) -> Vec<SyntaxError> {
-        if !self.erroneous() {
-            return vec![];
-        }
-
-        if let Repr::Error(node) = &self.0 {
-            vec![node.error.clone()]
-        } else {
-            self.children()
-                .filter(|node| node.erroneous())
-                .flat_map(|node| node.errors())
-                .collect()
-        }
+    pub(crate) fn leaf(kind: SyntaxKind, text: impl Into<EcoString>, span: Span) -> Self {
+        Self(Repr::Leaf(LeafNode::new(kind, text, span)))
     }
 
-    pub fn warnings(&self) -> Vec<SyntaxError> {
-        match &self.0 {
-            Repr::Error(node) => {
-                if node.error.severity == SyntaxErrorSeverity::Warning {
-                    vec![node.error.clone()]
-                } else {
-                    vec![]
-                }
-            }
-            Repr::Inner(i) => i.children.iter().flat_map(|node| node.warnings()).collect(),
-            Repr::Leaf(_) => vec![],
-        }
+    pub(crate) fn inner(kind: SyntaxKind, children: Vec<SyntaxNode>) -> Self {
+        Self(Repr::Inner(Arc::new(InnerNode::new(kind, children))))
     }
 
-    pub fn error_mut(&mut self) -> Option<&mut SyntaxError> {
-        match &mut self.0 {
-            Repr::Error(e) => Some(&mut Arc::make_mut(e).error),
-            _ => None,
+    pub(crate) const fn placeholder(kind: SyntaxKind) -> Self {
+        if matches!(kind, SyntaxKind::Error) {
+            panic!("cannot create error placeholder");
         }
-    }
-
-    pub(crate) fn descendents(&self) -> usize {
-        match &self.0 {
-            Repr::Leaf(_) | Repr::Error(_) => 1,
-            Repr::Inner(i) => i.descendents,
-        }
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        match &self.0 {
-            Repr::Leaf(l) => l.len(),
-            Repr::Inner(i) => i.len,
-            Repr::Error(e) => e.len(),
-        }
+        Self(Repr::Leaf(LeafNode {
+            kind,
+            text: EcoString::new(),
+            span: Span::detached(),
+        }))
     }
 }
 
@@ -102,28 +73,6 @@ impl SyntaxNode {
 }
 
 impl SyntaxNode {
-    pub(crate) fn error(error: SyntaxError, text: impl Into<EcoString>) -> Self {
-        Self(Repr::Error(Arc::new(ErrorNode::new(error, text))))
-    }
-    pub(crate) fn leaf(kind: SyntaxKind, text: impl Into<EcoString>, span: Span) -> Self {
-        Self(Repr::Leaf(LeafNode::new(kind, text, span)))
-    }
-
-    pub(crate) fn inner(kind: SyntaxKind, children: Vec<SyntaxNode>) -> Self {
-        Self(Repr::Inner(Arc::new(InnerNode::new(kind, children))))
-    }
-
-    pub(crate) const fn placeholder(kind: SyntaxKind) -> Self {
-        if matches!(kind, SyntaxKind::Error) {
-            panic!("cannot create error placeholder");
-        }
-        Self(Repr::Leaf(LeafNode {
-            kind,
-            text: EcoString::new(),
-            span: Span::detached(),
-        }))
-    }
-
     pub fn kind(&self) -> SyntaxKind {
         match &self.0 {
             Repr::Leaf(l) => l.kind,
@@ -215,6 +164,67 @@ impl SyntaxNode {
         }
     }
 }
+
+impl SyntaxNode {
+    pub(crate) fn erroneous(&self) -> bool {
+        match &self.0 {
+            Repr::Leaf(_) => false,
+            Repr::Inner(i) => i.erroneous,
+            Repr::Error(e) => e.error.severity == SyntaxErrorSeverity::Error,
+        }
+    }
+    pub fn errors(&self) -> Vec<SyntaxError> {
+        if !self.erroneous() {
+            return vec![];
+        }
+
+        if let Repr::Error(node) = &self.0 {
+            vec![node.error.clone()]
+        } else {
+            self.children()
+                .filter(|node| node.erroneous())
+                .flat_map(|node| node.errors())
+                .collect()
+        }
+    }
+
+    pub fn warnings(&self) -> Vec<SyntaxError> {
+        match &self.0 {
+            Repr::Error(node) => {
+                if node.error.severity == SyntaxErrorSeverity::Warning {
+                    vec![node.error.clone()]
+                } else {
+                    vec![]
+                }
+            }
+            Repr::Inner(i) => i.children.iter().flat_map(|node| node.warnings()).collect(),
+            Repr::Leaf(_) => vec![],
+        }
+    }
+
+    pub fn error_mut(&mut self) -> Option<&mut SyntaxError> {
+        match &mut self.0 {
+            Repr::Error(e) => Some(&mut Arc::make_mut(e).error),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn descendents(&self) -> usize {
+        match &self.0 {
+            Repr::Leaf(_) | Repr::Error(_) => 1,
+            Repr::Inner(i) => i.descendents,
+        }
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        match &self.0 {
+            Repr::Leaf(l) => l.len(),
+            Repr::Inner(i) => i.len,
+            Repr::Error(e) => e.len(),
+        }
+    }
+}
+
 
 impl Default for SyntaxNode {
     fn default() -> Self {

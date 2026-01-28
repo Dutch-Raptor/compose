@@ -1,29 +1,34 @@
+use compose_doc::ErrorHandlingMode;
 use proc_macro::TokenStream as BoundaryStream;
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Attribute, Item};
+use syn::{Attribute, Item, parse_macro_input};
 use unindent::unindent;
 
 #[proc_macro]
 pub fn compose_doc(input: BoundaryStream) -> BoundaryStream {
     let ComposeDocInput { attrs, item } = parse_macro_input!(input as ComposeDocInput);
 
-    let lines: Vec<_> = attrs.iter()
-        .filter_map(extract_doc_line)
-        .collect();
+    let lines: Vec<_> = attrs.iter().filter_map(extract_doc_line).collect();
 
     let markdown = unindent(&lines.join("\n"));
 
     // Transform markdown
-    let transformed =
-        match compose_doc::transform_markdown(&markdown, &compose_doc::Config::no_color().emit_code_as_doc_tests(true)) {
-            Ok(t) => t,
-            Err(e) => {
-                return syn::Error::new_spanned(&item, format!("{}: {}", e.line, e.message))
-                    .to_compile_error()
-                    .into();
-            }
-        };
+    let transformed = match compose_doc::transform_markdown(
+        &markdown,
+        &compose_doc::Config::new()
+            .with_no_color()
+            .with_code_block_error_mode(ErrorHandlingMode::EmitAsTests)
+            .with_output_block_error_mode(ErrorHandlingMode::EmitAsTests),
+
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            return syn::Error::new_spanned(&item, format!("{}: {}", e.line, e.message))
+                .to_compile_error()
+                .into();
+        }
+    };
 
     let doc_lines = transformed.lines().map(|line| quote! { #[doc = #line] });
 
@@ -37,7 +42,6 @@ pub fn compose_doc(input: BoundaryStream) -> BoundaryStream {
 
     output.into()
 }
-
 
 struct ComposeDocInput {
     attrs: Vec<Attribute>,

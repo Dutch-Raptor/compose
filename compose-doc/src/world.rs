@@ -11,6 +11,16 @@ pub(crate) struct DocWorld {
     pub stdout: Mutex<String>
 }
 
+impl Clone for DocWorld {
+    fn clone(&self) -> Self {
+        Self {
+            source: self.source.clone(),
+            library: self.library.clone(),
+            stdout: Mutex::new(self.stdout.lock().expect("failed to lock stdout").clone())
+        }
+    }   
+}
+
 impl DocWorld {
     pub(crate) fn from_str(text: &str) -> Self {
         let entrypoint = FileId::new("main.comp");

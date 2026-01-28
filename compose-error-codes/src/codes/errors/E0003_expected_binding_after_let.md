@@ -46,6 +46,7 @@ let x = 5;
 #### ✅ Use a destructuring pattern:
 
 ```compose
+# let some_object = { a: 1, b: 2 };
 let { a, b } = some_object;
 ```
 

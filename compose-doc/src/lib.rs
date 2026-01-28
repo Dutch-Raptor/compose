@@ -135,7 +135,7 @@ If a block:
 - emits diagnostics not marked with `error(...)` or `warn(...)`, or
 - claims to emit diagnostics that aren’t produced by the code,
 
-then `transform_markdown` will fail with a line-referenced error.
+then [`transform_markdown`] will fail with a line-referenced error.
 
 ---
 
@@ -143,8 +143,9 @@ then `transform_markdown` will fail with a line-referenced error.
 
 ```rust
 use compose_doc::Config;
-let config = Config::ansi();      // diagnostics with colour
-let config = Config::no_color();  // plain-text diagnostics
+
+let config = Config::new().with_ansi();      // diagnostics with colour
+let config = Config::new().with_no_color();  // plain-text diagnostics
 ```
 */
 mod block;
@@ -285,7 +286,7 @@ mod tests {
         "#};
 
         let output =
-            transform_markdown(input, &Config::no_color()).expect("failed to transform markdown");
+            transform_markdown(input, &Config::new().with_no_color()).expect("failed to transform markdown");
 
         assert_eq!(
             output.trim(),
@@ -332,7 +333,7 @@ mod tests {
         "#};
 
         let output =
-            transform_markdown(input, &Config::no_color()).expect("failed to transform markdown");
+            transform_markdown(input, &Config::new().with_no_color()).expect("failed to transform markdown");
 
         assert_eq!(
             output.trim(),

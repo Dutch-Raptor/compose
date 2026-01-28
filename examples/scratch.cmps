@@ -1,5 +1,2 @@
 let value = 1;
-
-if value is Int {
-    println(value)
-}
+value = 5;

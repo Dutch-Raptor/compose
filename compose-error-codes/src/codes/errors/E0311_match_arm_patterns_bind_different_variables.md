@@ -2,7 +2,7 @@
 
 ### Error
 
-```ignore
+```text
 patterns within a match arm have differing bindings
 ```
 
@@ -20,7 +20,8 @@ Therefore, **each pattern must bind the same variables**.
 ### Example
 
 ```compose error(E0311)
-match value {
+# let value = [0,1];
+match (value) {
     [0, a] | [1, b] => a + b
 }
 ```
@@ -42,7 +43,7 @@ No execution binds both variables.
 
 A `|`-joined arm behaves like multiple patterns with a single body:
 
-```compose
+```text
 p1 | p2 => body
 ```
 
@@ -56,7 +57,7 @@ Since `body` is shared, it may only reference variables bound by **all** pattern
 
 ```compose
 # let value = [0, 1];
-match value {
+match (value) {
     [0, x] | [1, x] => x
 }
 ```
@@ -64,8 +65,8 @@ match value {
 **Or split the arms:**
 
 ```compose
-#let value = [0, 1];
-match value {
+# let value = [0, 1];
+match (value) {
     [0, a] => a,
     [1, b] => b,
 }

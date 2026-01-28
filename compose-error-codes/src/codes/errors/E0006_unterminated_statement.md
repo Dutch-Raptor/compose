@@ -8,7 +8,8 @@ consistent.
 ### Example
 
 ```compose error(E0006)
-let x = 1 let y = 2
+let x = 1 
+let y = 2
 ```
 
 ```output error(E0006)
@@ -18,7 +19,8 @@ let x = 1 let y = 2
 ✅ **Fix:**
 
 ```compose
-let x = 1; let y = 2;
+let x = 1; 
+let y = 2;
 ```
 
 ---

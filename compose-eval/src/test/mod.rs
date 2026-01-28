@@ -3,9 +3,7 @@ use compose_error_codes::ErrorCode;
 use compose_library::diag::compose_codespan_reporting::term::termcolor::{
     ColorChoice, StandardStream,
 };
-use compose_library::diag::{
-    FileError, FileResult, SourceDiagnostic, SourceResult, Warned, write_diagnostics,
-};
+use compose_library::diag::{FileError, FileResult, SourceDiagnostic, SourceResult, Warned, write_diagnostics, write_diagnostics_to_string};
 use compose_library::{Library, Value, World, library};
 use compose_syntax::{FileId, Source};
 use ecow::{EcoVec, eco_format, eco_vec};
@@ -15,16 +13,17 @@ use std::io::{Read, Write};
 use std::sync::Mutex;
 use tap::pipe::Pipe;
 
+mod flow_variables;
 #[cfg(test)]
 mod iterators;
 #[cfg(test)]
 mod snippets;
-mod flow_variables;
 
 pub struct TestWorld {
     sources: Mutex<HashMap<FileId, Source>>,
     entrypoint: FileId,
     library: Library,
+    stdout: Mutex<String>,
 }
 
 impl Clone for TestWorld {
@@ -33,6 +32,7 @@ impl Clone for TestWorld {
             sources: Mutex::new(self.sources.lock().unwrap().clone()),
             entrypoint: self.entrypoint,
             library: self.library.clone(),
+            stdout: Mutex::new(String::new()),
         }
     }
 }
@@ -65,6 +65,7 @@ impl TestWorld {
             sources: Mutex::new(sources),
             entrypoint,
             library: library(),
+            stdout: Mutex::new(String::new()),
         }
     }
 
@@ -108,8 +109,15 @@ impl World for TestWorld {
         &self.library
     }
 
-    fn write(&self, f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
-        f(&mut std::io::stdout())
+    fn write(
+        &self,
+        f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
+        let mut buffer: Vec<u8> = Vec::new();
+        f(&mut buffer)?;
+        let output = String::from_utf8(buffer).expect("Invalid UTF-8");
+        self.stdout.lock().expect("failed to lock stdout").push_str(&output);
+        Ok(())
     }
 
     fn read(&self, f: &mut dyn FnMut(&mut dyn Read) -> std::io::Result<()>) -> std::io::Result<()> {
@@ -186,6 +194,17 @@ impl TestResult {
         self
     }
 
+    pub fn errors(&self) -> &[SourceDiagnostic] {
+        match &self.value {
+            Ok(_) => &[],
+            Err(errors) => errors,
+        }
+    }
+
+    pub fn warnings(&self) -> &[SourceDiagnostic] {
+        &self.warnings
+    }
+
     #[track_caller]
     pub fn assert_no_warnings(self) -> Self {
         if !self.warnings.is_empty() {
@@ -198,23 +217,38 @@ impl TestResult {
     #[track_caller]
     pub fn assert_errors(self, expected_errors: &[&ErrorCode]) -> Self {
         match &self.value {
-            Ok(_) if expected_errors.is_empty() => {},
+            Ok(_) if expected_errors.is_empty() => {}
             Ok(_) => panic!("expected errors, but got none"),
             Err(errors) => {
-                if expected_errors.is_empty() {
-                    panic!("expected no errors, but got: {:?}", errors)
-                }
-                if errors
+                let missing_expected_errors = expected_errors
                     .iter()
+                    .filter(|e| !errors.iter().any(|c| c.code == Some(*e)))
                     .map(|e| e.code)
-                    .zip(expected_errors.iter().map(Some))
-                    .any(|(a, b)| a.as_ref() != b)
-                {
-                    print_diagnostics(&self.world, errors, &self.warnings);
-                    panic!(
-                        "expected errors: {:?}, but got: {:?}",
-                        expected_errors, errors
-                    )
+                    .collect::<Vec<_>>();
+                let unexpected_errors = errors
+                    .iter()
+                    .filter(|d| {
+                        !expected_errors
+                            .iter()
+                            .any(|e| Some(e.code) == d.code.map(|c| c.code))
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+
+                let mut error = String::new();
+                if !missing_expected_errors.is_empty() {
+                    error.push_str("expected errors did not occur: ");
+                    error.push_str(&missing_expected_errors.join(", "));
+                    error.push_str("\n");
+                }
+
+                if !unexpected_errors.is_empty() {
+                    error.push_str("unexpected errors occurred: \n");
+                    error.push_str(write_diagnostics_to_string(&self.world, &unexpected_errors, &[]).as_str());
+                }
+
+                if !missing_expected_errors.is_empty() || !unexpected_errors.is_empty() {
+                    panic!("{}", error);
                 }
             }
         }
@@ -256,6 +290,16 @@ impl TestResult {
             Ok(_) => eco_vec!(),
             Err(errors) => errors.clone(),
         }
+    }
+
+    pub fn assert_stdout(&self, expected: &str) {
+        let stdout = self.world.stdout.lock().expect("failed to lock stdout").clone();
+        assert_eq!(stdout, expected);
+    }
+
+    pub fn assert_stdout_predicate(&self, predicate: impl FnOnce(&str) -> bool) {
+        let stdout = self.world.stdout.lock().expect("failed to lock stdout").clone();
+        assert!(predicate(&stdout));
     }
 }
 

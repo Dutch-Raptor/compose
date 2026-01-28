@@ -189,16 +189,16 @@ compose_doc! {
     Both `while` and `for` loops can also be used as expressions. You can return a value from a loop using `break`:
 
     ```compose
-    // let result = {
-    //     let mut i = 0;
-    //     while (true) {
-    //         if (i == 5) {
-    //             break i * 2; // returns 10
-    //         };
-    //         i = i + 1;
-    //     };
-    // };
-    // assert::eq(result, 10);
+    let result = {
+        let mut i = 0;
+        while (true) {
+            if (i == 5) {
+                break i * 2; // returns 10
+            };
+            i = i + 1;
+        };
+    };
+    assert::eq(result, 10);
     ```
 
     If no `break` with value occurs, the result of the loop is `unit`.
@@ -248,7 +248,7 @@ compose_doc! {
 
     | Previous            | Next                                                                 |
     |---------------------|--------------------------------------------------------------------|
-    | [Back](crate::docs) | [Next: Variables and scopes](crate::docs::C2_Variables_and_Scopes) |
+    | [Back](crate::language) | [Next: Variables and scopes](crate::language::C2_Variables_and_Scopes) |
 
     */
     pub mod C1_Overview {}
