@@ -1,9 +1,7 @@
 # The Compose Programming Language
 
 ```rust
-# compose::test::assert_eval(r#"
 println("'Hello, world' from Compose!");
-# "#);
 ```
 
 Compose is a functionally flavoured interpreted programming language with Rust-like syntax.
