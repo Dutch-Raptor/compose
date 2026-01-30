@@ -7,11 +7,11 @@ println("'Hello, world' from Compose!");
 # "#);
 ```
 
-A functional flavoured interpreted programming language with rust-like syntax.
+Compose is a functionally flavoured interpreted programming language with Rust-like syntax.
 
 Features:
-- Expression focused: blocks and control flow are expressed as expressions.
-- Functions as first class citizens
+- Expression focused: blocks and control flow (`if`, `match`, loops) are expressions and produce values.
+- Functions as first-class citizens
 - High quality diagnostics
 - Variables are immutable by default
 - Garbage collection
@@ -24,7 +24,6 @@ Compose is being developed as a hobby project and is not intended for production
 </div>
 
 To learn about the language, see the [language] module.
-
 To learn about how compose is implemented internally, see the [implementation] docs.
 
 # Using this crate
