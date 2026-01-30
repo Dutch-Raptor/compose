@@ -16,16 +16,16 @@ pub fn cast(stream: TokenStream) -> Result<TokenStream> {
 
     let reflect_impl = (!input.from_value.is_empty()).then_some({
         quote! {
-            impl #foundations::Reflect for #ty {
+            impl #foundations::cast::Reflect for #ty {
                 fn castable(value: &#foundations::Value) -> bool {
                     #castable_body
                 }
 
-                fn input() -> #foundations::CastInfo {
+                fn input() -> #foundations::cast::CastInfo {
                     #input_body
                 }
 
-                fn output() -> #foundations::CastInfo {
+                fn output() -> #foundations::cast::CastInfo {
                     #output_body
                 }
             }
@@ -34,7 +34,7 @@ pub fn cast(stream: TokenStream) -> Result<TokenStream> {
 
     let into_value = input.into_value.map(|expr| {
         quote! {
-            impl #foundations::IntoValue for #ty {
+            impl #foundations::cast::IntoValue for #ty {
                 fn into_value(self) -> #foundations::Value {
                     #expr
                 }
@@ -49,18 +49,18 @@ pub fn cast(stream: TokenStream) -> Result<TokenStream> {
             let expr = &cast.expr;
 
             quote! {
-                if <#ty as #foundations::Reflect>::castable(&value) {
-                    let #pattern = <#ty as #foundations::FromValue>::from_value(value)?;
+                if <#ty as #foundations::cast::Reflect>::castable(&value) {
+                    let #pattern = <#ty as #foundations::cast::FromValue>::from_value(value)?;
                     return Ok(#expr);
                 }
             }
         });
 
         quote! {
-            impl #foundations::FromValue for #ty {
+            impl #foundations::cast::FromValue for #ty {
                 fn from_value(value: #foundations::Value) -> ::compose_library::diag::StrResult<Self> {
                     #(#cast_checks)*
-                    Err(<Self as #foundations::Reflect>::error(&value))
+                    Err(<Self as #foundations::cast::Reflect>::error(&value))
                 }
             }
         }
@@ -75,7 +75,7 @@ pub fn cast(stream: TokenStream) -> Result<TokenStream> {
 
 fn create_output_body() -> TokenStream {
     quote! {
-        <Self as #foundations::Reflect>::input()
+        <Self as #foundations::cast::Reflect>::input()
     }
 }
 
@@ -83,7 +83,7 @@ fn create_input_body(input: &CastData) -> TokenStream {
     let infos = input.from_value.iter().map(|cast| {
         let ty = &cast.ty;
         quote! {
-            <#ty as #foundations::Reflect>::input()
+            <#ty as #foundations::cast::Reflect>::input()
         }
     });
 
@@ -96,7 +96,7 @@ fn create_castable_body(input: &CastData) -> TokenStream {
     let casts = input.from_value.iter().map(|cast| {
         let ty = &cast.ty;
         quote! {
-            if <#ty as #foundations::Reflect>::castable(&value) {
+            if <#ty as #foundations::cast::Reflect>::castable(&value) {
                 return true;
             }
         }

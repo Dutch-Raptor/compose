@@ -1,8 +1,5 @@
-use crate::{ArrayValue, HeapRef, MapValue, Trace};
-use crate::{UntypedRef, Value};
 use compose_library::diag::{SourceResult, bail, error};
 use compose_library::vm::Vm;
-use compose_library::{Func, Str};
 use compose_macros::{func, scope, ty};
 use compose_syntax::Span;
 use std::collections::HashMap;
@@ -14,10 +11,15 @@ mod iter_combinators;
 mod range_iter;
 mod string_iter;
 
-use crate::diag::{SourceDiagnostic, StrResult, UnSpanned};
-use crate::support::eval_func;
+use crate::{
+    foundations::support::eval_func,
+    diag::{SourceDiagnostic, StrResult, UnSpanned},
+    Value,
+    foundations::support::eval_predicate
+};
 pub use array_iter::*;
-use compose_library::support::eval_predicate;
+use compose_library::foundations::types::{ArrayValue, Func, MapValue, Str};
+use compose_library::gc::{HeapRef, Trace, UntypedRef};
 pub use iter_combinators::*;
 pub use range_iter::*;
 pub use string_iter::*;
@@ -109,7 +111,7 @@ pub fn requires_mutable_iter<T>(value: Value) -> Result<T, UnSpanned<SourceDiagn
     .into())
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Iter {
     String(StringIterator),
     Array(ArrayIter),

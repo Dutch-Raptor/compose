@@ -3,7 +3,7 @@ mod into_value;
 mod into_result;
 
 use crate::diag::{Spanned, StrResult};
-use crate::{UnitValue, Value};
+use crate::{foundations::types::UnitValue, Value};
 use compose_macros::cast;
 pub use into_result::*;
 pub use into_value::*;

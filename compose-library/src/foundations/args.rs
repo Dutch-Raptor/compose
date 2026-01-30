@@ -1,10 +1,11 @@
-use crate::diag::{bail, error, At, SourceDiagnostic, SourceResult, Spanned};
-use crate::foundations::cast::FromValue;
-use crate::foundations::IntoValue;
-use crate::{Trace, Value};
-use compose_library::UntypedRef;
+use crate::{
+    Value,
+    diag::{At, SourceDiagnostic, SourceResult, Spanned, bail, error},
+    foundations::{cast::FromValue, cast::IntoValue},
+    gc::{Trace, UntypedRef},
+};
 use compose_syntax::Span;
-use ecow::{eco_vec, EcoVec};
+use ecow::{EcoVec, eco_vec};
 
 #[derive(Debug, Clone)]
 pub struct Args {
@@ -60,7 +61,7 @@ impl Args {
             }
             let value = self.items.remove(i).value;
             let span = value.span;
-            return T::from_value(value).at(span).map(Some)
+            return T::from_value(value).at(span).map(Some);
         }
         Ok(None)
     }
@@ -90,7 +91,7 @@ impl Args {
                 let value = self.items.remove(i).value;
                 let span = value.span;
                 let casted = T::from_value(value).at(span)?;
-                
+
                 if found.is_none() {
                     found = Some(casted);
                 }
@@ -165,7 +166,7 @@ pub struct Meta(u8);
 impl Meta {
     const REF: Meta = Meta(1);
     const MUT: Meta = Meta(2);
-    
+
     pub fn new() -> Meta {
         Meta(0)
     }

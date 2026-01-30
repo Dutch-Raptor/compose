@@ -1,9 +1,10 @@
-use compose_library::{Binding, Library, Scope, Scopes, Value};
 use compose_syntax::ast::{Arg, AstNode, Expr, Ident, ParamKind, Statement};
 use compose_syntax::{ast, Span};
 use ecow::EcoString;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use compose_library::foundations::scope::{Binding, Scope, Scopes};
+use compose_library::{Library, Value};
 
 /// Visits a closure and determines which variables are captured implicitly.
 #[derive(Debug)]
@@ -290,7 +291,7 @@ mod tests {
     use crate::expression::captures_visitor::CapturesVisitor;
     use crate::test::{print_diagnostics, TestWorld};
     use compose_library::diag::SourceDiagnostic;
-    use compose_library::{Scope, Scopes};
+    use compose_library::foundations::scope::{Scope, Scopes};
     use compose_syntax::ast;
 
     #[track_caller]

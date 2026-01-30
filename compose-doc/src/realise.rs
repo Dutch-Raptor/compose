@@ -7,7 +7,7 @@ pub(crate) fn eval_code(code: &str) -> EvalResult {
     let world = DocWorld::from_str(code);
     let mut vm = Machine::new(&world);
 
-    let Warned { value, warnings } = compose_eval::eval(
+    let Warned { value, warnings } = compose_eval::eval_source(
         &world.source,
         &mut vm,
         &EvalConfig {

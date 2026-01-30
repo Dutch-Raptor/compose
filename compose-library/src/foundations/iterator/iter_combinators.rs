@@ -1,9 +1,13 @@
 use crate::diag::StrResult;
-use crate::IterValue;
-use compose_library::diag::{bail, At, SourceResult};
-use compose_library::support::eval_predicate;
+use compose_library::Value;
+use compose_library::diag::{At, SourceResult, bail};
+use compose_library::foundations::args::Args;
+use compose_library::foundations::cast::IntoValue;
+use compose_library::foundations::iterator::{IterValue, ValueIterator};
+use compose_library::foundations::support::eval_predicate;
+use compose_library::foundations::types::{ArrayValue, Func};
+use compose_library::gc::{Trace, UntypedRef};
 use compose_library::vm::Vm;
-use compose_library::{Args, ArrayValue, Func, IntoValue, Trace, UntypedRef, Value, ValueIterator};
 use std::iter;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
@@ -23,22 +27,22 @@ impl TakeIter {
     }
 }
 
-// impl PartialEq for TakeIter {
-//     fn eq(&self, other: &Self) -> bool {
-//         if self.inner != other.inner {
-//             return false;
-//         }
-//
-//         let take_a = self.take.lock().expect("mutex poisoned");
-//         let take_b = other.take.lock().expect("mutex poisoned");
-//
-//         if *take_a != *take_b {
-//             return false;
-//         }
-//
-//         true
-//     }
-// }
+impl PartialEq for TakeIter {
+    fn eq(&self, other: &Self) -> bool {
+        if self.inner != other.inner {
+            return false;
+        }
+
+        let take_a = self.take.lock().expect("mutex poisoned").clone();
+        let take_b = other.take.lock().expect("mutex poisoned").clone();
+
+        if take_a != take_b {
+            return false;
+        }
+
+        true
+    }
+}
 
 impl Trace for TakeIter {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
@@ -71,24 +75,24 @@ pub struct SkipIter {
     pub(crate) skip: Arc<Mutex<usize>>,
 }
 
-// impl PartialEq for SkipIter {
-//     fn eq(&self, other: &Self) -> bool {
-//         if self.inner != other.inner {
-//             return false;
-//         }
-//
-//         {
-//             let skip_a = self.skip.lock().expect("mutex poisoned");
-//             let skip_b = self.skip.lock().expect("mutex poisoned");
-//
-//             if *skip_a != *skip_b {
-//                 return false;
-//             }
-//         }
-//
-//         true
-//     }
-// }
+impl PartialEq for SkipIter {
+    fn eq(&self, other: &Self) -> bool {
+        if self.inner != other.inner {
+            return false;
+        }
+
+        {
+            let skip_a = self.skip.lock().expect("mutex poisoned").clone();
+            let skip_b = self.skip.lock().expect("mutex poisoned").clone();
+
+            if skip_a != skip_b {
+                return false;
+            }
+        }
+
+        true
+    }
+}
 
 impl Trace for SkipIter {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
@@ -153,6 +157,16 @@ impl ValueIterator for TakeWhileIter {
     // nth method cannot be optimized here, so we just fall back to the default
 }
 
+impl PartialEq for TakeWhileIter {
+    fn eq(&self, other: &Self) -> bool {
+        if self.inner != other.inner {
+            return false;
+        }
+
+        self.predicate == other.predicate
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FilterIter {
     pub(crate) inner: IterValue,
@@ -186,6 +200,16 @@ impl ValueIterator for FilterIter {
     // Fall back to the default implementation
 }
 
+impl PartialEq for FilterIter {
+    fn eq(&self, other: &Self) -> bool {
+        if self.inner != other.inner {
+            return false;
+        }
+
+        self.predicate == other.predicate
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MapIter {
     pub(crate) inner: IterValue,
@@ -217,6 +241,12 @@ impl ValueIterator for MapIter {
     }
 }
 
+impl PartialEq for MapIter {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner && self.map == other.map
+    }
+}
+
 impl StepByIter {
     pub fn new(inner: IterValue, step: usize) -> StrResult<Self> {
         if step == 0 {
@@ -231,23 +261,26 @@ impl StepByIter {
     }
 }
 
-// impl PartialEq for StepByIter {
-//     fn eq(&self, other: &Self) -> bool {
-//         if self.step != other.step {
-//             return false;
-//         }
-//
-//         if *self.first_step.lock().unwrap() != *other.first_step.lock().unwrap() {
-//             return false;
-//         }
-//
-//         if self.inner != other.inner {
-//             return false;
-//         }
-//
-//         true
-//     }
-// }
+impl PartialEq for StepByIter {
+    fn eq(&self, other: &Self) -> bool {
+        if self.step != other.step {
+            return false;
+        }
+
+        if self.inner != other.inner {
+            return false;
+        }
+
+        let self_first_step = self.first_step.lock().expect("lock poisened").clone();
+        let other_first_step = other.first_step.lock().expect("lock poisened").clone();
+
+        if self_first_step != other_first_step {
+            return false;
+        }
+
+        true
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct StepByIter {
@@ -325,5 +358,18 @@ impl ValueIterator for EnumerateIter {
         Ok(Some(
             ArrayValue::from(vm.heap_mut(), vec![index_cpy.into_value(), inner_value]).into_value(),
         ))
+    }
+}
+
+impl PartialEq for EnumerateIter {
+    fn eq(&self, other: &Self) -> bool {
+        if self.inner.iter != other.inner.iter {
+            return false;
+        }
+
+        let self_index = self.index.lock().expect("index poisoned").clone();
+        let other_index = other.index.lock().expect("index poisoned").clone();
+
+        self_index == other_index
     }
 }

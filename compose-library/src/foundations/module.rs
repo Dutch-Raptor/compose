@@ -1,11 +1,14 @@
-use crate::{Scope, SyntaxContext, Trace};
 use compose_library::diag::{bail, error, SourceResult};
-use compose_library::{Sink, UntypedRef, Value};
 use compose_macros::ty;
 use compose_syntax::ast::{AstNode, LetBinding};
 use compose_syntax::{FileId, Fix, FixBuilder, Label, Span};
 use ecow::EcoString;
 use std::sync::Arc;
+use compose_library::foundations::scope::{Scope, Visibility};
+use compose_library::gc::{Trace, UntypedRef};
+use compose_library::sink::Sink;
+use compose_library::Value;
+use compose_library::world::SyntaxContext;
 
 #[derive(Debug, Clone)]
 #[ty(cast)]
@@ -46,7 +49,7 @@ impl Module {
             );
         };
 
-        if binding.visibility != crate::Visibility::Public {
+        if binding.visibility != Visibility::Public {
             let mut err = error!(
                 access_span, "cannot access private binding `{path}` in module `{}`", self.name;
                 label_message: "this binding is private";

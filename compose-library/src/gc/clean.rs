@@ -1,12 +1,12 @@
 use compose_library::gc::trigger::GcEvent;
-use compose_library::{Heap, Trace};
 use slotmap::SecondaryMap;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
+use compose_library::gc::{Heap, Trace};
 
 impl Heap {
     pub fn maybe_gc(&mut self, root: &impl Trace) -> Option<CleanResult> {
-        if !self.policy.on_event(&GcEvent::MaybeGc, &self.data()) {
+        if !self.policy.on_event(&GcEvent::MaybeGc, &self.metadata()) {
             return None;
         }
         Some(self.clean(root))
@@ -54,7 +54,7 @@ impl Heap {
             gc_duration,
         };
         
-        self.policy.after_gc(&result, &self.data());
+        self.policy.after_gc(&result, &self.metadata());
         
         result
     }

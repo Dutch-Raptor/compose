@@ -3,13 +3,15 @@ use crate::expression::pattern::{destructure_pattern, PatternContext, PatternMat
 use crate::vm::{FlowEvent, TrackedContainer};
 use crate::{Eval, Machine};
 use compose_library::diag::{bail, error, IntoSourceDiagnostic, SourceResult, Spanned};
-use compose_library::{
-    Args, Binding, BindingKind, Closure, Func, IntoValue, Scope, Value,
-    VariableAccessError, Visibility,
-};
 use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind, Pattern};
 use compose_syntax::{ast, Label};
 use ecow::EcoVec;
+use compose_library::foundations::args::Args;
+use compose_library::foundations::cast::IntoValue;
+use compose_library::foundations::scope::{Binding, BindingKind, Scope, VariableAccessError, Visibility};
+use compose_library::foundations::types::Func;
+use compose_library::foundations::types::func::Closure;
+use compose_library::Value;
 use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
 
 impl Eval for ast::Lambda<'_> {

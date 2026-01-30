@@ -1,5 +1,5 @@
 use crate::repr::separated_list;
-use compose_library::{Type, Value};
+use compose_library::{foundations::types::Type, Value};
 use ecow::{eco_format, EcoString};
 use std::fmt::Write;
 

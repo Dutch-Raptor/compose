@@ -1,7 +1,8 @@
 use crate::vm::Tracked;
 use crate::{Eval, Machine};
 use compose_library::diag::SourceResult;
-use compose_library::{IntoValue, Vm};
+use compose_library::{Vm};
+use compose_library::foundations::cast::IntoValue;
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 use crate::evaluated::Evaluated;

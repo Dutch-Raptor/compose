@@ -43,13 +43,13 @@ fn create(ty: &Type, item: Option<&syn::Item>) -> TokenStream {
     });
     
     let scope = if meta.scope {
-        quote! { <#ident as #foundations::NativeScope>::scope() }
+        quote! { <#ident as #foundations::scope::NativeScope>::scope() }
     } else {
-        quote! { &#foundations::EMPTY_SCOPE }
+        quote! { &#foundations::scope::EMPTY_SCOPE }
     };
 
     let data = quote! {
-        #foundations::NativeTypeData {
+        #foundations::types::NativeTypeData {
             name: #name,
             title: #title,
             docs: #docs,
@@ -69,11 +69,11 @@ fn create(ty: &Type, item: Option<&syn::Item>) -> TokenStream {
         #item
         #cast
 
-        impl #foundations::NativeType for #ident {
+        impl #foundations::types::NativeType for #ident {
             const NAME: &'static str = #name;
 
-            fn data() -> &'static #foundations::NativeTypeData {
-                static DATA: #foundations::NativeTypeData = #data;
+            fn data() -> &'static #foundations::types::NativeTypeData {
+                static DATA: #foundations::types::NativeTypeData = #data;
                 &DATA
             }
         }

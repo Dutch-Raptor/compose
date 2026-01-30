@@ -1,7 +1,7 @@
 use crate::vm::Machine;
 use crate::Eval;
 use compose_library::diag::SourceResult;
-use compose_library::IntoValue;
+use compose_library::foundations::cast::IntoValue;
 use compose_syntax::ast;
 use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
 

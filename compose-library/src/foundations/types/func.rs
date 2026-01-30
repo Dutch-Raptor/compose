@@ -1,10 +1,8 @@
 use crate::diag::{SourceResult, StrResult, bail};
 use crate::foundations::args::Args;
 use crate::vm::Vm;
-use crate::{Sink, Trace, Value};
 use compose_error_codes::E0010_UNCAPTURED_VARIABLE;
 use compose_library::diag::{Spanned, error};
-use compose_library::{Scope, UntypedRef};
 use compose_macros::{cast, ty};
 use compose_syntax::ast::{AstNode};
 use compose_syntax::{Label, Span, SyntaxNode, ast};
@@ -14,6 +12,10 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::LazyLock;
 use tap::Tap;
+use compose_library::foundations::scope::Scope;
+use compose_library::gc::{Trace, UntypedRef};
+use compose_library::sink::Sink;
+use compose_library::Value;
 
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast)]

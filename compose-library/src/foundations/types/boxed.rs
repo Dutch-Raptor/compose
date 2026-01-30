@@ -1,6 +1,5 @@
 use crate::gc::HeapRef;
-use crate::UntypedRef;
-use compose_library::gc::Heap;
+use compose_library::gc::{Heap, UntypedRef};
 use compose_library::vm::Vm;
 use compose_library::Value;
 use compose_macros::func;

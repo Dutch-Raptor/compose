@@ -3,7 +3,7 @@ use crate::expression::pattern::{PatternContext, PatternMatchResult};
 use crate::vm::{ErrorMode, Machine};
 use crate::Eval;
 use compose_library::diag::{bail, At, SourceResult};
-use compose_library::{BindingKind, Visibility};
+use compose_library::foundations::scope::{BindingKind, Visibility};
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 use crate::evaluated::Evaluated;
@@ -72,10 +72,12 @@ impl<'a> Eval for ast::LetBinding<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::test::{assert_eval, assert_eval_with_vm, eval_code_with_vm, TestWorld};
     use compose_error_codes::{E0004_MUTATE_IMMUTABLE_VARIABLE, W0001_USED_UNINITIALIZED_VARIABLE};
-    use compose_library::{BindingKind, UnitValue, Value};
+    use compose_library::foundations::scope::BindingKind;
+    use compose_library::foundations::types::UnitValue;
+    use compose_library::Value;
+    use crate::Machine;
 
     #[test]
     fn test_let_binding() {

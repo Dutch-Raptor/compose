@@ -1,6 +1,8 @@
 use std::fmt::{Debug, Formatter};
+use compose_library::foundations::scope::{Binding, Scopes, VariableAccessError};
+use compose_library::gc::{Trace, UntypedRef};
+use compose_library::Library;
 use crate::Machine;
-use compose_library::{Binding, Library, Scopes, Trace, UntypedRef, VariableAccessError};
 
 #[derive(Clone)]
 pub struct StackFrames<'a> {

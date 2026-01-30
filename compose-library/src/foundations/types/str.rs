@@ -1,13 +1,12 @@
-use crate::Iter;
-use compose_library::diag::bail;
+use compose_library::{bail, Value};
 use compose_library::repr::Repr;
 use compose_library::vm::Vm;
-use compose_library::{IterValue, StringIterator, Value};
 use compose_macros::func;
 use compose_macros::{cast, scope, ty};
 use ecow::EcoString;
 use std::fmt;
 use std::ops::Add;
+use compose_library::foundations::iterator::{Iter, IterValue, StringIterator};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[ty(scope, cast, name = "String")]

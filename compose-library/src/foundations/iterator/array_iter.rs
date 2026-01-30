@@ -1,8 +1,10 @@
-use crate::{Array, Trace};
-use compose_library::{UntypedRef, Value, ValueIterator, Vm};
+use compose_library::{Value, Vm};
 use ecow::EcoVec;
 use std::sync::{Arc, Mutex};
 use compose_library::diag::SourceResult;
+use compose_library::foundations::iterator::ValueIterator;
+use compose_library::foundations::types::Array;
+use compose_library::gc::{Trace, UntypedRef};
 
 #[derive(Debug, Clone)]
 pub struct ArrayIter {

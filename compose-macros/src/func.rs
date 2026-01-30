@@ -23,9 +23,9 @@ fn create(func: &Func, item: &ItemFn) -> TokenStream {
 
     let data_impl = if function_type.is_some() {
         quote! {
-            impl ::compose_library::foundations::NativeFunc for #rust_name {
-                fn data() -> &'static ::compose_library::foundations::NativeFuncData {
-                    static DATA: #foundations::NativeFuncData = #data;
+            impl ::compose_library::foundations::types::func::NativeFunc for #rust_name {
+                fn data() -> &'static #foundations::types::func::NativeFuncData {
+                    static DATA: #foundations::types::func::NativeFuncData = #data;
                     &DATA
                 }
             }
@@ -33,8 +33,8 @@ fn create(func: &Func, item: &ItemFn) -> TokenStream {
     } else {
         let ident_data = quote::format_ident!("{rust_name}_data");
         quote! {
-            #vis fn #ident_data() -> &'static #foundations::NativeFuncData {
-                static DATA: #foundations::NativeFuncData = #data;
+            #vis fn #ident_data() -> &'static #foundations::types::func::NativeFuncData {
+                static DATA: #foundations::types::func::NativeFuncData = #data;
                 &DATA
             }
         }
@@ -80,23 +80,23 @@ fn create_func_data(func: &Func) -> TokenStream {
     } = func;
 
     let scope = if *scope {
-        quote! { <#rust_name as #foundations::NativeScope>::scope() }
+        quote! { <#rust_name as #foundations::scope::NativeScope>::scope() }
     } else {
-        quote! { &#foundations::EMPTY_SCOPE }
+        quote! { &#foundations::scope::EMPTY_SCOPE }
     };
 
     let closure = create_wrapper_closure(func);
 
     let fn_type = match special.self_ {
-        Some(Param { binding: Binding::RefMut, ..}) => quote! { #foundations::FuncType::MethodMut },
-        Some(_) => quote! { #foundations::FuncType::Method },
-        None => quote! { #foundations::FuncType::Associated },   
+        Some(Param { binding: Binding::RefMut, ..}) => quote! { #foundations::types::func::FuncType::MethodMut },
+        Some(_) => quote! { #foundations::types::func::FuncType::Method },
+        None => quote! { #foundations::types::func::FuncType::Associated },
     };
 
     let name = quote! { #name };
 
     quote! {
-        ::compose_library::foundations::NativeFuncData {
+        #foundations::types::func::NativeFuncData {
             name: #name,
             closure: #closure,
             scope: ::std::sync::LazyLock::new(|| #scope),
@@ -142,7 +142,7 @@ fn create_wrapper_closure(func: &Func) -> TokenStream {
             #arg_handlers
             #finish
             let ret = #call;
-            ::compose_library::foundations::IntoResult::into_result(ret, args.span)
+            #foundations::cast::IntoResult::into_result(ret, args.span)
         }
     }
 }

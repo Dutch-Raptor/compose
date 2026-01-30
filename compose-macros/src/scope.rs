@@ -49,10 +49,10 @@ pub fn scope(_: TokenStream, item: syn::Item) -> Result<TokenStream> {
 
     Ok(quote! {
         #base
-        impl #foundations::NativeScope for #self_ty {
-            fn scope() -> &'static #foundations::Scope {
-                static SCOPE: ::std::sync::LazyLock<#foundations::Scope> = ::std::sync::LazyLock::new(|| {
-                    let mut scope = #foundations::Scope::new_lexical();
+        impl #foundations::scope::NativeScope for #self_ty {
+            fn scope() -> &'static #foundations::scope::Scope {
+                static SCOPE: ::std::sync::LazyLock<#foundations::scope::Scope> = ::std::sync::LazyLock::new(|| {
+                    let mut scope = #foundations::scope::Scope::new_lexical();
                     #(#definitions;)*
                     scope
                 });
@@ -85,7 +85,7 @@ fn rewrite_primitive_base(item: &ItemImpl, ident_ext: &Ident) -> TokenStream {
                 let ident_data = quote::format_ident!("{}_data", sig.ident);
                 sigs.push(quote! { #sig; });
                 sigs.push(quote! {
-                    fn #ident_data() -> &'static #foundations::NativeFuncData;
+                    fn #ident_data() -> &'static #foundations::types::func::NativeFuncData;
                 });
             }
 

@@ -42,6 +42,10 @@ impl VirtualPath {
     pub fn display(&self) -> String {
         self.0.display().to_string()
     }
+    
+    pub fn to_path_buf(&self) -> PathBuf {
+        self.0.clone()
+    }
 }
 
 impl Debug for VirtualPath {

@@ -41,7 +41,7 @@ To make this less error-prone, [`Machine`] provides several helpers:
 - [`Machine::in_flow_scope_guard`]
 - [`Machine::new_flow_scope_guard`]
 
-To read more about the rationale behind scope usage see [`compose_library::Scopes`].
+To read more about the rationale behind scope usage see [`compose_library::foundations::scope::Scopes`].
 
 *Example: Evaluating a code block*
 
@@ -159,18 +159,18 @@ pub struct EvalConfig {
     pub include_syntax_warnings: bool,
 }
 
-pub fn eval(
+pub fn eval_source(
     source: &Source,
     vm: &mut Machine,
     eval_config: &EvalConfig,
 ) -> Warned<SourceResult<Value>> {
-    eval_range(source, 0..usize::MAX, vm, eval_config)
+    eval_source_range(source, 0..usize::MAX, vm, eval_config)
 }
 
 /// Eval a source file.
 ///
 /// eval_range: eval these nodes
-pub fn eval_range(
+pub fn eval_source_range(
     source: &Source,
     eval_range: Range<usize>,
     vm: &mut Machine,

@@ -1,9 +1,11 @@
 use crate::diag::SourceResult;
-use crate::Range;
 use compose_library::diag::{bail, StrResult};
-use compose_library::{IntoValue, Str, Value, ValueIterator, Vm};
 use ecow::eco_format;
 use std::sync::{Arc, Mutex};
+use compose_library::foundations::cast::IntoValue;
+use compose_library::foundations::iterator::ValueIterator;
+use compose_library::foundations::types::{Range, Str};
+use compose_library::{Value, Vm};
 
 #[derive(Debug, Clone, PartialEq)]
 enum RangeIterType {
