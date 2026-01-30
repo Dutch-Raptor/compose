@@ -2,11 +2,7 @@ use crate::evaluated::Evaluated;
 use crate::{Eval, Machine};
 use compose_error_codes::{E0007_MISSING_EQUALS_AFTER_LET_BINDING, E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS, E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS, E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE, E0304_TYPE_PATTERNS_NOT_ALLOWED_IN_LET_BINDINGS};
 use compose_library::diag::{At, SourceDiagnostic, SourceResult, Spanned};
-use compose_library::ops::Comparison;
-use compose_library::{
-    ArrayValue, Binding, BindingKind, DebugRepr, IntoValue, MapValue, Type, Value, Visibility, Vm,
-    bail, error,
-};
+use compose_library::{bail, error, Value, Vm};
 use compose_syntax::ast::{AstNode, DestructuringItem, Expr, Ident, LiteralPattern, Pattern};
 use compose_syntax::{Span, ast};
 use compose_utils::trace_fn;
@@ -15,6 +11,11 @@ use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use tap::Tap;
+use compose_library::foundations::cast::IntoValue;
+use compose_library::foundations::ops::Comparison;
+use compose_library::foundations::scope::{Binding, BindingKind, Visibility};
+use compose_library::foundations::types::{ArrayValue, MapValue, Type};
+use compose_library::foundations::value::DebugRepr;
 
 impl Eval for LiteralPattern<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<crate::Evaluated> {

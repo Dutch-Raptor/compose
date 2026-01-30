@@ -1,6 +1,8 @@
 use crate::{Eval, Machine};
 use compose_library::diag::SourceResult;
-use compose_library::{ArrayValue, IntoValue, Value, Vm};
+use compose_library::{ Value, Vm};
+use compose_library::foundations::cast::IntoValue;
+use compose_library::foundations::types::ArrayValue;
 use compose_syntax::ast;
 use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
 

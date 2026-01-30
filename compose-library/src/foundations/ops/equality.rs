@@ -1,10 +1,11 @@
 use crate::diag::StrResult;
-use crate::{Array, ArrayValue, MapValue, Value};
-use compose_library::Heap;
 use compose_library::diag::bail;
+use compose_library::foundations::types::{Array, ArrayValue, MapValue};
+use compose_library::gc::Heap;
+use compose_library::Value;
 
 pub trait Comparison {
-    fn equals(&self, other: &Self, heap: &crate::Heap) -> compose_library::diag::StrResult<bool>;
+    fn equals(&self, other: &Self, heap: &Heap) -> compose_library::diag::StrResult<bool>;
 
     fn not_equals(&self, other: &Self, heap: &Heap) -> StrResult<bool> {
         self.equals(other, heap).map(|b| !b)

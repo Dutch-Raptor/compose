@@ -1,7 +1,9 @@
 use crate::access::Access;
 use crate::{Eval, Machine};
 use compose_library::diag::{bail, At, SourceResult, StrResult};
-use compose_library::{ops, Heap, Value};
+use compose_library::{Value};
+use compose_library::foundations::ops;
+use compose_library::gc::Heap;
 use compose_syntax::ast::{AstNode, UnOp, Unary};
 use crate::evaluated::Evaluated;
 

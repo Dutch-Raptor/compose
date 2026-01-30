@@ -2,7 +2,9 @@ use crate::expression::pattern::{destructure_pattern, PatternContext, PatternMat
 use crate::vm::{FlowEvent, Tracked};
 use crate::{Eval, Machine};
 use compose_library::diag::{At, SourceResult};
-use compose_library::{bail, BindingKind, IterValue, Value, ValueIterator, Visibility};
+use compose_library::{bail, Value};
+use compose_library::foundations::iterator::{IterValue, ValueIterator};
+use compose_library::foundations::scope::{BindingKind, Visibility};
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 use crate::evaluated::Evaluated;

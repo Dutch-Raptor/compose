@@ -2,9 +2,9 @@ mod equality;
 
 use crate::Value;
 use crate::diag::StrResult;
-use compose_library::Heap;
-pub use compose_library::ops::equality::*;
+pub use compose_library::foundations::ops::equality::*;
 use ecow::eco_format;
+use compose_library::gc::Heap;
 
 macro_rules! type_error {
     ($fmt:expr, $($value:expr),* $(,)?) => {

@@ -1,19 +1,20 @@
 use crate::diag::{At, SourceResult, Spanned};
-use crate::foundations::boxed::Boxed;
-use crate::{CastInfo, Str, SyntaxContext, UnitValue};
-use crate::{FromValue, Func};
-use crate::{IntoValue, Vm};
-use crate::{NativeScope, Reflect};
-use crate::{Sink, Type};
 use compose_library::diag::{StrResult, bail, error};
-use compose_library::foundations::range::RangeValue;
 use compose_library::repr::Repr;
-use compose_library::{Args, ArrayValue, Heap, IterValue, MapValue, Module};
 use compose_macros::func;
 use compose_macros::scope;
 use compose_syntax::Span;
 use ecow::{EcoString, eco_format};
 use std::{fmt, iter};
+use compose_library::foundations::args::Args;
+use compose_library::foundations::cast::FromValue;
+use compose_library::foundations::iterator::IterValue;
+use compose_library::foundations::scope::NativeScope;
+use compose_library::foundations::types::{*};
+use compose_library::gc::Heap;
+use compose_library::sink::Sink;
+use compose_library::Vm;
+use compose_library::world::SyntaxContext;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -267,13 +268,13 @@ macro_rules! primitive {
         $ty:ty: $name:literal, $variant:ident
         $(, $other:ident$(($binding:ident))? => $out:expr)*
     ) => {
-        impl Reflect for $ty {
-            fn input() -> CastInfo {
-                CastInfo::Type(Type::of::<Self>())
+        impl compose_library::foundations::cast::Reflect for $ty {
+            fn input() -> compose_library::foundations::cast::CastInfo {
+                compose_library::foundations::cast::CastInfo::Type(Type::of::<Self>())
             }
 
-            fn output() -> CastInfo {
-                CastInfo::Type(Type::of::<Self>())
+            fn output() -> compose_library::foundations::cast::CastInfo {
+                compose_library::foundations::cast::CastInfo::Type(Type::of::<Self>())
             }
 
             fn castable(value: &Value) -> bool {
@@ -282,18 +283,18 @@ macro_rules! primitive {
             }
         }
 
-        impl IntoValue for $ty {
+        impl compose_library::foundations::cast::IntoValue for $ty {
             fn into_value(self) -> Value {
                 Value::$variant(self)
             }
         }
 
-        impl FromValue for $ty {
+        impl compose_library::foundations::cast::FromValue for $ty {
             fn from_value(value: Value) -> StrResult<Self> {
                 match value {
                     Value::$variant(v) => Ok(v),
                     $(Value::$other$(($binding))? => Ok($out),)*
-                    v => Err(<Self as Reflect>::error(&v)),
+                    v => Err(<Self as compose_library::foundations::cast::Reflect>::error(&v)),
                 }
             }
         }

@@ -1,8 +1,10 @@
 use compose_library::diag::SourceResult;
 use compose_library::vm::Vm;
-use compose_library::{IntoValue, Value, ValueIterator};
+use compose_library::{Value};
 use ecow::EcoString;
 use std::sync::{Arc, Mutex};
+use compose_library::foundations::cast::IntoValue;
+use compose_library::foundations::iterator::ValueIterator;
 
 #[derive(Debug, Clone)]
 pub struct StringIterator {

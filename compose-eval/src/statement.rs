@@ -1,12 +1,14 @@
 use crate::evaluated::Evaluated;
 use crate::vm::FlowEvent;
-use crate::{Eval, EvalConfig, Machine, eval};
+use crate::{Eval, EvalConfig, Machine, eval_source};
 use compose_library::diag::{SourceResult, Trace, TracePoint, Warned, bail, error};
-use compose_library::{Binding, IntoValue, Module};
 use compose_syntax::ast::{AstNode, BreakStatement};
 use compose_syntax::{FileId, ast};
 use ecow::{EcoString, eco_vec};
 use std::path::PathBuf;
+use compose_library::foundations::cast::IntoValue;
+use compose_library::foundations::module::Module;
+use compose_library::foundations::scope::Binding;
 
 impl Eval for ast::Statement<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -115,7 +117,7 @@ impl Eval for ast::ModuleImport<'_> {
 
         let module = vm
             .with_frame(|vm| {
-                let Warned { value, warnings } = eval(&source, vm, &EvalConfig::default());
+                let Warned { value, warnings } = eval_source(&source, vm, &EvalConfig::default());
                 value?;
                 vm.sink_mut().warnings.extend(warnings);
 

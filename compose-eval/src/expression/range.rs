@@ -1,6 +1,7 @@
 use crate::{Eval, Machine};
 use compose_library::diag::{At, SourceResult};
-use compose_library::{RangeValue, Value};
+use compose_library::{Value};
+use compose_library::foundations::types::RangeValue;
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
 use crate::evaluated::Evaluated;

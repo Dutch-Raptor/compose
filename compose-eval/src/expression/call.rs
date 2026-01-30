@@ -1,11 +1,14 @@
 use crate::vm::ErrorMode;
 use crate::{Eval, Machine};
 use compose_library::diag::{bail, At, SourceResult, Spanned, Trace, TracePoint};
-use compose_library::{Arg, Args, Func, NativeScope, Type, UnboundItem, Value};
 use compose_syntax::ast::AstNode;
 use compose_syntax::{ast, Label, Span};
 use ecow::{eco_format, EcoString, EcoVec};
 use extension_traits::extension;
+use compose_library::foundations::args::{Arg, Args};
+use compose_library::foundations::scope::{NativeScope, UnboundItem};
+use compose_library::foundations::types::{Func, Type};
+use compose_library::Value;
 use crate::evaluated::Evaluated;
 
 impl Eval for ast::FuncCall<'_> {

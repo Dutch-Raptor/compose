@@ -1,14 +1,71 @@
 mod clean;
 mod trigger;
 
+use crate::Value;
 use crate::gc::trigger::{GcTriggerPolicy, SimplePolicy};
-use crate::{Array, Value};
+use compose_library::foundations::iterator::Iter;
+use compose_library::foundations::types::{Array, Map};
 use compose_library::gc::trigger::GcData;
-use compose_library::{Iter, Map};
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{SlotMap, new_key_type};
 use std::fmt::Debug;
 use std::ops::Deref;
 
+/// A managed heap containing [`HeapItem`]s accessible through [`UntypedRef`] or [`HeapRef`] keys.
+///
+/// The heap implements garbage collection through a simple mark and sweep algorithm. When cleaning the roots need to be provided.
+/// These roots are any type implementing the [Trace] trait. Anything not accessible through the provided roots will be deallocated.
+///
+/// # Example: Interacting with heap values
+///
+/// ```
+/// use compose_library::{gc::Heap, Value, gc::HeapItem};
+/// let mut heap = Heap::new();
+///
+/// let value = Value::Int(6);
+///
+/// // Allocate a value on the heap and get a key to it.
+/// let key = heap.alloc(value);
+///
+/// // Now the value is accessible through the key.
+/// assert_eq!(heap.get(key), Some(&Value::Int(6)));
+///
+/// let value_mut = heap.get_mut(key).unwrap();
+/// *value_mut = Value::Int(7);
+///
+/// // The value is updated and anyone with the key will see the new value
+/// assert_eq!(heap.get(key), Some(&Value::Int(7)));
+///
+/// // Remove the value from the heap. This will give ownership of the value to the caller.
+/// let removed_item = heap.remove(key);
+///
+/// assert_eq!(removed_item, Some(HeapItem::Value(Value::Int(7))));
+/// assert_eq!(heap.get(key), None);
+/// ```
+///
+/// # Example: Garbage Collection
+///
+/// ```
+/// use compose_library::gc::{Heap, UntypedRef};
+/// use compose_library::Value;
+/// let mut heap = Heap::new();
+///
+/// let key = heap.alloc(Value::Int(6));
+/// assert_eq!(heap.metadata().heap_size, 1);
+/// assert_eq!(heap.get(key), Some(&Value::Int(6)));
+///
+/// // clean while passing the key to the value as a simple root
+/// heap.clean(&key);
+///
+/// // The value is still accessible and the heap size hasn't changed
+/// assert_eq!(heap.metadata().heap_size, 1);
+/// assert_eq!(heap.get(key), Some(&Value::Int(6)));
+///
+/// // clean while passing a root that doesn't have access to the value
+/// heap.clean(&None::<UntypedRef>);
+///
+/// assert_eq!(heap.metadata().heap_size, 0);
+/// assert_eq!(heap.get(key), None);
+/// ```
 #[derive(Debug)]
 pub struct Heap {
     map: SlotMap<UntypedRef, HeapItem>,
@@ -21,6 +78,9 @@ pub struct HeapRef<T: HeapObject> {
     _marker: std::marker::PhantomData<T>,
 }
 
+// Manually implement clone and copy for HeapRef because
+// the derive macro puts a Clone requirement on T, which is not
+// actually required
 impl<T: HeapObject> Clone for HeapRef<T> {
     fn clone(&self) -> Self {
         HeapRef {
@@ -70,24 +130,24 @@ where
 {
     #[track_caller]
     pub fn get_unwrap(self, heap: &Heap) -> &T {
-        heap.get(self).unwrap_or_else(|| {
-            panic!("Use after free. This is a bug. Key: {:?}", self.key)
-        })
-    }
-    
-    pub fn try_get(self, heap: &Heap) -> StrResult<&T> {
-        heap.get(self).ok_or_else(|| "Use after free. This is a bug.".into())
+        heap.get(self)
+            .unwrap_or_else(|| panic!("Use after free. This is a bug. Key: {:?}", self.key))
     }
 
-    #[track_caller]   
-    pub fn get_mut_unwrap(self, heap: &mut Heap) -> &mut T {
-        heap.get_mut(self).unwrap_or_else(|| {
-            panic!("Use after free. This is a bug. Key: {:?}", self.key)       
-        })
+    pub fn try_get(self, heap: &Heap) -> StrResult<&T> {
+        heap.get(self)
+            .ok_or_else(|| "Use after free. This is a bug.".into())
     }
-    
+
+    #[track_caller]
+    pub fn get_mut_unwrap(self, heap: &mut Heap) -> &mut T {
+        heap.get_mut(self)
+            .unwrap_or_else(|| panic!("Use after free. This is a bug. Key: {:?}", self.key))
+    }
+
     pub fn try_get_mut(self, heap: &mut Heap) -> StrResult<&mut T> {
-        heap.get_mut(self).ok_or_else(|| "Use after free. This is a bug.".into())
+        heap.get_mut(self)
+            .ok_or_else(|| "Use after free. This is a bug.".into())
     }
 }
 
@@ -97,7 +157,7 @@ impl Heap {
             map: SlotMap::with_key(),
             policy: Box::new(SimplePolicy {
                 heap_size_threshold: 500,
-            })
+            }),
         }
     }
 
@@ -108,7 +168,7 @@ impl Heap {
         self.map.insert(value.to_untyped()).into()
     }
 
-    pub fn data(&self) -> GcData {
+    pub fn metadata(&self) -> GcData {
         GcData {
             heap_size: self.map.len(),
         }
@@ -121,7 +181,7 @@ impl Heap {
     pub fn remove<T: HeapObject>(&mut self, key: HeapRef<T>) -> Option<HeapItem> {
         self.map.remove(*key)
     }
-    
+
     pub fn get_untyped(&self, key: UntypedRef) -> Option<&HeapItem> {
         self.map.get(key)
     }
@@ -136,6 +196,26 @@ impl Trace for &[UntypedRef] {
     fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
         for key in *self {
             f(*key)
+        }
+    }
+}
+
+impl<T: HeapObject> Trace for HeapRef<T> {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        f(self.key())
+    }
+}
+
+impl Trace for UntypedRef {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        f(*self)
+    }
+}
+
+impl<T: Trace> Trace for Option<T> {
+    fn visit_refs(&self, f: &mut dyn FnMut(UntypedRef)) {
+        if let Some(v) = self {
+            v.visit_refs(f)
         }
     }
 }
@@ -225,7 +305,7 @@ impl_heap_obj!(Array, Array);
 impl_heap_obj!(Map, Map);
 
 heap_enum! {
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum HeapItem {
         Value(Value),
         Iter(Iter),

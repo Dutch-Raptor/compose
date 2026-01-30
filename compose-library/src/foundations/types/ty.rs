@@ -1,12 +1,14 @@
-use crate::{Scope, Sink, Trace, UnBoundError, Value};
 use compose_library::diag::StrResult;
-use compose_library::{UnboundItem, UntypedRef};
 use compose_macros::{cast, ty};
 use compose_syntax::Span;
 use compose_utils::Static;
 use ecow::eco_format;
 use std::fmt::Display;
 use std::sync::LazyLock;
+use compose_library::foundations::scope::{Scope, UnBoundError, UnboundItem};
+use compose_library::gc::{Trace, UntypedRef};
+use compose_library::sink::Sink;
+use compose_library::Value;
 
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast, name = "type")]

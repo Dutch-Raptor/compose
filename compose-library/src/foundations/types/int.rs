@@ -1,4 +1,4 @@
-use crate::diag::bail;
+use compose_library::bail;
 use compose_library::diag::StrResult;
 use compose_library::Value;
 use compose_macros::{cast, func};

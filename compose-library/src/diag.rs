@@ -1,5 +1,5 @@
 pub use compose_codespan_reporting;
-use compose_codespan_reporting::term::termcolor::{NoColor, WriteColor};
+use compose_codespan_reporting::term::termcolor::{Ansi, NoColor, WriteColor};
 use compose_codespan_reporting::{diagnostic, term};
 use compose_syntax::{
     FileId, Fix, FixDisplay, Label, LabelType, PatchEngine, Span, SyntaxError, SyntaxErrorSeverity,
@@ -116,6 +116,22 @@ pub fn write_diagnostics_to_string(
         &String::from_utf8(diags_buffer).expect("failed to convert diagnostics to string"),
     );
     output.trim_end().to_string()
+}
+
+pub fn print_diagnostics(
+    world: &dyn World,
+    errors: &[SourceDiagnostic],
+    warnings: &[SourceDiagnostic],
+    ascii_only: bool,
+) -> Result<(), compose_codespan_reporting::files::Error> {
+    let mut stderr = io::stderr();
+    let writer: &mut dyn WriteColor = if ascii_only {
+        &mut NoColor::new(&mut stderr)
+    } else {
+        &mut Ansi::new(&mut stderr)
+    };
+
+    write_diagnostics(world, errors, warnings, writer, &Config::default())
 }
 
 fn diag_label(diag: &SourceDiagnostic) -> Option<diagnostic::Label<FileId>> {

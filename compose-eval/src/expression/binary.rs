@@ -1,7 +1,8 @@
 use crate::vm::Machine;
 use crate::Eval;
 use compose_library::diag::{bail, At, SourceResult};
-use compose_library::{ops, Value};
+use compose_library::{Value};
+use compose_library::foundations::ops;
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, BinOp};
 use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};

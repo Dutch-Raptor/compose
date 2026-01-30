@@ -1,7 +1,9 @@
 use compose_error_codes::E0012_PREDICATE_MUST_RETURN_BOOLEAN;
 use compose_library::diag::{SourceResult, bail, error};
-use compose_library::{Args, Func, Value, Vm};
 use std::iter;
+use compose_library::foundations::types::Func;
+use compose_library::{Value, Vm};
+use compose_library::foundations::args::Args;
 
 pub fn eval_predicate(
     vm: &mut dyn Vm,

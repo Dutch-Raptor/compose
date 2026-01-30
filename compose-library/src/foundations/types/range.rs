@@ -1,10 +1,12 @@
 use crate::repr::Repr;
-use crate::{FromValue, Iter, Trace};
 use compose_library::diag::{StrResult, bail};
-use compose_library::{IntoValue, IterValue, RangeIter, UntypedRef, Value, Vm};
 use compose_macros::{func, scope, ty};
 use ecow::{EcoString, eco_format};
 use std::sync::Arc;
+use compose_library::foundations::cast::{FromValue, IntoValue};
+use compose_library::gc::{Trace, UntypedRef};
+use compose_library::{Value, Vm};
+use compose_library::foundations::iterator::{Iter, IterValue, RangeIter};
 
 #[ty(scope, cast, name = "range")]
 #[derive(Clone, Debug, PartialEq)]

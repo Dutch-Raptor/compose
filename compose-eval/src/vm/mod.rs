@@ -2,19 +2,27 @@ mod stack;
 
 use crate::expression::eval_lambda;
 use crate::vm::stack::{StackFrames, TrackMarker};
-use compose_library::diag::{error, At, SourceDiagnostic, SourceResult};
-use compose_library::{
-    Args, Binding, BindingKind, Engine, Func, FuncKind, Heap, IntoValue, Routines, Scopes, Sink,
-    SyntaxContext, Trace, UntypedRef, Value, VariableAccessError, Visibility, Vm, World,
+use compose_library::diag::{At, SourceDiagnostic, SourceResult, error};
+use compose_library::engine::Engine;
+use compose_library::foundations::args::Args;
+use compose_library::foundations::cast::IntoValue;
+use compose_library::foundations::scope::{
+    Binding, BindingKind, Scopes, VariableAccessError, Visibility,
 };
+use compose_library::foundations::types::Func;
+use compose_library::foundations::types::func::FuncKind;
+use compose_library::gc::{Heap, Trace, UntypedRef};
+use compose_library::sink::Sink;
+use compose_library::world::SyntaxContext;
+use compose_library::{Value, Vm, World};
 use compose_syntax::ast::AstNode;
-use compose_syntax::{ast, Span};
+use compose_syntax::{Span, ast};
 use compose_utils::{defer, trace_fn};
 use ecow::EcoString;
 pub use stack::Tracked;
 pub use stack::TrackedContainer;
 use std::fmt::Debug;
-use std::ops::{DerefMut};
+use std::ops::DerefMut;
 
 pub struct Machine<'a> {
     pub frames: StackFrames<'a>,
@@ -55,7 +63,6 @@ impl<'a> Machine<'a> {
             frames: StackFrames::new(Some(world.library())),
             flow: None,
             engine: Engine {
-                routines: routines(),
                 sink: Sink::default(),
                 world,
             },
@@ -81,7 +88,7 @@ impl<'a> Machine<'a> {
         };
         self.heap.maybe_gc(&roots);
     }
-    
+
     pub fn sink_mut(&mut self) -> &mut Sink {
         &mut self.engine.sink
     }
@@ -92,7 +99,7 @@ impl<'a> Machine<'a> {
     /// scope is pushed before `f` is executed and is always popped afterwards,
     /// even if `f` introduces new bindings.
     ///
-    /// # Scope behavior
+    /// # Scope behaviour
     /// - Always creates a new lexical scope
     /// - Scope is exited immediately after `f` returns
     pub fn in_lexical_scope<T>(&mut self, f: impl FnOnce(&mut Machine<'a>) -> T) -> T {
@@ -145,7 +152,7 @@ impl<'a> Machine<'a> {
     /// - Safe to use with early returns or error propagation
     #[must_use]
     pub fn in_flow_scope_guard(&mut self) -> impl DerefMut<Target = Self> {
-        let _trace_guard = ::compose_utils::TraceFnGuard::new("in_flow_scope_guard", None);
+        let _trace_guard = compose_utils::TraceFnGuard::new("in_flow_scope_guard", None);
         let top_was_flow = self.scopes().top_flow().is_some();
         if !top_was_flow {
             self.scopes_mut().enter_flow();
@@ -172,7 +179,7 @@ impl<'a> Machine<'a> {
     /// - Safe across early returns and error paths
     #[must_use]
     pub fn new_lexical_scope_guard(&mut self) -> impl DerefMut<Target = Self> {
-        let _trace_guard = ::compose_utils::TraceFnGuard::new("lexical_scope_guard", None);
+        let _trace_guard = compose_utils::TraceFnGuard::new("lexical_scope_guard", None);
         self.scopes_mut().enter_lexical();
         defer(self, move |vm| {
             vm.scopes_mut().exit_lexical();
@@ -196,7 +203,7 @@ impl<'a> Machine<'a> {
     #[track_caller]
     #[must_use]
     pub fn new_flow_scope_guard(&mut self) -> impl DerefMut<Target = Self> {
-        let _trace_guard = ::compose_utils::TraceFnGuard::new("new_flow_scope_guard", None);
+        let _trace_guard = compose_utils::TraceFnGuard::new("new_flow_scope_guard", None);
         self.scopes_mut().enter_flow();
         defer(self, move |vm| {
             vm.scopes_mut().exit_flow();
@@ -275,7 +282,10 @@ impl<'a> Machine<'a> {
 
     pub fn try_bind(&mut self, name: EcoString, binding: Binding) -> SourceResult<&mut Binding> {
         let span = binding.span();
-        self.scopes_mut().top_lexical_mut().try_bind(name, binding).at(span)
+        self.scopes_mut()
+            .top_lexical_mut()
+            .try_bind(name, binding)
+            .at(span)
     }
 
     pub fn bind(&mut self, name: EcoString, binding: Binding) -> &mut Binding {
@@ -359,7 +369,6 @@ impl FlowEvent {
     }
 }
 
-
 #[derive(Debug)]
 pub struct VmRoots<'a> {
     pub frames: &'a StackFrames<'a>,
@@ -373,11 +382,6 @@ impl Trace for VmRoots<'_> {
             flow.visit_refs(f);
         }
     }
-}
-
-
-pub fn routines() -> Routines {
-    Routines {}
 }
 
 #[derive(Debug, Clone, Default)]
@@ -399,5 +403,4 @@ impl ErrorMode {
     }
 }
 
-impl Machine<'_> {
-}
+impl Machine<'_> {}

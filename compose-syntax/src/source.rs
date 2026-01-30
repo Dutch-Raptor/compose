@@ -22,8 +22,8 @@ impl Source {
         Self::new(FileId::new(path), text)
     }
 
-    pub fn from_string(name: &str, text: String) -> Self {
-        Self::new(FileId::fake(name), text)
+    pub fn from_string(name: &str, text: impl Into<String>) -> Self {
+        Self::new(FileId::fake(name), text.into())
     }
 
     pub fn new(file_id: FileId, text: String) -> Self {

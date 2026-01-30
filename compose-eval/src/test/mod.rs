@@ -159,7 +159,7 @@ pub fn eval_code_with_vm(vm: &mut Machine, world: &TestWorld, input: &str) -> Te
     let source = world.entrypoint_src();
     let len_after_edit = source.nodes().len();
 
-    let Warned { value, warnings } = crate::eval_range(
+    let Warned { value, warnings } = crate::eval_source_range(
         &source,
         len_before_edit..len_after_edit,
         vm,
