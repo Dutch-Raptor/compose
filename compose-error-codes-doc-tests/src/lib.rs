@@ -9,3 +9,5 @@ via `compose_doc::transform_markdown` into documented items with doc-tests.
 */
 
 include!(concat!(env!("OUT_DIR"), "/Error_Codes"));
+
+pub use compose_error_codes;

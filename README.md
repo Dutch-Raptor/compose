@@ -62,7 +62,7 @@ This should print `Hello, from Compose!` to the console.
 ### Run a file
 
 ```bash
-compose file examples/hello.cmps
+compose file hello.cmps
 ```
 
 ### Start a REPL
@@ -74,7 +74,7 @@ compose repl
 Load a file in the REPL:
 
 ```bash
-compose repl --from examples/prelude.cmps
+compose repl --from prelude.cmps
 ```
 
 ### Explain an error

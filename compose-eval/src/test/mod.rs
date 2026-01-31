@@ -1,10 +1,10 @@
-use crate::{EvalConfig, Machine};
+use crate::{Machine};
 use compose_error_codes::ErrorCode;
 use compose_library::diag::compose_codespan_reporting::term::termcolor::{
     ColorChoice, StandardStream,
 };
 use compose_library::diag::{FileError, FileResult, SourceDiagnostic, SourceResult, Warned, write_diagnostics, write_diagnostics_to_string};
-use compose_library::{Library, Value, World, library};
+use compose_library::{Library, Value, World, };
 use compose_syntax::{FileId, Source};
 use ecow::{EcoVec, eco_format, eco_vec};
 use std::collections::HashMap;
@@ -64,7 +64,7 @@ impl TestWorld {
         Self {
             sources: Mutex::new(sources),
             entrypoint,
-            library: library(),
+            library: Library::default(),
             stdout: Mutex::new(String::new()),
         }
     }
@@ -163,9 +163,6 @@ pub fn eval_code_with_vm(vm: &mut Machine, world: &TestWorld, input: &str) -> Te
         &source,
         len_before_edit..len_after_edit,
         vm,
-        &EvalConfig {
-            include_syntax_warnings: true,
-        },
     );
 
     TestResult {

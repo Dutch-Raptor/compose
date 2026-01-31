@@ -1,6 +1,6 @@
 use crate::evaluated::Evaluated;
 use crate::vm::FlowEvent;
-use crate::{Eval, EvalConfig, Machine, eval_source};
+use crate::{Eval, Machine, eval_source};
 use compose_library::diag::{SourceResult, Trace, TracePoint, Warned, bail, error};
 use compose_syntax::ast::{AstNode, BreakStatement};
 use compose_syntax::{FileId, ast};
@@ -117,7 +117,7 @@ impl Eval for ast::ModuleImport<'_> {
 
         let module = vm
             .with_frame(|vm| {
-                let Warned { value, warnings } = eval_source(&source, vm, &EvalConfig::default());
+                let Warned { value, warnings } = eval_source(&source, vm);
                 value?;
                 vm.sink_mut().warnings.extend(warnings);
 

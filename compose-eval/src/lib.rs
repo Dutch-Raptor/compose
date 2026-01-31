@@ -12,12 +12,12 @@ pub mod test;
 mod vm;
 
 pub use crate::vm::Machine;
-pub use evaluated::Evaluated;
-use compose_library::diag::{error, SourceDiagnostic, SourceResult, Warned};
-use compose_library::Value;
+use compose_library::diag::{IntoSourceDiagnostic, SourceDiagnostic, SourceResult, Warned, error};
+use compose_library::{Value, Vm};
 use compose_syntax::ast::Statement;
-use compose_syntax::Source;
-use ecow::{eco_vec, EcoVec};
+use compose_syntax::{Source, Span};
+use ecow::{EcoVec, eco_vec};
+pub use evaluated::Evaluated;
 use std::cmp::min;
 use std::ops::Range;
 
@@ -148,23 +148,27 @@ impl Eval for ast::Statement<'_> {
 ```
 */
 
-
 pub trait Eval {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated>;
-}
-
-#[derive(Default)]
-pub struct EvalConfig {
-    /// Whether to include syntax warnings in the returned result.
-    pub include_syntax_warnings: bool,
 }
 
 pub fn eval_source(
     source: &Source,
     vm: &mut Machine,
-    eval_config: &EvalConfig,
 ) -> Warned<SourceResult<Value>> {
-    eval_source_range(source, 0..usize::MAX, vm, eval_config)
+    eval_source_range(source, 0..usize::MAX, vm)
+}
+
+pub fn eval(vm: &mut Machine) -> Warned<SourceResult<Value>> {
+    let entry_point = vm.engine().world.entry_point();
+    let source = match vm.engine().world.source(entry_point) {
+        Ok(source) => source,
+        Err(err) => {
+            return Warned::new(Err(eco_vec!(err.into_source_diagnostic(Span::detached()))));
+        }
+    };
+
+    eval_source(&source, vm)
 }
 
 /// Eval a source file.
@@ -174,7 +178,6 @@ pub fn eval_source_range(
     source: &Source,
     eval_range: Range<usize>,
     vm: &mut Machine,
-    config: &EvalConfig,
 ) -> Warned<SourceResult<Value>> {
     let mut result = Value::unit();
 
@@ -188,15 +191,11 @@ pub fn eval_source_range(
         .map(|e| e.into())
         .collect::<EcoVec<SourceDiagnostic>>();
 
-    let syntax_warnings = if config.include_syntax_warnings {
-        nodes
-            .iter()
-            .flat_map(|n| n.warnings())
-            .map(|e| e.into())
-            .collect::<EcoVec<SourceDiagnostic>>()
-    } else {
-        eco_vec![]
-    };
+    let syntax_warnings = nodes
+        .iter()
+        .flat_map(|n| n.warnings())
+        .map(|e| e.into())
+        .collect::<EcoVec<SourceDiagnostic>>();
 
     if !errors.is_empty() {
         return Warned::new(Err(errors)).with_warnings(syntax_warnings);
@@ -209,19 +208,17 @@ pub fn eval_source_range(
                 let span = node.span();
                 let err = error!(span, "expected a statement, found {:?}", node);
 
-                return build_err(&syntax_warnings, vm, eco_vec![err], config);
+                return build_err(&syntax_warnings, vm, eco_vec![err]);
             }
         };
         result = match statement.eval(vm) {
             Ok(value) => value.value,
-            Err(err) => return build_err(&syntax_warnings, vm, err, config),
+            Err(err) => return build_err(&syntax_warnings, vm, err),
         }
     }
 
     let mut warnings = vm.sink_mut().take_warnings();
-    if config.include_syntax_warnings {
-        warnings.extend_from_slice(&syntax_warnings);
-    }
+    warnings.extend_from_slice(&syntax_warnings);
 
     Warned::new(Ok(result)).with_warnings(warnings)
 }
@@ -230,12 +227,9 @@ pub fn build_err(
     syntax_warnings: &[SourceDiagnostic],
     vm: &mut Machine,
     errs: EcoVec<SourceDiagnostic>,
-    config: &EvalConfig,
 ) -> Warned<SourceResult<Value>> {
     let mut warnings = vm.sink_mut().take_warnings();
-    if config.include_syntax_warnings {
-        warnings.extend_from_slice(syntax_warnings);
-    }
+    warnings.extend_from_slice(syntax_warnings);
 
     Warned::new(Err(errs)).with_warnings(warnings)
 }

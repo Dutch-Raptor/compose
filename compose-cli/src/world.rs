@@ -1,5 +1,5 @@
 use compose_library::diag::{FileError, FileResult};
-use compose_library::{library, Library, World};
+use compose_library::{Library, World};
 use compose_syntax::{FileId, Source};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -53,7 +53,7 @@ impl SystemWorld {
             sources: Mutex::new(sources),
             entrypoint,
             root,
-            library: library(),
+            library: Library::default(),
         })
     }
 
@@ -67,7 +67,7 @@ impl SystemWorld {
             sources: Mutex::new(sources),
             entrypoint,
             root: PathBuf::new(),
-            library: library(),
+            library: Library::default(),
         }
     }
     

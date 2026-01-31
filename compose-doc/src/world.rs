@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 use std::sync::Mutex;
 use compose_library::diag::FileResult;
-use compose_library::{library, Library, World};
+use compose_library::{Library, World};
 use compose_syntax::{FileId, Source};
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ impl DocWorld {
 
         Self {
             source,
-            library: library(),
+            library: Library::default(),
             stdout: Mutex::new(String::new())
         }
     }
