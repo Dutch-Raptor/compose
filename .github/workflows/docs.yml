@@ -25,9 +25,13 @@ jobs:
       - name: Create rustdoc
         run: cargo doc
 
+      - name: Generate index.html file
+        run: |
+            echo "<meta http-equiv=refresh content=0;url=compose/index.html>" > target/doc/index.html
+
       # - name: Create CNAME
       #   run: |
-      #     echo 'rustdoc.swc.rs' > target/doc/CNAME
+      #     echo 'example.com' > target/doc/CNAME
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@4.1.8
