@@ -181,7 +181,7 @@ compose_doc!(
 
     Closures can **capture variables** from their surrounding environment. In Compose, only **boxed values** (`box`) can be captured by reference. This helps ensure clarity and memory safety.
 
-    Variables need to be captured explicitly using a capture list: `let closure = |x| () => x + 1;` (the `|x|` part is the capture list).
+    Variables need to be captured explicitly using a capture list: `let closure = { |x| => x + 1; };` (the `|x|` part is the capture list).
 
 
     #### ✅ Capturing by Reference

@@ -1,15 +1,15 @@
 use crate::error::CliError;
-use crate::repl::editor::{print_input, EditorFooter, EditorGutter, EditorHistory, EditorReader};
+use crate::repl::editor::{EditorFooter, EditorGutter, EditorHistory, EditorReader, print_input};
 use crate::world::SystemWorld;
-use crate::{explain, ReplArgs};
+use crate::{ReplArgs, explain};
 use compose_editor::editor::Editor;
 use compose_editor::renderer::full::CrosstermRenderer;
-use compose_eval::{EvalConfig, Machine};
-use compose_library::diag::{eco_format, Warned};
+use compose_eval::Machine;
+use compose_library::diag::{Warned, eco_format};
+use compose_library::repr::Repr;
 use compose_library::{Value, World};
 use compose_syntax::{FileId, Lexer, Source, SyntaxKind};
 use std::fs;
-use compose_library::repr::Repr;
 
 mod editor;
 
@@ -172,8 +172,7 @@ fn eval_initial_pass(vm: &mut Machine, world: &SystemWorld) {
     // Evaluate every node in the source, printing any diagnostics along the way.
     // Do not return early if there are any errors, as we want to print all diagnostics.
     for i in 0..source.nodes().len() {
-        let Warned { value, warnings } =
-            compose_eval::eval_source_range(&source, i..i + 1, vm, &EvalConfig::default());
+        let Warned { value, warnings } = compose_eval::eval_source_range(&source, i..i + 1, vm);
         crate::print_diagnostics(world, &[], &warnings).unwrap();
         if let Err(err) = value {
             crate::print_diagnostics(world, &err, &warnings).unwrap();
@@ -192,7 +191,7 @@ pub fn eval_repl_input(vm: &mut Machine, world: &SystemWorld, input: &str, args:
 
     let source = entrypoint(world);
     let len_after_edit = source.nodes().len();
-    
+
     if args.print_tokens {
         print_tokens(input, source.id());
     }
@@ -212,12 +211,8 @@ pub fn eval_repl_input(vm: &mut Machine, world: &SystemWorld, input: &str, args:
         crate::print_diagnostics(world, &[], &syntax_warnings).unwrap();
     }
 
-    let Warned { value, warnings } = compose_eval::eval_source_range(
-        &source,
-        len_before_edit..len_after_edit,
-        vm,
-        &EvalConfig::default(),
-    );
+    let Warned { value, warnings } =
+        compose_eval::eval_source_range(&source, len_before_edit..len_after_edit, vm);
 
     if args.debug {
         println!("{vm:#?}\n");

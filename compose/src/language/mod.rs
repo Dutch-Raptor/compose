@@ -1,3 +1,6 @@
+/*!
+# Language overview
+*/
 mod introduction;
 mod basics;
 mod patterns;

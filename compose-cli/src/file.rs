@@ -1,7 +1,7 @@
 use crate::error::CliError;
 use crate::world::SystemWorld;
 use crate::FileArgs;
-use compose_eval::{EvalConfig, Machine};
+use compose_eval::{Machine};
 use compose_library::diag::Warned;
 use crate::repl::print_tokens;
 
@@ -24,7 +24,7 @@ pub fn file(args: FileArgs) -> Result<(), CliError> {
         crate::print_diagnostics(&world, &[], &warnings).unwrap();
     }
 
-    let Warned { value, warnings } = compose_eval::eval_source(&source, &mut vm, &EvalConfig::default());
+    let Warned { value, warnings } = compose_eval::eval_source(&source, &mut vm);
 
     if let Err(err) = value {
         crate::print_diagnostics(&world, &err, &warnings).unwrap();
