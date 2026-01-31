@@ -27,7 +27,7 @@ jobs:
 
       - name: Generate index.html file
         run: |
-            echo "<meta http-equiv=refresh content=0;url=compose/index.html>" > target/doc/index.html
+            echo "<meta http-equiv=refresh content=0;url=compose>" > target/doc/index.html
 
       # - name: Create CNAME
       #   run: |
