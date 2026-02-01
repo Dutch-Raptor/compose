@@ -1,0 +1,37 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="E0001: Unclosed delimiter"><title>E0001_UNCLOSED_DELIMITER in compose_error_codes - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="compose_error_codes" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../static.files/storage-e2aeef58.js"></script><script defer src="sidebar-items.js"></script><script defer src="../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc constant"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">E0001_UNCLOSED_DELIMITER</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../compose_error_codes/index.html">compose_<wbr>error_<wbr>codes</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">E0001_<wbr>UNCLOSED_<wbr>DELIMITER</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#e0001-unclosed-delimiter" title="E0001: Unclosed delimiter">E0001: Unclosed delimiter</a><ul><li><a href="#example-1-missing-closing-parenthesis" title="Example 1: Missing closing parenthesis">Example 1: Missing closing parenthesis</a></li><li><a href="#example-2-unexpected-closing-delimiter" title="Example 2: Unexpected closing delimiter">Example 2: Unexpected closing delimiter</a></li><li><a href="#example-3-reaching-the-end-of-the-file-without-closing" title="Example 3: Reaching the end of the file without closing">Example 3: Reaching the end of the file without closing</a></li><li><a href="#summary" title="Summary">Summary</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="index.html">In crate compose_<wbr>error_<wbr>codes</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="index.html">compose_error_codes</a></div><h1>Constant <span class="constant">E0001_<wbr>UNCLOSED_<wbr>DELIMITER</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/compose_error_codes/home/runner/work/compose/compose/target/debug/build/compose-error-codes-4d4265df93cb07c3/out/Error_Codes.html#84-88">Source</a> </span></div><pre class="rust item-decl"><code>pub const E0001_UNCLOSED_DELIMITER: <a class="struct" href="struct.ErrorCode.html" title="struct compose_error_codes::ErrorCode">ErrorCode</a>;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="e0001-unclosed-delimiter"><a class="doc-anchor" href="#e0001-unclosed-delimiter">§</a>E0001: Unclosed delimiter</h2>
+<p>This error occurs when the parser encounters an opening delimiter like <code>(</code>, <code>{</code>, or <code>[</code> that isn’t properly closed. Compose requires all delimiters to be <strong>balanced and properly nested</strong>.</p>
+<p>Unclosed delimiters can happen in several ways: forgetting a closing character, accidentally mismatching different kinds of delimiters, or reaching the end of the file before closing.</p>
+<hr />
+<h5 id="example-1-missing-closing-parenthesis"><a class="doc-anchor" href="#example-1-missing-closing-parenthesis">§</a>Example 1: Missing closing parenthesis</h5><div class="example-wrap"><pre class="language-compose"><code># let unclosed_paren = 2;
+{unclosed_paren == 2;
+let other_statement;</code></pre></div><div class="example-wrap"><pre class="language-output"><code>// autogenerated</code></pre></div>
+<p>The opening <code>(</code> is never closed before the next statement begins.</p>
+<p>✅ <strong>Fix:</strong></p>
+<div class="example-wrap"><pre class="language-compose"><code># let unclosed_paren = 2;
+(unclosed_paren == 2);
+let other_statement;</code></pre></div>
+<hr />
+<h5 id="example-2-unexpected-closing-delimiter"><a class="doc-anchor" href="#example-2-unexpected-closing-delimiter">§</a>Example 2: Unexpected closing delimiter</h5><div class="example-wrap"><pre class="language-compose"><code>{
+    let f = { a, b =&gt; a == b };
+)</code></pre></div><div class="example-wrap"><pre class="language-output"><code>// autogenerated</code></pre></div>
+<p>A block opened with <code>{</code> was never closed with <code>}</code>. Instead, an unrelated <code>)</code> was found.</p>
+<p>✅ <strong>Fix:</strong></p>
+<div class="example-wrap"><pre class="language-compose"><code>{
+    let f = { a, b =&gt; a == b };
+}</code></pre></div>
+<hr />
+<h5 id="example-3-reaching-the-end-of-the-file-without-closing"><a class="doc-anchor" href="#example-3-reaching-the-end-of-the-file-without-closing">§</a>Example 3: Reaching the end of the file without closing</h5><div class="example-wrap"><pre class="language-compose"><code>{ unclosed_to_eof</code></pre></div>
+<p>The block was never closed, and the file ended before the parser could find the matching <code>}</code>.</p>
+<p>✅ <strong>Fix:</strong></p>
+<div class="example-wrap"><pre class="language-compose"><code># let unclosed_to_eof = 2;
+{ unclosed_to_eof; }</code></pre></div>
+<hr />
+<h4 id="summary"><a class="doc-anchor" href="#summary">§</a>Summary</h4>
+<p>Unclosed delimiters are a syntax error. To fix them:</p>
+<ul>
+<li>Make sure every <code>(</code> has a matching <code>)</code>, every <code>{</code> has a matching <code>}</code>, and every <code>[</code> has a matching <code>]</code>.</li>
+<li>Watch for mismatched pairs, such as opening with <code>{</code> and closing with <code>)</code>.</li>
+<li>Check for missing closings especially near the end of files or after nested code.</li>
+</ul>
+<p>💡 Tip: If you see many unclosed delimiter errors, start by fixing the <strong>first</strong> one. Later ones are often caused by it.</p>
+</div></details></section></div></main></body></html>

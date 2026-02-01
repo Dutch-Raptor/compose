@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["DisplayStyle"],"fn":["emit"],"mod":["termcolor"],"struct":["Chars","ColorArg","Config","Styles"]};

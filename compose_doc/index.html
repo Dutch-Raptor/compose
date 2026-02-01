@@ -1,0 +1,110 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Compose Markdown Processor"><title>compose_doc - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="compose_doc" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../static.files/storage-e2aeef58.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate compose_doc</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../compose_doc/index.html">compose_<wbr>doc</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#compose-markdown-processor" title="Compose Markdown Processor">Compose Markdown Processor</a><ul><li><a href="#-features" title="✨ Features">✨ Features</a></li><li><a href="#-usage" title="🚀 Usage">🚀 Usage</a></li><li><a href="#-running-transform_markdown" title="🧪 Running `transform_markdown`">🧪 Running <code>transform_markdown</code></a></li><li><a href="#-code-block-header-dsl" title="🧩 Code Block Header DSL">🧩 Code Block Header DSL</a></li><li><a href="#-hidden-setup-code" title="🕵 Hidden Setup Code">🕵 Hidden Setup Code</a></li><li><a href="#-error-handling" title="🧼 Error Handling">🧼 Error Handling</a></li><li><a href="#-configuration" title="🛠️ Configuration">🛠️ Configuration</a></li></ul></li></ul><h3><a href="#structs">Crate Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>compose_<wbr>doc</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/compose_doc/lib.rs.html#1-354">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="compose-markdown-processor"><a class="doc-anchor" href="#compose-markdown-processor">§</a>Compose Markdown Processor</h2>
+<p>This crate provides a utility for automatically processing fenced code blocks in Markdown files, evaluating <code>compose</code> code, and generating verified documentation that stays in sync with runtime behaviour.</p>
+<p>This is especially useful for:</p>
+<ul>
+<li><strong>Tutorials and learning material</strong></li>
+<li><strong>Code documentation with expected errors/warnings</strong></li>
+<li><strong>Doc-tests with output and diagnostics</strong></li>
+<li><strong>Generating error explanation pages</strong></li>
+</ul>
+<hr />
+<h3 id="-features"><a class="doc-anchor" href="#-features">§</a>✨ Features</h3>
+<ul>
+<li>✅ Evaluate <code>compose</code> code blocks inline</li>
+<li>✅ Automatically check for expected errors or warnings</li>
+<li>✅ Capture output (<code>stdout</code>) from code blocks</li>
+<li>✅ Use <code>#</code> to hide setup lines from rendered output (like Rustdoc)</li>
+<li>✅ Emit diagnostics only when referenced explicitly</li>
+<li>✅ Full test coverage to ensure docs don’t go out of sync</li>
+</ul>
+<hr />
+<h3 id="-usage"><a class="doc-anchor" href="#-usage">§</a>🚀 Usage</h3><h4 id="compose-block-with-captured-output"><a class="doc-anchor" href="#compose-block-with-captured-output">§</a>Compose block with captured output</h4><div class="example-wrap"><pre class="language-markdown"><code>```compose
+# let name = &quot;World&quot;;
+println(&quot;Hello, &quot; + name + &quot;!&quot;);
+```
+
+Output:
+
+```output stdout
+// output will be automatically filled
+```</code></pre></div><h4 id="compose-block-with-expected-diagnostics"><a class="doc-anchor" href="#compose-block-with-expected-diagnostics">§</a>Compose block with expected diagnostics</h4><div class="example-wrap"><pre class="language-markdown"><code>```compose error(E0004)
+let a = 3;
+a = 5; // ❌ cannot assign to immutable variable
+```
+
+Error:
+
+```output error(E0004)
+// error message will be inserted here
+```</code></pre></div>
+<hr />
+<h3 id="-running-transform_markdown"><a class="doc-anchor" href="#-running-transform_markdown">§</a>🧪 Running <code>transform_markdown</code></h3>
+<p>You can call <code>transform_markdown(markdown, config)</code> to convert your Markdown source string into one that includes:</p>
+<ul>
+<li>Verified code blocks</li>
+<li>Auto-generated diagnostic blocks</li>
+<li>Correct output (e.g. printed values)</li>
+</ul>
+<p>Example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>compose_doc::{transform_markdown, Config};
+
+<span class="kw">let </span>input = <span class="string">r#"
+```compose
+println("hi!");
+```
+
+```output stdout
+// output will be automatically filled
+```
+"#</span>;
+
+<span class="kw">let </span>result = transform_markdown(input, <span class="kw-2">&amp;</span>Config::new()).unwrap();
+<span class="macro">assert_eq!</span>(result.trim(),
+<span class="string">r#"
+````compose
+println("hi!");
+````
+
+````text
+hi!
+````
+"#</span>.trim())</code></pre></div>
+<hr />
+<h3 id="-code-block-header-dsl"><a class="doc-anchor" href="#-code-block-header-dsl">§</a>🧩 Code Block Header DSL</h3>
+<p>You can specify metadata for a code block using space-separated flags:</p>
+<ul>
+<li><code>compose error(E0001)</code> – expects an error with code <code>E0001</code></li>
+<li><code>output stdout</code> – emits the standard output of the preceding block</li>
+<li><code>warn(W0002)</code> – expects a warning with code <code>W0002</code></li>
+</ul>
+<p>You can combine these:</p>
+<div class="example-wrap"><pre class="language-markdown"><code>```output error(E0001) warn(W0002) stdout
+```</code></pre></div>
+<hr />
+<h3 id="-hidden-setup-code"><a class="doc-anchor" href="#-hidden-setup-code">§</a>🕵 Hidden Setup Code</h3>
+<p>Any line prefixed with <code>#</code> will still be evaluated but omitted from the rendered output.</p>
+<div class="example-wrap"><pre class="language-markdown"><code>```compose
+# let x = 42;
+println(x);
+```
+
+```output stdout
+// output will be automatically filled
+```
+</code></pre></div>
+<hr />
+<h3 id="-error-handling"><a class="doc-anchor" href="#-error-handling">§</a>🧼 Error Handling</h3>
+<p>If a block:</p>
+<ul>
+<li>emits diagnostics not marked with <code>error(...)</code> or <code>warn(...)</code>, or</li>
+<li>claims to emit diagnostics that aren’t produced by the code,</li>
+</ul>
+<p>then <a href="fn.transform_markdown.html" title="fn compose_doc::transform_markdown"><code>transform_markdown</code></a> will fail with a line-referenced error.</p>
+<hr />
+<h3 id="-configuration"><a class="doc-anchor" href="#-configuration">§</a>🛠️ Configuration</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>compose_doc::Config;
+
+<span class="kw">let </span>config = Config::new().with_ansi();      <span class="comment">// diagnostics with colour
+</span><span class="kw">let </span>config = Config::new().with_no_color();  <span class="comment">// plain-text diagnostics</span></code></pre></div></div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.ComposeBlock.html" title="struct compose_doc::ComposeBlock">Compose<wbr>Block</a></dt><dt><a class="struct" href="struct.Config.html" title="struct compose_doc::Config">Config</a></dt><dt><a class="struct" href="struct.Error.html" title="struct compose_doc::Error">Error</a></dt><dt><a class="struct" href="struct.Ir.html" title="struct compose_doc::Ir">Ir</a></dt><dt><a class="struct" href="struct.OutputBlock.html" title="struct compose_doc::OutputBlock">Output<wbr>Block</a></dt><dt><a class="struct" href="struct.OutputBlockDiags.html" title="struct compose_doc::OutputBlockDiags">Output<wbr>Block<wbr>Diags</a></dt></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.DiagMode.html" title="enum compose_doc::DiagMode">Diag<wbr>Mode</a></dt><dt><a class="enum" href="enum.ErrorHandlingMode.html" title="enum compose_doc::ErrorHandlingMode">Error<wbr>Handling<wbr>Mode</a></dt></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.transform_markdown.html" title="fn compose_doc::transform_markdown">transform_<wbr>markdown</a></dt><dd>Transforms Markdown by evaluating fenced <code>compose</code> code blocks and replacing/validating
+adjacent <code>output</code> blocks.</dd></dl></section></div></main></body></html>

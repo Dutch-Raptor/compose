@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["DiagMode","ErrorHandlingMode"],"fn":["transform_markdown"],"struct":["ComposeBlock","Config","Error","Ir","OutputBlock","OutputBlockDiags"]};

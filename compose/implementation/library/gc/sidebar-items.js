@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HeapItem"],"struct":["Heap","HeapRef","UntypedRef"],"trait":["HeapObject","Trace"]};

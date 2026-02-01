@@ -1,0 +1,103 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="🧩 Variables, Let Bindings, and Scoping"><title>compose::language::C2_Variables_and_Scopes - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="compose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module C2_Variables_and_Scopes</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../compose/index.html">compose</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module C2_<wbr>Variables_<wbr>and_<wbr>Scopes</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#-variables-let-bindings-and-scoping" title="🧩 Variables, Let Bindings, and Scoping">🧩 Variables, Let Bindings, and Scoping</a><ul><li><a href="#-let-bindings" title="📌 Let Bindings">📌 Let Bindings</a></li><li><a href="#-uninitialized-bindings" title="🚫 Uninitialized Bindings">🚫 Uninitialized Bindings</a></li><li><a href="#-variable-scope" title="📚 Variable Scope">📚 Variable Scope</a></li><li><a href="#-summary" title="✅ Summary">✅ Summary</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In compose::<wbr>language</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">compose</a>::<wbr><a href="../index.html">language</a></div><h1>Module <span>C2_<wbr>Variables_<wbr>and_<wbr>Scopes</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/compose/language/basics.rs.html#126">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h3 id="-variables-let-bindings-and-scoping"><a class="doc-anchor" href="#-variables-let-bindings-and-scoping">§</a>🧩 Variables, Let Bindings, and Scoping</h3>
+<p>Variables in Compose are introduced using the <code>let</code> keyword. Every variable has a <em>scope</em>—the region of code where it is visible—and Compose is designed to make variable behavior clear and predictable.</p>
+<h4 id="-let-bindings"><a class="doc-anchor" href="#-let-bindings">§</a>📌 Let Bindings</h4>
+<p>To bind a value to a name, use <code>let</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">10</span>;
+<span class="kw">let </span>name = <span class="string">"Compose"</span>;</code></pre></div>
+<p>By default, variables are <strong>immutable</strong>—once assigned, they cannot be changed:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">5</span>;
+x = <span class="number">6</span>;</code></pre></div><div class="example-wrap"><pre class="language-text"><code>error[E0004]: cannot reassign to a variable declared as immutable
+  ┌─ main.comp:2:1
+  │
+1 │ let x = 5;
+  │     - was defined as immutable here
+2 │ x = 6;
+  │ ^ is immutable
+  │
+  = note: variables are immutable by default
+  = help: make the variable mutable by writing `let mut`
+  = help: for more information about this error, try `compose explain E0004`</code></pre></div>
+<p>If you want to change the value later, use <code>let mut</code> to make the variable mutable:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span><span class="kw-2">mut </span>count = <span class="number">0</span>;
+count = count + <span class="number">1</span>;
+assert::eq(count, <span class="number">1</span>);</code></pre></div>
+<blockquote>
+<p>Compose encourages immutability for clarity, but allows mutation when it’s explicitly requested.</p>
+</blockquote>
+<hr />
+<h4 id="-uninitialized-bindings"><a class="doc-anchor" href="#-uninitialized-bindings">§</a>🚫 Uninitialized Bindings</h4>
+<p>In Compose, you can declare a variable without giving it an initial value.</p>
+<p>This can be useful when multiple branches assign different values to the same variable:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x;
+<span class="kw">if </span>(<span class="bool-val">true</span>) {
+    x = <span class="number">1</span>;
+} <span class="kw">else </span>{
+    x = <span class="number">2</span>;
+};
+assert::eq(x, <span class="number">1</span>);</code></pre></div>
+<blockquote>
+<p>However, in this instance we might use the fact that <code>if</code> is an expression to assign the intended value to x directly.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="kw">if </span>(<span class="bool-val">true</span>) { <span class="number">1</span>; } <span class="kw">else </span>{ <span class="number">2</span>; };
+assert::eq(x, <span class="number">1</span>);</code></pre></div></blockquote>
+<p>Reading an uninitialized variable is allowed and resolves to <code>()</code> (the unit value).
+However, this produces a warning and relying on this behaviour should be avoided.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x;
+assert::eq(x, ());</code></pre></div><div class="example-wrap"><pre class="language-text"><code>warning[W0001]: use of variable before it has been initialized
+  ┌─ main.comp:2:12
+  │
+1 │ let x;
+  │     - variable declared here without an initial value
+2 │ assert::eq(x, ());
+  │            ^ use of uninitialized variable
+  │
+  = note: uninitialised variables evaluate to `()` by default
+  = help: for more information about this error, try `compose explain W0001`</code></pre></div>
+<hr />
+<h4 id="-variable-scope"><a class="doc-anchor" href="#-variable-scope">§</a>📚 Variable Scope</h4>
+<p>The <strong>scope</strong> of a variable starts where it is declared and ends at the closing brace of the block that contains it.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>outer = <span class="number">10</span>;
+{
+    <span class="kw">let </span>inner = <span class="number">20</span>;
+    assert::eq(outer, <span class="number">10</span>);
+    assert::eq(inner, <span class="number">20</span>);
+};
+assert::eq(inner, <span class="number">10</span>); <span class="comment">// inner is out of scope here</span></code></pre></div><div class="example-wrap"><pre class="language-text"><code>error[E0011]: Unbound variable: `inner`
+  ┌─ main.comp:7:12
+  │
+7 │ assert::eq(inner, 10); // inner is out of scope here
+  │            ^^^^^ this variable is unbound here
+  │
+  = help: for more information about this error, try `compose explain E0011`</code></pre></div>
+<p>Variables can shadow earlier bindings in a new scope:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>value = <span class="number">1</span>;
+{
+    <span class="kw">let </span>value = value + <span class="number">1</span>;
+    assert::eq(value, <span class="number">2</span>);
+};
+assert::eq(value, <span class="number">1</span>);</code></pre></div>
+<p>Variables can also be shadowed in the same scope:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">1</span>;
+<span class="kw">let </span>x = x + <span class="number">1</span>; <span class="comment">// shadowing, not mutation
+</span>assert::eq(x, <span class="number">2</span>);</code></pre></div>
+<blockquote>
+<p>Shadowing is a way to “reuse” names safely. Each binding is separate and lives in its own scope.</p>
+</blockquote>
+<hr />
+<h4 id="-summary"><a class="doc-anchor" href="#-summary">§</a>✅ Summary</h4>
+<ul>
+<li>Variables are immutable by default. Use <code>let mut</code> to allow mutation.</li>
+<li>Use <code>let</code> to bind values or patterns.</li>
+<li>Variables can be uninitialised and resolve to <code>()</code> before assignment.</li>
+<li>Scoping rules help prevent accidental usage of invalid or stale values.</li>
+<li>Shadowing lets you reuse names in a controlled and explicit way.</li>
+</ul>
+</div></details></section></div></main></body></html>

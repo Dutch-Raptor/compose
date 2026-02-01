@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["defer","with_indent"],"macro":["trace_fn","trace_log"],"static":["ENABLE_TRACE"],"struct":["Static","TraceFnGuard"]};

@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="E0302: map destructuring does not cover all keys"><title>compose::language::Error_Codes::DOC_E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="compose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module DOC_E0302_MAP_DESTRUCTURING_UNCOVERED_KEYS</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../compose/index.html">compose</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module DOC_<wbr>E0302_<wbr>MAP_<wbr>DESTRUCTURING_<wbr>UNCOVERED_<wbr>KEYS</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#e0302-map-destructuring-does-not-cover-all-keys" title="E0302: map destructuring does not cover all keys">E0302: map destructuring does not cover all keys</a><ul><li><a href="#what-this-means" title="What this means">What this means</a></li><li><a href="#example-that-triggers-this-error" title="Example that triggers this error">Example that triggers this error</a></li><li><a href="#why-this-is-an-error" title="Why this is an error">Why this is an error</a></li><li><a href="#how-to-fix-it" title="How to fix it">How to fix it</a></li><li><a href="#summary" title="Summary">Summary</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In compose::<wbr>language::<wbr>Error_<wbr>Codes</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">compose</a>::<wbr><a href="../../index.html">language</a>::<wbr><a href="../index.html">Error_Codes</a></div><h1>Module <span>DOC_<wbr>E0302_<wbr>MAP_<wbr>DESTRUCTURING_<wbr>UNCOVERED_<wbr>KEYS</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../../src/compose_error_codes_doc_tests/home/runner/work/compose/compose/target/debug/build/compose-error-codes-doc-tests-581af9632a3fc0c2/out/Error_Codes.html#1319">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h3 id="e0302-map-destructuring-does-not-cover-all-keys"><a class="doc-anchor" href="#e0302-map-destructuring-does-not-cover-all-keys">§</a>E0302: map destructuring does not cover all keys</h3><h4 id="what-this-means"><a class="doc-anchor" href="#what-this-means">§</a>What this means</h4>
+<p>This error occurs when a map destructuring pattern does not account for <strong>every key</strong> in the map being destructured.</p>
+<p>In Compose, map destructuring is <strong>exhaustive</strong> by default:
+if a map contains keys that are not explicitly destructured, the pattern is rejected.</p>
+<hr />
+<h4 id="example-that-triggers-this-error"><a class="doc-anchor" href="#example-that-triggers-this-error">§</a>Example that triggers this error</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>{ a } = { a: <span class="number">1</span>, b: <span class="number">2 </span>};</code></pre></div>
+<p>The map contains the keys <code>a</code> and <code>b</code>, but the pattern only destructures <code>a</code>.
+Since <code>b</code> is not handled, this results in an error.</p>
+<hr />
+<h4 id="why-this-is-an-error"><a class="doc-anchor" href="#why-this-is-an-error">§</a>Why this is an error</h4>
+<p>Allowing partial map destructuring without being explicit would make it unclear whether:</p>
+<ul>
+<li>extra keys are intentionally ignored, or</li>
+<li>a key was forgotten by mistake</li>
+</ul>
+<p>To avoid silent bugs, Compose requires you to <strong>explicitly choose</strong> what happens to the remaining keys.</p>
+<hr />
+<h4 id="how-to-fix-it"><a class="doc-anchor" href="#how-to-fix-it">§</a>How to fix it</h4>
+<p>You have two options.</p>
+<h5 id="ignore-remaining-keys"><a class="doc-anchor" href="#ignore-remaining-keys">§</a>Ignore remaining keys</h5>
+<p>Use <code>..</code> to explicitly discard any keys not listed in the pattern:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>{ a, .. } = { a: <span class="number">1</span>, b: <span class="number">2 </span>};</code></pre></div><h5 id="capture-remaining-keys"><a class="doc-anchor" href="#capture-remaining-keys">§</a>Capture remaining keys</h5>
+<p>Use <code>..name</code> to bind the remaining keys into a new map:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>{ a, ..rest } = { a: <span class="number">1</span>, b: <span class="number">2 </span>};</code></pre></div>
+<p>Here, <code>rest</code> will be a map containing <code>{ b: 2 }</code>.</p>
+<hr />
+<h4 id="summary"><a class="doc-anchor" href="#summary">§</a>Summary</h4>
+<ul>
+<li>Map destructuring in Compose is exhaustive by default</li>
+<li>All keys must be handled explicitly</li>
+<li>Use <code>..</code> to ignore remaining keys</li>
+<li>Use <code>..name</code> to capture remaining keys into a map</li>
+</ul>
+<p>This design favors clarity and prevents accidental data loss.</p>
+</div></details></section></div></main></body></html>

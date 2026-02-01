@@ -1,0 +1,67 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="E0301: Array destructuring pattern did not fit array length"><title>compose_error_codes_doc_tests::DOC_E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="compose_error_codes_doc_tests" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module DOC_E0301_ARRAY_DESTRUCTURING_WRONG_NUMBER_OF_ELEMENTS</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../compose_error_codes_doc_tests/index.html">compose_<wbr>error_<wbr>codes_<wbr>doc_<wbr>tests</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module DOC_<wbr>E0301_<wbr>ARRAY_<wbr>DESTRUCTURING_<wbr>WRONG_<wbr>NUMBER_<wbr>OF_<wbr>ELEMENTS</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#e0301-array-destructuring-pattern-did-not-fit-array-length" title="E0301: Array destructuring pattern did not fit array length">E0301: Array destructuring pattern did not fit array length</a><ul><li><a href="#too-many-elements-in-the-array-pattern-without-" title="Too many elements in the array, pattern without `..`">Too many elements in the array, pattern without <code>..</code></a></li><li><a href="#case-2-too-few-elements-in-the-array-pattern-without-" title="Case 2: Too few elements in the array, pattern without `..`">Case 2: Too few elements in the array, pattern without <code>..</code></a></li><li><a href="#case-4-too-few-elements-when-using-a-name-binding" title="Case 4: Too few elements when using a `..name` binding">Case 4: Too few elements when using a <code>..name</code> binding</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate compose_<wbr>error_<wbr>codes_<wbr>doc_<wbr>tests</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">compose_error_codes_doc_tests</a></div><h1>Module <span>DOC_<wbr>E0301_<wbr>ARRAY_<wbr>DESTRUCTURING_<wbr>WRONG_<wbr>NUMBER_<wbr>OF_<wbr>ELEMENTS</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/compose_error_codes_doc_tests/home/runner/work/compose/compose/target/debug/build/compose-error-codes-doc-tests-581af9632a3fc0c2/out/Error_Codes.html#1223">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h3 id="e0301-array-destructuring-pattern-did-not-fit-array-length"><a class="doc-anchor" href="#e0301-array-destructuring-pattern-did-not-fit-array-length">§</a>E0301: Array destructuring pattern did not fit array length</h3>
+<p>This error occurs when an array destructuring pattern does not match the number of elements in the array.</p>
+<p>Array destructuring in Compose requires that:</p>
+<ol>
+<li>If the pattern <strong>does not use <code>..</code></strong>, the number of bindings must exactly match the array’s length.</li>
+<li>If the pattern <strong>uses a <code>..</code> (rest) binding</strong>, the array must have <strong>at least as many elements as the non-rest bindings</strong>.</li>
+</ol>
+<p>Violating these rules results in a <strong>length mismatch error</strong>.</p>
+<hr />
+<h5 id="too-many-elements-in-the-array-pattern-without-"><a class="doc-anchor" href="#too-many-elements-in-the-array-pattern-without-">§</a><strong>Too many elements in the array, pattern without <code>..</code></strong></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>[a, b] = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];</code></pre></div><div class="example-wrap"><pre class="language-text"><code>error[E0301]: too many elements to destructure
+  ┌─ main.comp:1:5
+  │
+1 │ let [a, b] = [1, 2, 3];
+  │     ^^^^^^
+  │
+  = help: the provided array has a length of 3, but the pattern expects 2 elements
+  = help: use `..` to ignore the remaining elements, or `..name` to bind them
+  = help: for more information about this error, try `compose explain E0301`</code></pre></div>
+<ul>
+<li>Pattern binds 2 elements.</li>
+<li>Array has 3 elements.</li>
+<li><strong>Error</strong>: the pattern does not account for all elements.</li>
+</ul>
+<p><strong>Fix:</strong> Use <code>..</code> to ignore or capture the remaining elements:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>[a, b, ..] = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];       <span class="comment">// ignore remaining
+</span><span class="kw">let </span>[a, b, ..rest] = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];   <span class="comment">// capture remaining</span></code></pre></div>
+<hr />
+<h5 id="case-2-too-few-elements-in-the-array-pattern-without-"><a class="doc-anchor" href="#case-2-too-few-elements-in-the-array-pattern-without-">§</a><strong>Case 2: Too few elements in the array, pattern without <code>..</code></strong></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>[a, b, c] = [<span class="number">1</span>, <span class="number">2</span>];</code></pre></div><div class="example-wrap"><pre class="language-text"><code>error[E0301]: not enough elements to destructure
+  ┌─ main.comp:1:5
+  │
+1 │ let [a, b, c] = [1, 2];
+  │     ^^^^^^^^^
+  │
+  = help: the provided array has a length of 2, but the pattern expects 3 elements
+  = help: for more information about this error, try `compose explain E0301`</code></pre></div>
+<ul>
+<li>Pattern binds 3 elements.</li>
+<li>Array has only 2 elements.</li>
+<li><strong>Error</strong>: not enough elements to satisfy the pattern.</li>
+</ul>
+<p><strong>Fix:</strong> Provide an array with enough elements:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>[a, b, c] = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];  </code></pre></div>
+<hr />
+<h5 id="case-4-too-few-elements-when-using-a-name-binding"><a class="doc-anchor" href="#case-4-too-few-elements-when-using-a-name-binding">§</a><strong>Case 4: Too few elements when using a <code>..name</code> binding</strong></h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>[a, b, ..c] = [<span class="number">1</span>];</code></pre></div><div class="example-wrap"><pre class="language-text"><code>error[E0301]: not enough elements to destructure
+  ┌─ main.comp:1:5
+  │
+1 │ let [a, b, ..c] = [1];
+  │     ^^^^^^^^^^^
+  │
+  = help: the provided array has a length of 1, but the pattern expects at least 2 elements
+  = help: for more information about this error, try `compose explain E0301`</code></pre></div>
+<ul>
+<li>Pattern requires 2 non-rest elements (<code>a</code> and <code>b</code>).</li>
+<li>Array has only 1 element.</li>
+<li><strong>Error</strong>: not enough elements to bind all required non-rest values.</li>
+</ul>
+<p><strong>Fix:</strong> Ensure the array has at least as many elements as the non-rest bindings:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>[a, b, ..c] = [<span class="number">1</span>, <span class="number">2</span>];  </code></pre></div>
+<p>or reduce the number of non-rest bindings:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>[a, ..c] = [<span class="number">1</span>];  </code></pre></div></div></details></section></div></main></body></html>

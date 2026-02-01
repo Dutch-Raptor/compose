@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="W0001: Use of a variable before it has been initialized"><title>compose::language::Error_Codes::DOC_W0001_USED_UNINITIALIZED_VARIABLE - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="compose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module DOC_W0001_USED_UNINITIALIZED_VARIABLE</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../compose/index.html">compose</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module DOC_<wbr>W0001_<wbr>USED_<wbr>UNINITIALIZED_<wbr>VARIABLE</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#w0001-use-of-a-variable-before-it-has-been-initialized" title="W0001: Use of a variable before it has been initialized">W0001: Use of a variable before it has been initialized</a><ul><li><a href="#example-of-problematic-code" title="Example of problematic code">Example of problematic code</a></li><li><a href="#explanation" title="Explanation">Explanation</a></li><li><a href="#fixes" title="Fixes">Fixes</a></li><li><a href="#why-this-matters" title="Why this matters">Why this matters</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In compose::<wbr>language::<wbr>Error_<wbr>Codes</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">compose</a>::<wbr><a href="../../index.html">language</a>::<wbr><a href="../index.html">Error_Codes</a></div><h1>Module <span>DOC_<wbr>W0001_<wbr>USED_<wbr>UNINITIALIZED_<wbr>VARIABLE</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../../src/compose_error_codes_doc_tests/home/runner/work/compose/compose/target/debug/build/compose-error-codes-doc-tests-581af9632a3fc0c2/out/Error_Codes.html#1794">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="w0001-use-of-a-variable-before-it-has-been-initialized"><a class="doc-anchor" href="#w0001-use-of-a-variable-before-it-has-been-initialized">§</a>W0001: Use of a variable before it has been initialized</h2>
+<p>A variable declared with <code>let</code> but not initialized defaults to <code>()</code>.</p>
+<ul>
+<li>✅ Assign a value when declaring (e.g., <code>let a = 5;</code>)</li>
+<li>✅ Or assign a value before first use (e.g., <code>let a; a = 5; a</code>)</li>
+</ul>
+<hr />
+<h4 id="example-of-problematic-code"><a class="doc-anchor" href="#example-of-problematic-code">§</a>Example of problematic code</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a;
+a;</code></pre></div><div class="example-wrap"><pre class="language-text"><code>warning[W0001]: use of variable before it has been initialized
+  ┌─ main.comp:2:1
+  │
+1 │ let a;
+  │     - variable declared here without an initial value
+2 │ a;
+  │ ^ use of uninitialized variable
+  │
+  = note: uninitialised variables evaluate to `()` by default
+  = help: for more information about this error, try `compose explain W0001`</code></pre></div>
+<hr />
+<h4 id="explanation"><a class="doc-anchor" href="#explanation">§</a>Explanation</h4>
+<p>When you declare a variable with <code>let</code> but do <strong>not</strong> give it an initial value, Compose defaults it to the unit value <code>()</code> (similar to <code>void</code> in other languages).</p>
+<p>While this is valid syntax, it often indicates a mistake — such as assuming the variable has a meaningful default or forgetting to initialize it before use.</p>
+<p>This warning helps prevent subtle logic bugs or no-op evaluations.</p>
+<hr />
+<h4 id="fixes"><a class="doc-anchor" href="#fixes">§</a>Fixes</h4><h5 id="-initialize-the-variable-during-declaration"><a class="doc-anchor" href="#-initialize-the-variable-during-declaration">§</a>✅ Initialize the variable during declaration:</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a = <span class="number">42</span>;
+a</code></pre></div><h5 id="-assign-a-value-before-using-the-variable"><a class="doc-anchor" href="#-assign-a-value-before-using-the-variable">§</a>✅ Assign a value before using the variable:</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a;
+a = <span class="number">10</span>;
+a</code></pre></div><h5 id="-if-you-meant-to-use-the-unit-value-make-it-explicit"><a class="doc-anchor" href="#-if-you-meant-to-use-the-unit-value-make-it-explicit">§</a>✅ If you meant to use the unit value, make it explicit:</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a = ();
+a <span class="comment">// evaluates to ()</span></code></pre></div>
+<hr />
+<h4 id="why-this-matters"><a class="doc-anchor" href="#why-this-matters">§</a>Why this matters</h4>
+<p>Uninitialized variables default to <code>()</code>, which is often unintentional. For example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>total;
+println(<span class="string">"Total is"</span>, total);</code></pre></div><div class="example-wrap"><pre class="language-text"><code>Total is ()</code></pre></div>
+<p>This will print <code>"Total is ()"</code> — which likely isn’t what you meant.</p>
+</div></details></section></div></main></body></html>

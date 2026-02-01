@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="E0303: missing key in map pattern"><title>compose::language::Error_Codes::DOC_E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="compose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module DOC_E0303_MAP_DESTRUCTURING_MISSING_KEY_IN_VALUE</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../compose/index.html">compose</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module DOC_<wbr>E0303_<wbr>MAP_<wbr>DESTRUCTURING_<wbr>MISSING_<wbr>KEY_<wbr>IN_<wbr>VALUE</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#e0303-missing-key-in-map-pattern" title="E0303: missing key in map pattern">E0303: missing key in map pattern</a><ul><li><a href="#what-this-means" title="What this means">What this means</a></li><li><a href="#example-that-triggers-this-error" title="Example that triggers this error">Example that triggers this error</a></li><li><a href="#why-this-is-an-error" title="Why this is an error">Why this is an error</a></li><li><a href="#how-to-fix-it" title="How to fix it">How to fix it</a></li><li><a href="#summary" title="Summary">Summary</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In compose::<wbr>language::<wbr>Error_<wbr>Codes</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">compose</a>::<wbr><a href="../../index.html">language</a>::<wbr><a href="../index.html">Error_Codes</a></div><h1>Module <span>DOC_<wbr>E0303_<wbr>MAP_<wbr>DESTRUCTURING_<wbr>MISSING_<wbr>KEY_<wbr>IN_<wbr>VALUE</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../../src/compose_error_codes_doc_tests/home/runner/work/compose/compose/target/debug/build/compose-error-codes-doc-tests-581af9632a3fc0c2/out/Error_Codes.html#1447">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h3 id="e0303-missing-key-in-map-pattern"><a class="doc-anchor" href="#e0303-missing-key-in-map-pattern">§</a>E0303: missing key in map pattern</h3><h4 id="what-this-means"><a class="doc-anchor" href="#what-this-means">§</a>What this means</h4>
+<p>This error occurs when a map destructuring pattern <strong>requires a key that is not present</strong> in the map being destructured.</p>
+<p>In Compose, map patterns list the keys that must exist.
+If any required key is missing from the value, destructuring fails.</p>
+<hr />
+<h4 id="example-that-triggers-this-error"><a class="doc-anchor" href="#example-that-triggers-this-error">§</a>Example that triggers this error</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>{ a, b } = { a: <span class="number">1 </span>};</code></pre></div>
+<p>The pattern requires the keys <code>a</code> and <code>b</code>, but the map only contains <code>a</code>.
+Since <code>b</code> is not present, the pattern cannot be matched.</p>
+<hr />
+<h4 id="why-this-is-an-error"><a class="doc-anchor" href="#why-this-is-an-error">§</a>Why this is an error</h4>
+<p>Map destructuring is <strong>strict</strong>:</p>
+<ul>
+<li>Every key named in the pattern must exist in the map</li>
+<li>Missing keys would otherwise result in uninitialized bindings</li>
+</ul>
+<p>Rather than implicitly assigning a default value or ignoring missing keys, Compose reports an error to ensure correctness.</p>
+<hr />
+<h4 id="how-to-fix-it"><a class="doc-anchor" href="#how-to-fix-it">§</a>How to fix it</h4>
+<p>You have several options, depending on your intent.</p>
+<h5 id="provide-the-missing-key"><a class="doc-anchor" href="#provide-the-missing-key">§</a>Provide the missing key</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>{ a, b } = { a: <span class="number">1</span>, b: <span class="number">2 </span>};</code></pre></div><h5 id="remove-the-key-from-the-pattern"><a class="doc-anchor" href="#remove-the-key-from-the-pattern">§</a>Remove the key from the pattern</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>{ a } = { a: <span class="number">1 </span>};</code></pre></div><h5 id="conditionally-match-the-map"><a class="doc-anchor" href="#conditionally-match-the-map">§</a>Conditionally match the map</h5>
+<p>If the map may or may not contain the key, use a <strong>pattern test</strong> instead of direct destructuring.</p>
+<p>Patterns can be used in both <code>match</code> expressions <strong>and</strong> <code>is</code> expressions:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>map = { a: <span class="number">1 </span>};
+<span class="kw">if </span>(map is { a, b }) {
+    println(a, b);
+}</code></pre></div>
+<p>The <code>is</code> expression only returns true if the pattern matches.
+Inside the body of the <code>if</code> expression, all pattern bindings (<code>a</code> and <code>b</code>) are guaranteed to exist.</p>
+<p>The same pattern can also be used in a <code>match</code> expression:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>map = { a: <span class="number">1 </span>};
+<span class="kw">match </span>(map) {
+    { a, b } =&gt; println(a, b),
+    <span class="kw">_ </span>=&gt; (),
+}</code></pre></div><h4 id="summary"><a class="doc-anchor" href="#summary">§</a>Summary</h4>
+<ul>
+<li>Keys listed in a map pattern are required</li>
+<li>Direct destructuring is unconditional</li>
+<li>Use <code>if … is</code> or <code>match</code> to conditionally match maps</li>
+<li>This error ensures missing data is handled explicitly</li>
+</ul>
+</div></details></section></div></main></body></html>

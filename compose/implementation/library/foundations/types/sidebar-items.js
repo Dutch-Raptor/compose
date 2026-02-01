@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Range"],"mod":["array","bool","boxed","func","int","map","range","str","ty","unit"],"struct":["Array","ArrayValue","Boxed","Func","Map","MapValue","Module","NativeTypeData","RangeImpl","RangeValue","Str","Type","UnitValue"],"trait":["NativeType"]};

@@ -1,0 +1,34 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Painless string scanning."><title>unscanny - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="unscanny" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../static.files/storage-e2aeef58.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate unscanny</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../unscanny/index.html">unscanny</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#example" title="Example">Example</a></li></ul><h3><a href="#structs">Crate Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#traits" title="Traits">Traits</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>unscanny</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/unscanny/lib.rs.html#1-702">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Painless string scanning.</p>
+<p>Basically, you’ll want to use this crate if it’s too much pain to solve your
+problem with a bare <code>chars()</code> iterator. Speaking more broadly, <code>unscanny</code> is
+useful in these situations:</p>
+<ul>
+<li>You need to parse simple flat grammars (dates, times, custom stuff, …) and
+want an interface that’s a bit more convenient to use than a simple char
+iterator.</li>
+<li>You’re hand-writing a tokenizer.</li>
+</ul>
+<p>The <code>Scanner</code> keeps an internal cursor, allows you to peek around it, advance it
+beyond chars or other patterns  and easily slice substrings before and after the
+cursor.</p>
+<p>Note that the scanner doesn’t have built-in support for parsing things like
+numbers. It’s a level of abstraction below that and wouldn’t want to mandate a
+specific number format. However, you can very easily build your required
+abstractions on top.</p>
+<h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
+<p>Recognizing and parsing a simple comma separated list of floats.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span><span class="kw-2">mut </span>s = Scanner::new(<span class="string">" +12 , -15.3, 14.3  "</span>);
+<span class="kw">let </span><span class="kw-2">mut </span>nums = <span class="macro">vec!</span>[];
+<span class="kw">while </span>!s.done() {
+    s.eat_whitespace();
+    <span class="kw">let </span>start = s.cursor();
+    s.eat_if([<span class="string">'+'</span>, <span class="string">'-'</span>]);
+    s.eat_while(char::is_ascii_digit);
+    s.eat_if(<span class="string">'.'</span>);
+    s.eat_while(char::is_ascii_digit);
+    nums.push(s.from(start).parse::&lt;f64&gt;().unwrap());
+    s.eat_whitespace();
+    s.eat_if(<span class="string">','</span>);
+}
+<span class="macro">assert_eq!</span>(nums, [<span class="number">12.0</span>, -<span class="number">15.3</span>, <span class="number">14.3</span>]);</code></pre></div></div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.Scanner.html" title="struct unscanny::Scanner">Scanner</a></dt><dd>A string scanner.</dd></dl><h2 id="traits" class="section-header">Traits<a href="#traits" class="anchor">§</a></h2><dl class="item-table"><dt><a class="trait" href="trait.Pattern.html" title="trait unscanny::Pattern">Pattern</a></dt><dd>Something a string can start with.</dd></dl></section></div></main></body></html>

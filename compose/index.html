@@ -1,0 +1,142 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="The Compose Programming Language"><title>compose - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="compose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../static.files/storage-e2aeef58.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate compose</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../compose/index.html">compose</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#the-compose-programming-language" title="The Compose Programming Language">The Compose Programming Language</a><ul><li><a href="#documentation-overview" title="Documentation overview">Documentation overview</a></li><li><a href="#using-this-crate" title="Using this crate">Using this crate</a></li></ul></li></ul><h3><a href="#modules">Crate Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#traits" title="Traits">Traits</a></li><li><a href="#functions" title="Functions">Functions</a></li><li><a href="#types" title="Type Aliases">Type Aliases</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>compose</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/compose/lib.rs.html#1-246">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="the-compose-programming-language"><a class="doc-anchor" href="#the-compose-programming-language">§</a>The Compose Programming Language</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>println(<span class="string">"'Hello, world' from Compose!"</span>);</code></pre></div>
+<p>Compose is a functional-flavoured, interpreted programming language with Rust-like syntax.</p>
+<p>Features:</p>
+<ul>
+<li>Expression focused: blocks and control flow (<code>if</code>, <code>match</code>, loops) are expressions and produce values.</li>
+<li>Functions as first-class citizens</li>
+<li>High quality diagnostics</li>
+<li>Variables are immutable by default</li>
+<li>Garbage collection</li>
+<li>Portable: runs on any platform that supports Rust</li>
+</ul>
+<div class="warning">
+<p>Compose is being developed as a hobby project and is not intended for production use.</p>
+</div>
+<h3 id="documentation-overview"><a class="doc-anchor" href="#documentation-overview">§</a>Documentation overview</h3>
+<ul>
+<li>The <a href="language/index.html" title="mod compose::language"><code>language</code></a> module documents Compose syntax and semantics.</li>
+<li>The <a href="implementation/index.html" title="mod compose::implementation"><code>implementation</code></a> module documents the internals of the language implementation.</li>
+<li>The <a href="embedding/index.html" title="mod compose::embedding"><code>embedding</code></a> module documents how to embed Compose in your application.</li>
+<li>The <a href="cli/index.html" title="mod compose::cli"><code>cli</code></a> module documents the CLI.</li>
+</ul>
+<h3 id="using-this-crate"><a class="doc-anchor" href="#using-this-crate">§</a>Using this crate</h3>
+<blockquote>
+<p>Below follows a minimal example of embedding Compose in your application. If you want to take a deeper dive, check out the <a href="embedding/index.html" title="mod compose::embedding">embedding</a> documentation.</p>
+</blockquote>
+<p>Add Compose to your dependencies:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies]
+compose = { git = &quot;https://github.com/Dutch-Raptor/compose.git&quot; }</code></pre></div><h4 id="creating-a-world"><a class="doc-anchor" href="#creating-a-world">§</a>Creating a <a href="trait.World.html" title="trait compose::World"><code>World</code></a></h4>
+<p>Compose is designed to be <strong>embedded</strong> in your application. All interactions with the outside world (like reading files, printing to the console, etc.) go through the <a href="trait.World.html" title="trait compose::World"><code>World</code></a> trait. This allows running Compose in a CLI, in tests, or embedded in another application.</p>
+<p>A <a href="trait.World.html" title="trait compose::World"><code>World</code></a> should provide:</p>
+<ul>
+<li>The entrypoint source of the program.</li>
+<li>A way to access source files.</li>
+<li>Standard input and output.</li>
+<li>The standard library.</li>
+</ul>
+<p>Source files could be loaded from disk, stored in memory, or come from any other source.
+Standard input and output can be virtualised. The standard library can be customised to provide additional functionality.</p>
+<p>In this minimal example, we define a <a href="trait.World.html" title="trait compose::World"><code>World</code></a> that contains a single source file.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>compose::{
+    World,
+    library::Library,
+    library::diag::{FileError, FileResult},
+    syntax::{FileId, Source},
+};
+<span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>std::io::{Read, Write};
+
+<span class="kw">struct </span>ExampleWorld {
+    main: Source,
+    library: Library,
+}
+
+<span class="kw">impl </span>World <span class="kw">for </span>ExampleWorld {
+    <span class="kw">fn </span>entry_point(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; FileId {
+        <span class="self">self</span>.main.id()
+    }
+
+    <span class="comment">// This example world only supports a single source, so that is the only source it can return.
+    </span><span class="kw">fn </span>source(<span class="kw-2">&amp;</span><span class="self">self</span>, file_id: FileId) -&gt; FileResult&lt;Source&gt; {
+        <span class="kw">if </span>file_id == <span class="self">self</span>.main.id() {
+            <span class="prelude-val">Ok</span>(<span class="self">self</span>.main.clone())
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Err</span>(FileError::NotFound(file_id.path().as_path().clone()))
+        }
+    }
+
+    <span class="kw">fn </span>library(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Library {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.library
+    }
+
+    <span class="comment">// Write to stdout
+    </span><span class="kw">fn </span>write(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        f: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Write) -&gt; std::io::Result&lt;()&gt;,
+    ) -&gt; std::io::Result&lt;()&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>stdout_lock = std::io::stdout().lock();
+        f(<span class="kw-2">&amp;mut </span>stdout_lock)
+    }
+
+    <span class="comment">// read from stdin
+    </span><span class="kw">fn </span>read(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        f: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Read) -&gt; std::io::Result&lt;()&gt;,
+    ) -&gt; std::io::Result&lt;()&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>stdin_lock = std::io::stdin().lock();
+        f(<span class="kw-2">&amp;mut </span>stdin_lock)
+    }
+}
+
+<span class="kw">impl </span>ExampleWorld {
+    <span class="kw">fn </span>new(main_source: Source) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            main: main_source,
+            library: Library::default(),
+        }
+    }
+}</code></pre></div><h4 id="loading-source-code"><a class="doc-anchor" href="#loading-source-code">§</a>Loading source code</h4>
+<p>Compose source code is represented by the <a href="implementation/syntax/struct.Source.html" title="struct compose::implementation::syntax::Source"><code>Source</code></a> type.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>compose::syntax::Source;
+
+<span class="kw">let </span>source_text = <span class="string">r#"
+    println("Hello from Compose");
+    2 + 3 // the value of the last expression is returned
+"#</span>;
+
+<span class="kw">let </span>source = Source::from_string(<span class="string">"main.cmps"</span>, source_text);</code></pre></div><h4 id="evaluating-source-code"><a class="doc-anchor" href="#evaluating-source-code">§</a>Evaluating source code</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>compose::{
+    evaluation::{Machine, eval},
+    library::diag::print_diagnostics,
+    library::repr::Repr,
+    library::Value,
+};
+<span class="kw">use </span>std::process::exit;
+
+
+<span class="kw">let </span>world = ExampleWorld::new(source.clone());
+<span class="kw">let </span><span class="kw-2">mut </span>vm = Machine::new(<span class="kw-2">&amp;</span>world);
+
+<span class="comment">// `eval` evaluates the entrypoint source provided by the `world`.
+</span><span class="kw">let </span>result = eval(<span class="kw-2">&amp;mut </span>vm);
+
+<span class="comment">// Print any warnings
+</span>print_diagnostics(<span class="kw-2">&amp;</span>world, <span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>result.warnings, <span class="bool-val">false</span>).unwrap();
+
+<span class="kw">let </span>value = <span class="kw">match </span>result.value {
+    <span class="prelude-val">Ok</span>(value) =&gt; value,
+    <span class="prelude-val">Err</span>(errors) =&gt; {
+        print_diagnostics(<span class="kw-2">&amp;</span>world, <span class="kw-2">&amp;</span>errors, <span class="kw-2">&amp;</span>[], <span class="bool-val">false</span>).unwrap();
+        exit(<span class="number">1</span>);
+    }
+};
+
+<span class="comment">// Print the resulting value
+</span><span class="macro">println!</span>(<span class="string">"{}"</span>, value.repr(<span class="kw-2">&amp;</span>vm));
+<span class="macro">assert_eq!</span>(Value::Int(<span class="number">5</span>), value);
+</code></pre></div>
+<p>To learn more about embedding Compose in your application, check out the <a href="embedding/index.html" title="mod compose::embedding">embedding</a> documentation.</p>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="cli/index.html" title="mod compose::cli">cli</a></dt><dd>Compose CLI</dd><dt><a class="mod" href="embedding/index.html" title="mod compose::embedding">embedding</a></dt><dd>Embedding Compose</dd><dt><a class="mod" href="implementation/index.html" title="mod compose::implementation">implementation</a></dt><dd>Compose language implementation</dd><dt><a class="mod" href="language/index.html" title="mod compose::language">language</a></dt><dd>Language overview</dd><dt><a class="mod" href="test/index.html" title="mod compose::test">test</a></dt></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.SourceDiagnostic.html" title="struct compose::SourceDiagnostic">Source<wbr>Diagnostic</a></dt><dt><a class="struct" href="struct.Warned.html" title="struct compose::Warned">Warned</a></dt></dl><h2 id="traits" class="section-header">Traits<a href="#traits" class="anchor">§</a></h2><dl class="item-table"><dt><a class="trait" href="trait.World.html" title="trait compose::World">World</a></dt><dd>Defines how Compose interacts with the outside world.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.eval_source.html" title="fn compose::eval_source">eval_<wbr>source</a></dt><dt><a class="fn" href="fn.eval_source_range.html" title="fn compose::eval_source_range">eval_<wbr>source_<wbr>range</a></dt><dd>Eval a source file.</dd></dl><h2 id="types" class="section-header">Type Aliases<a href="#types" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.SourceResult.html" title="type compose::SourceResult">Source<wbr>Result</a></dt></dl></section></div></main></body></html>

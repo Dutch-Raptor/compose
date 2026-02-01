@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["array","bool","boxed","func","int","map","range","str","ty","unit"]};

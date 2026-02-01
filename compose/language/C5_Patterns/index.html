@@ -1,0 +1,62 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Pattern Matching in Compose"><title>compose::language::C5_Patterns - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="compose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module C5_Patterns</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../compose/index.html">compose</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module C5_<wbr>Patterns</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#pattern-matching-in-compose" title="Pattern Matching in Compose">Pattern Matching in Compose</a><ul><li><a href="#destructuring-with-let" title="Destructuring with `let`">Destructuring with <code>let</code></a></li><li><a href="#is-expressions" title="`is` Expressions"><code>is</code> Expressions</a></li><li><a href="#match-expressions" title="`match` Expressions"><code>match</code> Expressions</a></li><li><a href="#destructuring-in-function-parameters" title="Destructuring in Function Parameters">Destructuring in Function Parameters</a></li><li><a href="#summary" title="Summary">Summary</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In compose::<wbr>language</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">compose</a>::<wbr><a href="../index.html">language</a></div><h1>Module <span>C5_<wbr>Patterns</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/compose/language/patterns.rs.html#86">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="pattern-matching-in-compose"><a class="doc-anchor" href="#pattern-matching-in-compose">§</a>Pattern Matching in Compose</h2>
+<p>Compose provides powerful tools for inspecting and decomposing values using
+destructuring, <code>is</code> expressions, and <code>match</code> expressions. These let you
+ergonomically check a value’s structure or type, bind parts of it to variables, and
+conditionally execute code based on patterns.</p>
+<h3 id="destructuring-with-let"><a class="doc-anchor" href="#destructuring-with-let">§</a>Destructuring with <code>let</code></h3>
+<p>You can destructure arrays and other composite values directly in
+<code>let</code> bindings:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>array = [<span class="number">1</span>, <span class="string">"a string"</span>, <span class="number">3</span>];
+<span class="comment">// Destructure first element and the rest of the array
+</span><span class="kw">let </span>[first, ..rest] = array;
+assert::eq(first, <span class="number">1</span>);
+assert::eq(rest.len(), <span class="number">2</span>);
+<span class="kw">let </span>map = { a: <span class="number">1</span>, b: <span class="number">2 </span>};
+<span class="kw">let </span>{ a, b } = map;
+assert::eq(a, <span class="number">1</span>);
+assert::eq(b, <span class="number">2</span>);</code></pre></div>
+<p>Here, <code>first</code> is bound to the first element, and <code>rest</code> captures the remaining elements.</p>
+<h3 id="is-expressions"><a class="doc-anchor" href="#is-expressions">§</a><code>is</code> Expressions</h3>
+<p>Use <code>is</code> to check the structure or type of a value and optionally bind variables
+when the check succeeds:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>array = [<span class="number">1</span>, <span class="string">"a string"</span>, <span class="number">3</span>];
+<span class="kw">if </span>(array is [<span class="kw">_</span>, String s, ..] &amp;&amp; s.len() == <span class="number">8</span>) {
+    assert::eq(s, <span class="string">"a string"</span>); <span class="comment">// s is accessible within the if body
+</span>};</code></pre></div>
+<p>The pattern <code>[_, String s, ..]</code> matches any array whose second element is a string,
+binding it to <code>s</code>.</p>
+<h3 id="match-expressions"><a class="doc-anchor" href="#match-expressions">§</a><code>match</code> Expressions</h3>
+<p><code>match</code> lets you handle multiple patterns and conditions:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>array = [<span class="number">1</span>, <span class="string">"a string"</span>, <span class="number">3</span>];
+<span class="kw">match </span>(array) {
+    [<span class="kw">_</span>, <span class="kw">_</span>] =&gt; <span class="string">"any 2 elements"</span>,
+    [Int x, Int y, ..] =&gt; <span class="string">"array starting with 2 ints, bound to x and y"</span>,
+    [Int x, ..] <span class="kw">if </span>x % <span class="number">2 </span>== <span class="number">0 </span>=&gt; <span class="string">"array starting with an even int, bound to x"</span>,
+    [<span class="number">1</span>, <span class="string">"a string"</span>, ..] =&gt; <span class="string">"array starting with 1 and a string"</span>,
+    other =&gt; <span class="string">"anything else, bound to variable `other`"</span>,
+};</code></pre></div>
+<p>Notes:</p>
+<ul>
+<li>Patterns are checked in order, and the first match is taken.</li>
+<li>Variables bound in a pattern are available in the corresponding branch body.</li>
+<li>Guards (<code>if</code> clauses) can add additional conditions to a pattern.</li>
+</ul>
+<h3 id="destructuring-in-function-parameters"><a class="doc-anchor" href="#destructuring-in-function-parameters">§</a>Destructuring in Function Parameters</h3>
+<p>Patterns can also be used in function parameters for concise extraction:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>array = [<span class="number">1</span>, <span class="string">"a string"</span>, <span class="number">3</span>];
+<span class="kw">let </span>first = { [first, ..] =&gt; first };
+assert::eq(first(array), <span class="number">1</span>);</code></pre></div>
+<p>This defines a function that takes an array, destructures it, and returns the
+first element.</p>
+<h3 id="summary"><a class="doc-anchor" href="#summary">§</a>Summary</h3>
+<ul>
+<li>Use <code>let</code> for destructuring values in local bindings.</li>
+<li>Use <code>is</code> for conditional type/structure checks with optional bindings.</li>
+<li>Use <code>match</code> for multi-case branching with pattern matching.</li>
+<li>Destructuring can also appear in function parameters for concise, readable code.</li>
+</ul>
+</div></details></section></div></main></body></html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="🌍 Overview"><title>compose::language::C1_Overview - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="compose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module C1_Overview</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../compose/index.html">compose</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module C1_<wbr>Overview</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#-overview" title="🌍 Overview">🌍 Overview</a><ul><li><a href="#-statements-in-compose" title="🧱 Statements in Compose">🧱 Statements in Compose</a></li><li><a href="#-expressions-in-compose" title="✨ Expressions in Compose">✨ Expressions in Compose</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In compose::<wbr>language</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">compose</a>::<wbr><a href="../index.html">language</a></div><h1>Module <span>C1_<wbr>Overview</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/compose/language/introduction.rs.html#254">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="-overview"><a class="doc-anchor" href="#-overview">§</a>🌍 Overview</h2><h3 id="-statements-in-compose"><a class="doc-anchor" href="#-statements-in-compose">§</a>🧱 Statements in Compose</h3>
+<p>In Compose, programs are made up of <strong>statements</strong> each one representing a unit of execution. Statements can define variables, modify variables, or perform computations</p>
+<p>Let’s look at the different types of statements Compose supports:</p>
+<hr />
+<h4 id="1-expression-statement"><a class="doc-anchor" href="#1-expression-statement">§</a>1. Expression Statement</h4>
+<p>If you write an expression on its own, it’s treated as a statement. Useful for side effects:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="number">3 </span>+ <span class="number">4</span>;      <span class="comment">// evaluates to 7, but does nothing with it
+</span>println(<span class="string">"hi"</span>); <span class="comment">// prints "hi"</span></code></pre></div>
+<p>Output:</p>
+<div class="example-wrap"><pre class="language-text"><code>hi</code></pre></div>
+<blockquote>
+<p>Statements are always terminated with a semicolon.</p>
+</blockquote>
+<hr />
+<h4 id="2-let-binding"><a class="doc-anchor" href="#2-let-binding">§</a>2. Let Binding</h4>
+<p>To introduce a new variable, use a <code>let</code> statement:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">42</span>;
+<span class="kw">let </span>name = <span class="string">"Compose"</span>;</code></pre></div>
+<p>Let-bindings are <strong>immutable by default</strong>. Once assigned, the value cannot be changed. Compose encourages you to write code that avoids accidental mutation.</p>
+<p>To declare a mutable variable, use <code>let mut</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span><span class="kw-2">mut </span>x = <span class="number">42</span>;
+x = <span class="number">43</span></code></pre></div>
+<hr />
+<h4 id="3-assignment"><a class="doc-anchor" href="#3-assignment">§</a>3. Assignment</h4>
+<p>Assignments are statements that modify the value of an existing variable.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span><span class="kw-2">mut </span>x = <span class="number">42</span>;
+x = <span class="number">43</span>;         <span class="comment">// OK: `x` is mutable</span></code></pre></div><h5 id="modifying-an-immutable-variable-results-in-an-error"><a class="doc-anchor" href="#modifying-an-immutable-variable-results-in-an-error">§</a>Modifying an immutable variable results in an error:</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">1</span>;
+x = <span class="number">2</span>;</code></pre></div>
+<p>Error:</p>
+<div class="example-wrap"><pre class="language-text"><code>error[E0004]: cannot reassign to a variable declared as immutable
+  ┌─ main.comp:2:1
+  │
+1 │ let x = 1;
+  │     - was defined as immutable here
+2 │ x = 2;
+  │ ^ is immutable
+  │
+  = note: variables are immutable by default
+  = help: make the variable mutable by writing `let mut`
+  = help: for more information about this error, try `compose explain E0004`</code></pre></div><h5 id="assigning-to-an-undeclared-variable-results-in-an-error"><a class="doc-anchor" href="#assigning-to-an-undeclared-variable-results-in-an-error">§</a>Assigning to an undeclared variable results in an error:</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>y = <span class="number">4</span>;</code></pre></div>
+<p>Error:</p>
+<div class="example-wrap"><pre class="language-text"><code>error[E0011]: Unbound variable: `y`
+  ┌─ main.comp:1:1
+  │
+1 │ y = 4;
+  │ ^ this variable is unbound here
+  │
+  = help: for more information about this error, try `compose explain E0011`</code></pre></div>
+<blockquote>
+<p>Assignment always targets an existing variable. Compose will give you a helpful error if you try to assign to something undeclared or immutable.</p>
+</blockquote>
+<hr />
+<h3 id="-expressions-in-compose"><a class="doc-anchor" href="#-expressions-in-compose">§</a>✨ Expressions in Compose</h3>
+<p>In Compose, <em>nearly everything is an expression</em>.</p>
+<p>An <strong>expression</strong> is anything that produces a value. This makes expressions the building blocks of the language. You can use them in assignments, as arguments to functions, in conditionals, or simply by themselves.</p>
+<p>Unlike some languages that separate “statements” and “expressions”, Compose makes most constructs expressions—including control flow and blocks—so you can write more flexible and composable code.</p>
+<p>Let’s build up from the basics to more powerful forms.</p>
+<hr />
+<h4 id="1-literals-and-variables"><a class="doc-anchor" href="#1-literals-and-variables">§</a>1️⃣ Literals and Variables</h4>
+<p>The simplest expressions are <strong>literals</strong> and <strong>variable references</strong>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="number">42</span>;            <span class="comment">// number literal
+</span><span class="bool-val">true</span>;          <span class="comment">// boolean literal
+</span><span class="string">"hello"</span>;       <span class="comment">// string literal
+</span><span class="kw">let </span>x = <span class="number">10</span>;
+x;             <span class="comment">// variable reference</span></code></pre></div>
+<hr />
+<h4 id="2-arithmetic-and-logical-operators"><a class="doc-anchor" href="#2-arithmetic-and-logical-operators">§</a>2️⃣ Arithmetic and Logical Operators</h4>
+<p>Compose supports standard operations on values:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">1</span>;
+<span class="kw">let </span>y = <span class="number">2</span>;
+<span class="kw">let </span>z = <span class="number">3</span>;
+<span class="number">1 </span>+ <span class="number">2 </span>* <span class="number">3</span>;
+x - <span class="number">4</span>;
+!<span class="bool-val">true</span>;
+x &gt; <span class="number">5 </span>&amp;&amp; <span class="macro">y !</span>= <span class="number">0</span>;</code></pre></div>
+<p>Operators follow conventional precedence (e.g. multiplication before addition) and can be grouped with parentheses.</p>
+<hr />
+<h4 id="3-function-calls"><a class="doc-anchor" href="#3-function-calls">§</a>3️⃣ Function Calls</h4>
+<p>Functions and closures are called like this:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>add = { x, y =&gt; x + y; };
+print(<span class="string">"hi"</span>);
+add(<span class="number">1</span>, <span class="number">2</span>);</code></pre></div>
+<p>Output:</p>
+<div class="example-wrap"><pre class="language-text"><code>hi</code></pre></div>
+<hr />
+<h4 id="4-blocks-as-expressions"><a class="doc-anchor" href="#4-blocks-as-expressions">§</a>4️⃣ Blocks as Expressions</h4>
+<p>Curly-brace blocks <code>{ ... }</code> let you group multiple expressions. A block <strong>returns the value of its last expression</strong>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>result = {
+    <span class="kw">let </span>y = <span class="number">3</span>;
+    y + <span class="number">1</span>;     <span class="comment">// returns 4
+</span>};
+assert::eq(result, <span class="number">4</span>);</code></pre></div>
+<p>This makes blocks ideal for introducing temporary variables or conditionally computing a value.</p>
+<hr />
+<h4 id="5-if-expressions"><a class="doc-anchor" href="#5-if-expressions">§</a>5️⃣ <code>if</code> Expressions</h4>
+<p>Conditionals in Compose are expressions that produce a value:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a = <span class="number">15</span>;
+<span class="kw">let </span>x = <span class="kw">if </span>(a &gt; <span class="number">10</span>) {
+    <span class="string">"big"</span>;
+} <span class="kw">else </span>{
+    <span class="string">"small"</span>;
+};
+assert::eq(x, <span class="string">"big"</span>);</code></pre></div><h4 id="6-loops-as-expressions"><a class="doc-anchor" href="#6-loops-as-expressions">§</a>6️⃣ Loops as Expressions</h4>
+<p>Both <code>while</code> and <code>for</code> loops can also be used as expressions. You can return a value from a loop using <code>break</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>result = {
+    <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
+    <span class="kw">while </span>(<span class="bool-val">true</span>) {
+        <span class="kw">if </span>(i == <span class="number">5</span>) {
+            <span class="kw">break </span>i * <span class="number">2</span>; <span class="comment">// returns 10
+        </span>};
+        i = i + <span class="number">1</span>;
+    };
+};
+assert::eq(result, <span class="number">10</span>);</code></pre></div>
+<p>If no <code>break</code> with value occurs, the result of the loop is <code>unit</code>.</p>
+<hr />
+<h4 id="7-closures-and-anonymous-functions"><a class="doc-anchor" href="#7-closures-and-anonymous-functions">§</a>7️⃣ Closures and Anonymous Functions</h4>
+<p>Closures are expressions too. You can assign them, pass them, or immediately call them:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>double = { x =&gt; x * <span class="number">2</span>; };
+<span class="kw">let </span>result = double(<span class="number">5</span>);     <span class="comment">// 10
+</span>assert::eq(result, <span class="number">10</span>);</code></pre></div>
+<p>Closures can capture variables by reference if those variables are boxed:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span><span class="kw-2">mut </span>b = <span class="kw">box</span>::new(<span class="number">3</span>);
+<span class="kw">let </span>get = { |<span class="kw-2">ref </span>b| =&gt; <span class="kw-2">*</span>b; };            <span class="comment">// captures `b` by reference
+</span>assert::eq(get(), <span class="number">3</span>);
+<span class="kw-2">*</span>b = <span class="number">6</span>;
+assert::eq(get(), <span class="number">6</span>); <span class="comment">// get() returns the updated value of `b`</span></code></pre></div>
+<p>Closures are first-class values and compose naturally with the rest of the language.</p>
+<hr />
+<h4 id="summary"><a class="doc-anchor" href="#summary">§</a>Summary</h4><div><table><thead><tr><th>Expression Type</th><th>Produces a value?</th><th>Example</th></tr></thead><tbody>
+<tr><td>Literal</td><td>✅</td><td><code>42</code>, <code>"hi"</code></td></tr>
+<tr><td>Variable reference</td><td>✅</td><td><code>x</code></td></tr>
+<tr><td>Arithmetic</td><td>✅</td><td><code>1 + 2 * 3</code></td></tr>
+<tr><td>Function call</td><td>✅</td><td><code>add(1, 2)</code></td></tr>
+<tr><td>Block <code>{ ... }</code></td><td>✅</td><td><code>{ let x = 2; x + 1 }</code></td></tr>
+<tr><td><code>if</code>/<code>else</code></td><td>✅</td><td><code>if (x &gt; 0) { "yes" } else { "no" }</code></td></tr>
+<tr><td><code>while</code> / <code>for</code></td><td>✅ via <code>break</code></td><td><code>while (cond) { break 5; }</code></td></tr>
+<tr><td>Closure</td><td>✅</td><td><code>(x) =&gt; x + 1</code></td></tr>
+</tbody></table>
+</div>
+<p>In Compose, the idea is simple: <strong>if it does something, it probably returns something too.</strong></p>
+<hr />
+<div><table><thead><tr><th>Previous</th><th>Next</th></tr></thead><tbody>
+<tr><td><a href="../index.html" title="mod compose::language">Back</a></td><td><a href="../C2_Variables_and_Scopes/index.html" title="mod compose::language::C2_Variables_and_Scopes">Next: Variables and scopes</a></td></tr>
+</tbody></table>
+</div></div></details></section></div></main></body></html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Macro to assert the structure and content of the parsed syntax tree from source code."><title>assert_parse_tree in compose::implementation::syntax::test_utils - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="compose" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../../../static.files/storage-e2aeef58.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc macro"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">assert_parse_tree</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../compose/index.html">compose</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">assert_<wbr>parse_<wbr>tree</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#purpose" title="Purpose">Purpose</a></li><li><a href="#syntax-overview" title="Syntax Overview">Syntax Overview</a></li><li><a href="#notes" title="Notes">Notes</a></li><li><a href="#example-simple-function-call" title="Example: Simple function call">Example: Simple function call</a></li><li><a href="#example-error-recovery-with-warnings-and-errors" title="Example: Error recovery with warnings and errors">Example: Error recovery with warnings and errors</a></li><li><a href="#example-skipping-subtree-content" title="Example: Skipping subtree content">Example: Skipping subtree content</a></li><li><a href="#common-mistakes" title="Common mistakes">Common mistakes</a></li><li><a href="#see-also" title="See also">See also</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="index.html">In compose::<wbr>implementation::<wbr>syntax::<wbr>test_<wbr>utils</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">compose</a>::<wbr><a href="../../index.html">implementation</a>::<wbr><a href="../index.html">syntax</a>::<wbr><a href="index.html">test_utils</a></div><h1>Macro <span class="macro">assert_<wbr>parse_<wbr>tree</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../../src/compose_syntax/test_utils.rs.html#514">Source</a> </span></div><pre class="rust item-decl"><code>macro_rules! assert_parse_tree {
+    ($src:expr, $($tree:tt)+) =&gt; { ... };
+    (@seq $parser:ident, Warn ( $code:expr ) $($rest:tt)*) =&gt; { ... };
+    (@seq $parser:ident, Error ( $code:expr ) $($rest:tt)*) =&gt; { ... };
+    (@seq $parser:ident, $kind:ident [ $($children:tt)+ ] $($rest:tt)*) =&gt; { ... };
+    (@seq $parser:ident, $kind:ident ( $text:expr ) $($rest:tt)*) =&gt; { ... };
+    (@seq $parser:ident, $kind:ident $($rest:tt)*) =&gt; { ... };
+    (@seq $parser:ident, ...) =&gt; { ... };
+    (@seq $parser:ident,) =&gt; { ... };
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Macro to assert the structure and content of the parsed syntax tree from source code.</p>
+<h2 id="purpose"><a class="doc-anchor" href="#purpose">§</a>Purpose</h2>
+<p><code>assert_parse_tree!</code> allows you to declaratively specify the expected abstract syntax tree (AST)
+shape and tokens produced by your parser for a given source code snippet. It recursively
+matches nodes by their kinds (<code>SyntaxKind</code>) and token text, verifying both the hierarchical
+structure and token lexemes precisely.</p>
+<p>This macro is primarily useful in parser/unit tests where you want to:</p>
+<ul>
+<li>Assert nodes and their nested children are present in expected order.</li>
+<li>Assert leaf tokens have expected text content.</li>
+<li>Assert presence of parser errors and warnings at specific nodes.</li>
+</ul>
+<h2 id="syntax-overview"><a class="doc-anchor" href="#syntax-overview">§</a>Syntax Overview</h2>
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="macro">assert_parse_tree!</span>(
+    <span class="string">"source code string"</span>,
+    RootNodeKind [            <span class="comment">// Node with children
+        </span>ChildNodeKind1 ( <span class="string">"token_text" </span>)  <span class="comment">// Leaf node with exact text
+        </span>ChildNodeKind2 [                  <span class="comment">// Nested node with children
+            </span>...
+        ]
+        Warn(WARNING_CODE)               <span class="comment">// Warning node with an error code enum or const
+        </span>Error(ERROR_CODE)                <span class="comment">// Error node with an error code enum or const
+        </span>...                             <span class="comment">// Ellipsis to skip remaining children in this subtree
+    </span>]
+);</code></pre></div>
+<ul>
+<li><strong>Root node</strong>: The first argument is the source code string to parse.</li>
+<li><strong>Nodes with children</strong>: Use <code>KindName [ ... ]</code> where <code>KindName</code> is a variant of your <code>SyntaxKind</code> enum.</li>
+<li><strong>Leaf tokens</strong>: Use <code>KindName("token_text")</code> where the string is the exact matched source token text.</li>
+<li><strong>Warnings and errors</strong>: Use <code>Warn(WARNING_CODE)</code> and <code>Error(ERROR_CODE)</code> where the code is a known error/warning enum or constant.</li>
+<li><strong>Ellipsis (<code>...</code>)</strong>: Use to ignore remaining children in a node subtree (useful to reduce test verbosity).</li>
+</ul>
+<h2 id="notes"><a class="doc-anchor" href="#notes">§</a>Notes</h2>
+<ul>
+<li><code>KindName</code> must be a variant of your <code>SyntaxKind</code> enum (without the <code>SyntaxKind::</code> prefix).</li>
+<li>Leaf nodes <em>must</em> specify the exact token text as a string literal.</li>
+<li><code>Warn</code> and <code>Error</code> are reserved special nodes recognized by the macro for diagnostics.</li>
+<li>The macro performs strict ordering checks: children must appear in exact order as specified.</li>
+</ul>
+<h2 id="example-simple-function-call"><a class="doc-anchor" href="#example-simple-function-call">§</a>Example: Simple function call</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="macro">compose_syntax::test_utils::assert_parse_tree!</span>(
+    <span class="string">"f(a, b: c)"</span>,
+    FuncCall [
+        Ident(<span class="string">"f"</span>)
+        Args [
+            LeftParen(<span class="string">"("</span>)
+            Ident(<span class="string">"a"</span>)
+            Comma(<span class="string">","</span>)
+            Named [ Ident(<span class="string">"b"</span>) Colon(<span class="string">":"</span>) Ident(<span class="string">"c"</span>) ]
+            RightParen(<span class="string">")"</span>)
+        ]
+    ]
+);</code></pre></div><h2 id="example-error-recovery-with-warnings-and-errors"><a class="doc-anchor" href="#example-error-recovery-with-warnings-and-errors">§</a>Example: Error recovery with warnings and errors</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="macro">compose_syntax::test_utils::assert_parse_tree!</span>(
+    <span class="string">r#"
+    f(a, b, c
+    1 + 2
+    "#</span>,
+    FuncCall [
+        Ident(<span class="string">"f"</span>)
+        Args [
+            LeftParen(<span class="string">"("</span>)
+            Ident(<span class="string">"a"</span>)
+            Comma(<span class="string">","</span>)
+            Ident(<span class="string">"b"</span>)
+            Comma(<span class="string">","</span>)
+            Ident(<span class="string">"c"</span>)
+            Error(compose_error_codes::E0009_ARGS_MISSING_COMMAS)
+            Binary [
+                Int(<span class="string">"1"</span>)
+                Plus(<span class="string">"+"</span>)
+                Int(<span class="string">"2"</span>)
+            ]
+            Error(compose_error_codes::E0001_UNCLOSED_DELIMITER)
+        ]
+    ]
+);</code></pre></div><h2 id="example-skipping-subtree-content"><a class="doc-anchor" href="#example-skipping-subtree-content">§</a>Example: Skipping subtree content</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="macro">compose_syntax::test_utils::assert_parse_tree!</span>(
+    <span class="string">"{ ref mut a =&gt; a }"</span>,
+    Lambda [
+        LeftBrace(<span class="string">"{"</span>)
+        Params [
+            Param [
+                RefKW(<span class="string">"ref"</span>)
+                MutKW(<span class="string">"mut"</span>)
+                Ident(<span class="string">"a"</span>)
+            ]
+        ]
+        ...
+    ]
+);</code></pre></div><h2 id="common-mistakes"><a class="doc-anchor" href="#common-mistakes">§</a>Common mistakes</h2>
+<ul>
+<li>Forgetting to provide the exact token text string for leaf nodes results in a compile error.</li>
+<li>Using <code>Warn</code> or <code>Error</code> as <code>SyntaxKind</code> variants inside children nodes causes errors; they must use the special macro arms.</li>
+</ul>
+<h2 id="see-also"><a class="doc-anchor" href="#see-also">§</a>See also</h2>
+<ul>
+<li><a href="../enum.SyntaxKind.html" title="enum compose::implementation::syntax::SyntaxKind"><code>SyntaxKind</code></a> enum variants — the node/kind names used in this macro.</li>
+<li>Parser error codes for <code>Warn</code> and <code>Error</code> nodes.</li>
+<li><a href="struct.NodesTester.html" title="struct compose::implementation::syntax::test_utils::NodesTester"><code>NodesTester</code></a> struct for underlying test traversal and assertions.</li>
+</ul>
+</div></details></section></div></main></body></html>

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["FuncKind","FuncType"],"struct":["Closure","Func","NativeFuncData","ParamInfo"],"trait":["NativeFunc"]};

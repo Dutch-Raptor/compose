@@ -1,0 +1,34 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="E0304: Type patterns are not allowed in `let` bindings"><title>E0304_TYPE_PATTERNS_NOT_ALLOWED_IN_LET_BINDINGS in compose_error_codes - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="compose_error_codes" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../static.files/storage-e2aeef58.js"></script><script defer src="sidebar-items.js"></script><script defer src="../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc constant"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">E0304_TYPE_PATTERNS_NOT_ALLOWED_IN_LET_BINDINGS</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../compose_error_codes/index.html">compose_<wbr>error_<wbr>codes</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">E0304_<wbr>TYPE_<wbr>PATTERNS_<wbr>NOT_<wbr>ALLOWED_<wbr>IN_<wbr>LET_<wbr>BINDINGS</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#e0304-type-patterns-are-not-allowed-in-let-bindings" title="E0304: Type patterns are not allowed in `let` bindings">E0304: Type patterns are not allowed in <code>let</code> bindings</a><ul><li><a href="#why-this-is-not-allowed" title="Why this is not allowed">Why this is not allowed</a></li><li><a href="#how-to-fix-this" title="How to fix this">How to fix this</a></li><li><a href="#summary" title="Summary">Summary</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="index.html">In crate compose_<wbr>error_<wbr>codes</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="index.html">compose_error_codes</a></div><h1>Constant <span class="constant">E0304_<wbr>TYPE_<wbr>PATTERNS_<wbr>NOT_<wbr>ALLOWED_<wbr>IN_<wbr>LET_<wbr>BINDINGS</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/compose_error_codes/home/runner/work/compose/compose/target/debug/build/compose-error-codes-4d4265df93cb07c3/out/Error_Codes.html#931-935">Source</a> </span></div><pre class="rust item-decl"><code>pub const E0304_TYPE_PATTERNS_NOT_ALLOWED_IN_LET_BINDINGS: <a class="struct" href="struct.ErrorCode.html" title="struct compose_error_codes::ErrorCode">ErrorCode</a>;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h3 id="e0304-type-patterns-are-not-allowed-in-let-bindings"><a class="doc-anchor" href="#e0304-type-patterns-are-not-allowed-in-let-bindings">§</a>E0304: Type patterns are not allowed in <code>let</code> bindings</h3>
+<p>This error occurs when a <code>let</code> binding uses a <em>type pattern</em>, such as:</p>
+<div class="example-wrap"><pre class="language-compose"><code>let Int x = 1;</code></pre></div>
+<p>In Compose, <strong><code>let</code> bindings do not perform type checks</strong>. A binding like <code>let x = value;</code> simply introduces a name and assigns it a value.
+Writing a type before the binding name is <strong>not</strong> treated as a type annotation.</p>
+<h4 id="why-this-is-not-allowed"><a class="doc-anchor" href="#why-this-is-not-allowed">§</a>Why this is not allowed</h4>
+<p>Although Compose supports <em>type patterns</em> (for example <code>Int x</code>), those patterns are only meaningful in contexts where <strong>control flow can branch</strong>, such as <code>match</code> or <code>is</code> expressions. A plain <code>let</code> binding has no way to handle the case where the value does <em>not</em> match the type, so allowing type patterns there would be misleading.</p>
+<p>In other words:</p>
+<ul>
+<li><code>let Int x = ...</code> looks like a static type annotation</li>
+<li>but Compose does not use <code>let</code> for type checking</li>
+<li>and failed type matches must be handled explicitly</li>
+</ul>
+<p>To avoid unexpected runtime errors, type patterns are not allowed in <code>let</code> bindings.</p>
+<h4 id="how-to-fix-this"><a class="doc-anchor" href="#how-to-fix-this">§</a>How to fix this</h4>
+<p>If you simply want to bind a value:</p>
+<div class="example-wrap"><pre class="language-compose"><code>let x = 1;</code></pre></div>
+<p>If you want to <strong>check the type of a value</strong>, use a <code>match</code> expression:</p>
+<div class="example-wrap"><pre class="language-compose"><code># let value = 1;
+match (value) {
+    Int x =&gt; println(x),
+    _ =&gt; panic(&quot;expected an Int&quot;),
+}</code></pre></div>
+<p>Or use an <code>is</code> expression:</p>
+<div class="example-wrap"><pre class="language-compose"><code># let value = 1;
+if (value is Int x) {
+    println(x);
+}</code></pre></div><h4 id="summary"><a class="doc-anchor" href="#summary">§</a>Summary</h4>
+<ul>
+<li><code>let</code> bindings introduce names, they do not check types</li>
+<li><code>let Int x = ...</code> is <strong>not</strong> a type annotation in Compose</li>
+<li>use <code>match</code> or <code>is</code> when you need to branch on a value’s type</li>
+</ul>
+</div></details></section></div></main></body></html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="E0311: Match arm patterns bind different variables"><title>compose_error_codes_doc_tests::DOC_E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="compose_error_codes_doc_tests" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module DOC_E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../compose_error_codes_doc_tests/index.html">compose_<wbr>error_<wbr>codes_<wbr>doc_<wbr>tests</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module DOC_<wbr>E0311_<wbr>MATCH_<wbr>ARM_<wbr>PATTERNS_<wbr>BIND_<wbr>DIFFERENT_<wbr>VARIABLES</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#e0311-match-arm-patterns-bind-different-variables" title="E0311: Match arm patterns bind different variables">E0311: Match arm patterns bind different variables</a><ul><li><a href="#error" title="Error">Error</a></li><li><a href="#meaning" title="Meaning">Meaning</a></li><li><a href="#example" title="Example">Example</a></li><li><a href="#why-this-is-rejected" title="Why this is rejected">Why this is rejected</a></li><li><a href="#fixes" title="Fixes">Fixes</a></li><li><a href="#summary" title="Summary">Summary</a></li></ul></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate compose_<wbr>error_<wbr>codes_<wbr>doc_<wbr>tests</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">compose_error_codes_doc_tests</a></div><h1>Module <span>DOC_<wbr>E0311_<wbr>MATCH_<wbr>ARM_<wbr>PATTERNS_<wbr>BIND_<wbr>DIFFERENT_<wbr>VARIABLES</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/compose_error_codes_doc_tests/home/runner/work/compose/compose/target/debug/build/compose-error-codes-doc-tests-581af9632a3fc0c2/out/Error_Codes.html#1665">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h3 id="e0311-match-arm-patterns-bind-different-variables"><a class="doc-anchor" href="#e0311-match-arm-patterns-bind-different-variables">§</a>E0311: Match arm patterns bind different variables</h3><h4 id="error"><a class="doc-anchor" href="#error">§</a>Error</h4><div class="example-wrap"><pre class="language-text"><code>patterns within a match arm have differing bindings</code></pre></div>
+<hr />
+<h4 id="meaning"><a class="doc-anchor" href="#meaning">§</a>Meaning</h4>
+<p>All patterns joined with <code>|</code> in a <code>match</code> arm share the same body.
+That body must be valid for <strong>every</strong> pattern.</p>
+<p>Therefore, <strong>each pattern must bind the same variables</strong>.</p>
+<hr />
+<h4 id="example"><a class="doc-anchor" href="#example">§</a>Example</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>value = [<span class="number">0</span>,<span class="number">1</span>];
+<span class="kw">match </span>(value) {
+    [<span class="number">0</span>, a] | [<span class="number">1</span>, b] =&gt; a + b
+}</code></pre></div><div class="example-wrap"><pre class="language-text"><code>error[E0311]: patterns within a match arm have differing bindings
+  ┌─ main.comp:3:14
+  │
+3 │     [0, a] | [1, b] =&gt; a + b
+  │              ^^^^^^
+  │
+  = help: all patterns joined with `|` must bind the same variables, because the arm body must work for every pattern
+  = help: pattern bindings mismatch
+      - not bound here: `a`
+      - bound only here: `b`
+  = help: for more information about this error, try `compose explain E0311`</code></pre></div>
+<p>This is invalid:</p>
+<ul>
+<li><code>[0, a]</code> binds <code>a</code></li>
+<li><code>[1, b]</code> binds <code>b</code></li>
+<li>the body requires both</li>
+</ul>
+<p>No execution binds both variables.</p>
+<hr />
+<h4 id="why-this-is-rejected"><a class="doc-anchor" href="#why-this-is-rejected">§</a>Why this is rejected</h4>
+<p>A <code>|</code>-joined arm behaves like multiple patterns with a single body:</p>
+<div class="example-wrap"><pre class="language-text"><code>p1 | p2 =&gt; body</code></pre></div>
+<p>Since <code>body</code> is shared, it may only reference variables bound by <strong>all</strong> patterns.</p>
+<hr />
+<h4 id="fixes"><a class="doc-anchor" href="#fixes">§</a>Fixes</h4>
+<p><strong>Use the same bindings:</strong></p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>value = [<span class="number">0</span>, <span class="number">1</span>];
+<span class="kw">match </span>(value) {
+    [<span class="number">0</span>, x] | [<span class="number">1</span>, x] =&gt; x
+}</code></pre></div>
+<p><strong>Or split the arms:</strong></p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>value = [<span class="number">0</span>, <span class="number">1</span>];
+<span class="kw">match </span>(value) {
+    [<span class="number">0</span>, a] =&gt; a,
+    [<span class="number">1</span>, b] =&gt; b,
+}</code></pre></div>
+<hr />
+<h4 id="summary"><a class="doc-anchor" href="#summary">§</a>Summary</h4>
+<ul>
+<li><code>|</code>-joined patterns must bind identical variables</li>
+<li>the arm body must work for every pattern</li>
+<li>rename bindings or split the arm to resolve the error</li>
+</ul>
+</div></details></section></div></main></body></html>

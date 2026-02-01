@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["NativeTypeData","Type"],"trait":["NativeType"]};

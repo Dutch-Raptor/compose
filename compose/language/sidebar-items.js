@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["C1_Overview","C2_Variables_and_Scopes","C4_Functions_and_closures","C5_Patterns","Error_Codes"]};

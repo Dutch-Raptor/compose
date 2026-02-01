@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["FixDisplay","LabelType","Patch","SyntaxErrorSeverity","SyntaxKind"],"fn":["parse"],"macro":["assert_ast","assert_parse_tree","assert_tokens"],"mod":["ast","test_utils"],"struct":["FileId","Fix","FixBuilder","Label","Lexer","PatchEngine","Source","Span","SyntaxError","SyntaxNode"]};

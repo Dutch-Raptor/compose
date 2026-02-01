@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["FileError","Severity","TracePoint"],"fn":["print_diagnostics","write_diagnostics","write_diagnostics_to_string"],"macro":["bail","eco_format","error","warning"],"struct":["EcoString","SourceDiagnostic","Spanned","UnSpanned","Warned"],"trait":["At","IntoSourceDiagnostic","Trace"],"type":["FileResult","SourceResult","StrResult"]};

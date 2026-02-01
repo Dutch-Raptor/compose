@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["BindingKind","ScopeKind","UnboundItem","VariableAccessError","Visibility"],"static":["EMPTY_SCOPE"],"struct":["Binding","Scope","Scopes","UnBoundError"],"trait":["NativeScope"]};

@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["ecow",[["impl&lt;T: <a class=\"trait\" href=\"https://doc.rust-lang.org/1.93.0/core/clone/trait.Clone.html\" title=\"trait core::clone::Clone\">Clone</a>, const N: <a class=\"primitive\" href=\"https://doc.rust-lang.org/1.93.0/std/primitive.usize.html\">usize</a>&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.93.0/core/convert/trait.TryFrom.html\" title=\"trait core::convert::TryFrom\">TryFrom</a>&lt;<a class=\"struct\" href=\"ecow/vec/struct.EcoVec.html\" title=\"struct ecow::vec::EcoVec\">EcoVec</a>&lt;T&gt;&gt; for <a class=\"primitive\" href=\"https://doc.rust-lang.org/1.93.0/std/primitive.array.html\">[T; N]</a>"]]],["pulldown_cmark",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.93.0/core/convert/trait.TryFrom.html\" title=\"trait core::convert::TryFrom\">TryFrom</a>&lt;&amp;<a class=\"primitive\" href=\"https://doc.rust-lang.org/1.93.0/std/primitive.str.html\">str</a>&gt; for <a class=\"struct\" href=\"pulldown_cmark/struct.InlineStr.html\" title=\"struct pulldown_cmark::InlineStr\">InlineStr</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.93.0/core/convert/trait.TryFrom.html\" title=\"trait core::convert::TryFrom\">TryFrom</a>&lt;<a class=\"primitive\" href=\"https://doc.rust-lang.org/1.93.0/std/primitive.usize.html\">usize</a>&gt; for <a class=\"enum\" href=\"pulldown_cmark/enum.HeadingLevel.html\" title=\"enum pulldown_cmark::HeadingLevel\">HeadingLevel</a>"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[641,799]}
