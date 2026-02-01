@@ -5,6 +5,9 @@ use crate::{parse, Span, SyntaxError, SyntaxNode};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+/// A Compose source file.
+///
+/// Uses reference counting, so it is quite inexpensive to clone
 #[derive(Clone, Debug)]
 pub struct Source(Arc<Repr>);
 

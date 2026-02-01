@@ -21,17 +21,17 @@ pub fn file(args: FileArgs) -> Result<(), CliError> {
 
     let warnings: Vec<_> = source.warnings().into_iter().map(|w| w.into()).collect();
     if !warnings.is_empty() {
-        crate::print_diagnostics(&world, &[], &warnings).unwrap();
+        crate::print_diagnostics(&world, &[], &warnings).expect("failed to print diagnostics");
     }
 
     let Warned { value, warnings } = compose_eval::eval_source(&source, &mut vm);
 
     if let Err(err) = value {
-        crate::print_diagnostics(&world, &err, &warnings).unwrap();
+        crate::print_diagnostics(&world, &err, &warnings).expect("failed to print diagnostics");
         return Err(CliError::Execution);
     }
 
-    crate::print_diagnostics(&world, &[], &warnings).unwrap();
+    crate::print_diagnostics(&world, &[], &warnings).expect("failed to print diagnostics");
 
     Ok(())
 }

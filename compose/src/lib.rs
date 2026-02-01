@@ -81,7 +81,7 @@ impl World for ExampleWorld {
         if file_id == self.main.id() {
             Ok(self.main.clone())
         } else {
-            Err(FileError::NotFound(file_id.path().to_path_buf()))
+            Err(FileError::NotFound(file_id.path().as_path().clone()))
         }
     }
 
@@ -166,7 +166,7 @@ use std::process::exit;
 #         if file_id == self.main.id() {
 #             Ok(self.main.clone())
 #         } else {
-#             Err(FileError::NotFound(file_id.path().to_path_buf()))
+#             Err(FileError::NotFound(file_id.path().as_path().clone()))
 #         }
 #     }
 #
