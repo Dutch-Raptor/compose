@@ -43,8 +43,8 @@ impl VirtualPath {
         self.0.display().to_string()
     }
     
-    pub fn to_path_buf(&self) -> PathBuf {
-        self.0.clone()
+    pub fn as_path(&self) -> &PathBuf {
+        &self.0
     }
 }
 

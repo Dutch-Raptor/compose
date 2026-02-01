@@ -89,8 +89,8 @@ impl SystemWorld {
         }
 
         // try to read from disk
-        let path = file_id.path().0.clone();
-        let text = std::fs::read_to_string(&path).map_err(|e| FileError::from_io(e, &path))?;
+        let path = file_id.path().as_path();
+        let text = std::fs::read_to_string(path).map_err(|e| FileError::from_io(e, path))?;
         let source = Source::new(file_id, text);
         sources.insert(source.id(), source.clone());
         Ok(source)
