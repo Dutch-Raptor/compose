@@ -21,6 +21,7 @@ mod world;
 use compose_utils::ENABLE_TRACE;
 
 #[derive(Debug, clap::Parser)]
+#[command(version)]
 struct Args {
     #[clap(subcommand)]
     pub command: Command,
