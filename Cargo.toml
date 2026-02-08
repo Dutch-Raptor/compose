@@ -14,7 +14,7 @@ members = [
     "compose-doc-macros",
     "compose-doc",
     "compose-codespan-reporting"
-]
+, "compose-types", "compose-resolve"]
 
 default-members = [
     "compose-cli",
@@ -43,6 +43,7 @@ compose-doc-macros = { path = "compose-doc-macros" }
 compose-doc = { path = "compose-doc" }
 compose-codespan-reporting = { path = "compose-codespan-reporting" }
 itertools = "0.14.0"
+fxhash = "0.2.1"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

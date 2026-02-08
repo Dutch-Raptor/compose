@@ -1,0 +1,13 @@
+[package]
+name = "compose-resolve"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+indexmap = {workspace = true}
+compose-syntax = {workspace = true}
+fxhash = {workspace = true}
+ecow = {workspace = true}
+
+[lints]
+workspace = true
