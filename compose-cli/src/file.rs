@@ -16,7 +16,7 @@ pub fn file(args: FileArgs) -> Result<(), CliError> {
     }
 
     if args.print_ast {
-        println!("AST: {:#?}\n", source.nodes());
+        println!("AST: {:#?}\n", source.root_node());
     }
 
     let warnings: Vec<_> = source.warnings().into_iter().map(|w| w.into()).collect();

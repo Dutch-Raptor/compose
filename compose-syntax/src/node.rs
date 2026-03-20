@@ -118,6 +118,13 @@ impl SyntaxNode {
             Repr::Inner(i) => i.children.iter(),
         }
     }
+    
+    pub fn to_children(&self) -> Vec<SyntaxNode> {
+        match &self.0 {
+            Repr::Leaf(_) | Repr::Error(_) => vec![],
+            Repr::Inner(i) => i.children.clone(),
+        }
+    }
 
     /// Convert the node to another kind
     ///

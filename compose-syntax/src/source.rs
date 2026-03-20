@@ -1,7 +1,8 @@
 use crate::file::FileId;
 use crate::node::LinkedNode;
 use crate::parser::parse_with_offset;
-use crate::{parse, Span, SyntaxError, SyntaxNode};
+use crate::{Span, SyntaxError, SyntaxKind, SyntaxNode, parse};
+use std::iter;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -15,7 +16,7 @@ pub struct Source(Arc<Repr>);
 struct Repr {
     id: FileId,
     text: String,
-    nodes: Vec<SyntaxNode>,
+    root_node: SyntaxNode,
     /// The byte indexes of the start of each line
     line_starts: Vec<usize>,
 }
@@ -31,12 +32,12 @@ impl Source {
 
     pub fn new(file_id: FileId, text: String) -> Self {
         let line_starts = line_starts(&text, 0).collect();
-        let nodes = parse(&text, file_id);
+        let root_node = parse(&text, file_id);
         Self(Arc::new(Repr {
             line_starts,
             id: file_id,
             text,
-            nodes,
+            root_node,
         }))
     }
 
@@ -47,17 +48,17 @@ impl Source {
     pub fn text(&self) -> &str {
         &self.0.text
     }
-    
+
     pub fn span_text(&self, span: Span) -> Option<&str> {
         if self.0.id != span.id()? {
             return None;
         }
-        
+
         self.0.text.get(span.range()?)
     }
 
-    pub fn nodes(&self) -> &[SyntaxNode] {
-        &self.0.nodes
+    pub fn root_node(&self) -> &SyntaxNode {
+        &self.0.root_node
     }
 
     pub fn line_starts(&self) -> &[usize] {
@@ -72,32 +73,28 @@ impl Source {
         let inner = Arc::make_mut(&mut self.0);
 
         // parse the newly added text
-        inner
-            .nodes
-            .extend(parse_with_offset(&new_text, id, current_len));
+        let children = inner
+            .root_node
+            .to_children()
+            .into_iter()
+            .chain(iter::once(parse_with_offset(&new_text, id, current_len)))
+            .collect();
+        inner.root_node = SyntaxNode::inner(SyntaxKind::Code, children);
         inner.line_starts = line_starts(&new_text, 0).collect();
         inner.text = new_text;
     }
 
     pub fn warnings(&self) -> Vec<SyntaxError> {
-        self.nodes().iter().flat_map(SyntaxNode::warnings).collect()
+        self.0.root_node.warnings()
     }
 
     pub fn find(&self, span: Span) -> Option<LinkedNode<'_>> {
-        for node in self.nodes() {
-            let linked_node = LinkedNode::new(node);
-            match linked_node.find(span) {
-                Some(node) => return Some(node),
-                None => continue,
-            }
-        }
-
-        None
+        LinkedNode::new(&self.0.root_node).find(span)
     }
 }
 
 pub fn line_starts(source: &str, offset: usize) -> impl '_ + Iterator<Item = usize> {
-    core::iter::once(0).chain(source.match_indices('\n').map(move |(i, _)| i + 1 + offset))
+    iter::once(0).chain(source.match_indices('\n').map(move |(i, _)| i + 1 + offset))
 }
 
 impl AsRef<str> for Source {

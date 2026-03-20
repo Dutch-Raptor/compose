@@ -1,4 +1,5 @@
 mod trace;
+pub mod id;
 
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};

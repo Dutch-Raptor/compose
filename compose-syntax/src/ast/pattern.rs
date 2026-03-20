@@ -133,14 +133,6 @@ pub enum DestructuringItem<'a> {
 }
 
 impl<'a> Spread<'a> {
-    /// The spread expression.
-    ///
-    /// This should only be accessed if this `Spread` is contained in an
-    /// `ArrayItem`, `MapItem`, or `Arg`.
-    pub fn expr(self) -> Expr<'a> {
-        self.0.cast_first()
-    }
-
     /// The sink identifier, if present.
     ///
     /// This should only be accessed if this `Spread` is contained in a

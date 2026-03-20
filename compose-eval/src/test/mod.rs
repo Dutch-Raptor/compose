@@ -151,13 +151,13 @@ pub fn eval_code_with_vm(vm: &mut Machine, world: &TestWorld, input: &str) -> Te
         };
     }
 
-    let len_before_edit = world.entrypoint_src().nodes().len();
+    let len_before_edit = world.entrypoint_src().root_node().children().len();
     world.edit_source(world.entry_point(), |s| {
         s.append(format!("{}{input}", if !s.text().is_empty() { "\n" } else { "" }).as_str())
     });
 
     let source = world.entrypoint_src();
-    let len_after_edit = source.nodes().len();
+    let len_after_edit = source.root_node().children().len();
 
     let Warned { value, warnings } = crate::eval_source_range(
         &source,

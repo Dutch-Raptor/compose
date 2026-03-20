@@ -6,7 +6,7 @@ mod statements;
 
 use crate::file::FileId;
 use crate::kind::SyntaxKind;
-use crate::node::SyntaxNode;
+use crate::node::{SyntaxNode};
 use crate::scanner::Scanner;
 use crate::set::{SyntaxSet, syntax_set};
 use crate::{Lexer, Span, SyntaxError};
@@ -90,7 +90,7 @@ impl ExprContext {
 ///
 /// A vector of [`SyntaxNode`]s representing the parsed statements and any encountered
 /// syntax errors as [`SyntaxError`]s.
-pub fn parse(text: &str, file_id: FileId) -> Vec<SyntaxNode> {
+pub fn parse(text: &str, file_id: FileId) -> SyntaxNode {
     parse_with_offset(text, file_id, 0)
 }
 
@@ -111,12 +111,12 @@ pub fn parse(text: &str, file_id: FileId) -> Vec<SyntaxNode> {
 ///
 /// A vector of [`SyntaxNode`]s representing the parsed statements, including
 /// [`SyntaxError`] for any syntax issues encountered.
-pub fn parse_with_offset(text: &str, file_id: FileId, offset: usize) -> Vec<SyntaxNode> {
+pub fn parse_with_offset(text: &str, file_id: FileId, offset: usize) -> SyntaxNode {
     let mut p = Parser::new(text, offset, file_id);
 
     statements::code(&mut p, syntax_set!(End));
 
-    p.finish()
+    p.finish_into(SyntaxKind::Code)
 }
 
 impl Index<Marker> for Parser<'_> {
@@ -501,6 +501,7 @@ impl<'s> Parser<'s> {
     fn finish_into(self, kind: SyntaxKind) -> SyntaxNode {
         assert!(self.end());
         SyntaxNode::inner(kind, self.finish())
+
     }
 
     #[inline]
@@ -635,7 +636,7 @@ impl<'s> Parser<'s> {
         let from = from.0.min(to);
 
         let children = self.nodes.drain(from..to).collect();
-        self.nodes.insert(from, SyntaxNode::inner(kind, children))
+        self.nodes.insert(from, SyntaxNode::inner(kind, children));
     }
 
     fn lex(lexer: &mut Lexer) -> Token {

@@ -137,29 +137,24 @@ macro_rules! assert_ast {
 pub use assert_ast;
 
 
-pub fn test_parse(code: &str) -> Vec<SyntaxNode> {
+pub fn test_parse(code: &str) -> SyntaxNode {
     let file_id = FileId::new("main.comp");
-    let nodes = crate::parse(code, file_id);
-    nodes
+    crate::parse(code, file_id)
 }
 
 #[track_caller]
 pub fn assert_parse(code: &str) -> NodesTester {
-    let nodes = test_parse(code);
+    let node = test_parse(code);
 
-    let errors = nodes
-        .iter()
-        .flat_map(|node| node.errors())
-        .map(|error| error.code)
-        .collect::<Vec<_>>();
+    let errors = node.errors();
 
     assert_eq!(errors, vec![]);
 
-    NodesTester::new(nodes)
+    NodesTester::new(node.to_children())
 }
 
 pub fn assert_parse_with_warnings(code: &str, expected_warnings: &[ErrorCode]) -> NodesTester {
-    let nodes = test_parse(code);
+    let nodes = test_parse(code).to_children();
     let actual = nodes
         .iter()
         .flat_map(|node| node.warnings())
@@ -184,7 +179,7 @@ pub fn assert_parse_with_warnings(code: &str, expected_warnings: &[ErrorCode]) -
 }
 
 pub fn assert_parse_with_errors(code: &str, expected_errors: &[ErrorCode]) -> NodesTester {
-    let nodes = test_parse(code);
+    let nodes = test_parse(code).to_children();
     let actual = nodes
         .iter()
         .flat_map(|node| node.errors())
@@ -514,7 +509,7 @@ impl NodesTester {
 macro_rules! assert_parse_tree {
     // Entry point
     ($src:expr, $($tree:tt)+) => {{
-        let nodes = $crate::test_utils::test_parse($src);
+        let nodes = $crate::test_utils::test_parse($src).to_children();
         let mut p = $crate::test_utils::NodesTester::new(nodes);
         $crate::test_utils::assert_parse_tree!(@seq p, $($tree)+);
     }};

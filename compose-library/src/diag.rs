@@ -23,6 +23,7 @@ pub fn write_diagnostics(
         let mut diagnostic = match diag.severity {
             Severity::Error => diagnostic::Diagnostic::error(),
             Severity::Warning => diagnostic::Diagnostic::warning(),
+            Severity::Note => diagnostic::Diagnostic::note(),
         }
         .with_message(diag.message.clone())
         .with_labels_iter(
@@ -336,6 +337,24 @@ impl SourceDiagnostic {
         }
     }
 
+    pub fn create_note<S>(span: Span, message: S) -> Self
+    where
+        S: Into<EcoString>,
+    {
+        Self {
+            severity: Severity::Note,
+            span,
+            message: message.into(),
+            label_message: None,
+            trace: eco_vec!(),
+            hints: eco_vec!(),
+            labels: eco_vec!(),
+            notes: eco_vec!(),
+            code: None,
+            fixes: eco_vec!(),
+        }
+    }
+
     pub fn warning(span: Span, message: impl Into<EcoString>) -> Self {
         Self {
             severity: Severity::Warning,
@@ -432,6 +451,7 @@ where
 pub enum Severity {
     Error,
     Warning,
+    Note,
 }
 
 impl From<SyntaxErrorSeverity> for Severity {

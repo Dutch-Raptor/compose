@@ -119,6 +119,7 @@ pub enum SyntaxKind {
     IsKW,
     TypedPattern,
     IsExpression,
+    Code,
 }
 
 impl SyntaxKind {
@@ -149,6 +150,7 @@ impl SyntaxKind {
             SyntaxKind::BreakStatement => "break statement",
             SyntaxKind::CaptureList => "capture group",
             SyntaxKind::Capture => "captured variable",
+            SyntaxKind::Code => "code",
             SyntaxKind::CodeBlock => "code block",
             SyntaxKind::Colon => ":",
             SyntaxKind::ColonColon => "::",

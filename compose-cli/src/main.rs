@@ -11,6 +11,9 @@ use compose_codespan_reporting::term;
 use compose_library::diag::{write_diagnostics, SourceDiagnostic};
 use compose_library::World;
 use std::path::PathBuf;
+use compose_eval::Machine;
+use compose_resolve::{ExprIdTable, NameResolver};
+use compose_resolve::module::{Module, ModuleId};
 
 mod error;
 mod explain;
@@ -19,6 +22,7 @@ mod repl;
 mod world;
 
 use compose_utils::ENABLE_TRACE;
+use crate::world::SystemWorld;
 
 #[derive(Debug, clap::Parser)]
 #[command(version)]
@@ -35,6 +39,7 @@ enum Command {
     Repl(ReplArgs),
     File(FileArgs),
     Explain(ExplainArgs),
+    Resolve(FileArgs),
 }
 
 #[derive(Debug, clap::Parser)]
@@ -79,6 +84,22 @@ fn main() -> Result<(), CliError> {
         Command::Repl(args) => repl::repl(args)?,
         Command::File(args) => file::file(args)?,
         Command::Explain(args) => explain::explain_command(args)?,
+        Command::Resolve(args) => {
+            let file = args.file;
+            let world = SystemWorld::from_file(file)?;
+            let mut vm = Machine::new(&world);
+            let source = world.entry_point_source()?;
+
+            if args.print_ast {
+                println!("{:#?}", source.root_node());
+            }
+
+            let mut expr_ids = ExprIdTable::new();
+            expr_ids.visit_node(source.root_node());
+
+            let mut name_resolver = NameResolver::new(&expr_ids, &world);
+            name_resolver.resolve();
+        }
     }
 
     Ok(())

@@ -152,10 +152,7 @@ pub trait Eval {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated>;
 }
 
-pub fn eval_source(
-    source: &Source,
-    vm: &mut Machine,
-) -> Warned<SourceResult<Value>> {
+pub fn eval_source(source: &Source, vm: &mut Machine) -> Warned<SourceResult<Value>> {
     eval_source_range(source, 0..usize::MAX, vm)
 }
 
@@ -181,10 +178,11 @@ pub fn eval_source_range(
 ) -> Warned<SourceResult<Value>> {
     let mut result = Value::unit();
 
-    let range_start = min(eval_range.start, source.nodes().len());
-    let range_end = min(eval_range.end, source.nodes().len());
+    let nodes = source.root_node().to_children();
+    let range_start = min(eval_range.start, nodes.len());
+    let range_end = min(eval_range.end, nodes.len());
 
-    let nodes = source.nodes().get(range_start..range_end).unwrap();
+    let nodes = nodes.get(range_start..range_end).unwrap();
     let errors = nodes
         .iter()
         .flat_map(|n| n.errors())

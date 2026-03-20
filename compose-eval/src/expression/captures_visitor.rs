@@ -312,7 +312,7 @@ mod tests {
 
         let source = world.entrypoint_src();
         let mut fail = false;
-        for node in source.nodes() {
+        for node in source.root_node().children() {
             let errors = node
                 .errors()
                 .into_iter()

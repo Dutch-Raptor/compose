@@ -35,8 +35,7 @@ impl<'a> Range<'a> {
 mod tests {
     use super::*;
     use crate::assert_ast;
-    use crate::ast::{AstNode, FieldAccess, FuncCall, Int, Parenthesized};
-    use crate::test_utils::test_parse;
+    use crate::ast::{FieldAccess, FuncCall, Int, Parenthesized};
 
     #[test]
     fn test_range_exclusive() {
@@ -56,13 +55,6 @@ mod tests {
 
     #[test]
     fn test_range_inclusive() {
-        let nodes = test_parse("1..=5");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert_eq!(range.start().unwrap().to_text(), "1");
-        assert_eq!(range.end().unwrap().to_text(), "5");
-        assert!(range.is_inclusive());
-
         assert_ast!(
             "1..=5",
             range as Range {
@@ -193,13 +185,6 @@ mod tests {
 
     #[test]
     fn test_nested_ranges() {
-        let nodes = test_parse("(0..10)..20");
-        let range: Range = nodes[0].cast().unwrap();
-
-        assert_eq!(range.start().unwrap().to_text(), "(0..10)");
-        assert_eq!(range.end().unwrap().to_text(), "20");
-        assert!(!range.is_inclusive());
-
         assert_ast!(
             "(0..10)..20",
             range as Range {

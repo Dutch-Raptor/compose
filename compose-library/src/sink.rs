@@ -5,6 +5,7 @@ use crate::diag::SourceDiagnostic;
 #[derive(Default, Debug)]
 pub struct Sink {
     pub warnings: EcoVec<SourceDiagnostic>,
+    pub errors: EcoVec<SourceDiagnostic>,
 }
 
 impl Sink {
@@ -14,5 +15,13 @@ impl Sink {
     
     pub fn take_warnings(&mut self) -> EcoVec<SourceDiagnostic> {
         std::mem::take(&mut self.warnings)
+    }
+
+    pub fn error(&mut self, error: SourceDiagnostic) {
+        self.errors.push(error);
+    }
+
+    pub fn take_errors(&mut self) -> EcoVec<SourceDiagnostic> {
+        std::mem::take(&mut self.errors)
     }
 }

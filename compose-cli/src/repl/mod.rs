@@ -114,8 +114,7 @@ fn handle_repl_commands(vm: &mut Machine, world: &SystemWorld, input: &str) -> O
         }
         ":ast" => {
             let source = entrypoint(world);
-            let nodes = source.nodes();
-            println!("AST: {:#?}\n", nodes);
+            println!("AST: {:#?}\n", source.root_node());
         }
         ":help" => {
             print_help();
@@ -171,7 +170,7 @@ fn eval_initial_pass(vm: &mut Machine, world: &SystemWorld) {
 
     // Evaluate every node in the source, printing any diagnostics along the way.
     // Do not return early if there are any errors, as we want to print all diagnostics.
-    for i in 0..source.nodes().len() {
+    for i in 0..source.root_node().children().len() {
         let Warned { value, warnings } = compose_eval::eval_source_range(&source, i..i + 1, vm);
         crate::print_diagnostics(world, &[], &warnings).unwrap();
         if let Err(err) = value {
@@ -184,24 +183,24 @@ pub fn eval_repl_input(vm: &mut Machine, world: &SystemWorld, input: &str, args:
     if input.is_empty() {
         return;
     }
-    let len_before_edit = entrypoint(world).nodes().len();
+    let len_before_edit = entrypoint(world).root_node().children().len();
     world.edit_source(world.entry_point(), |s| {
         s.append(format!("{}{input}", if !s.text().is_empty() { "\n" } else { "" }).as_str())
     });
 
     let source = entrypoint(world);
-    let len_after_edit = source.nodes().len();
+    let len_after_edit = source.root_node().children().len();
 
     if args.print_tokens {
         print_tokens(input, source.id());
     }
 
+    let nodes = source.root_node().to_children();
     if args.print_ast {
-        let nodes = source.nodes().get(len_before_edit..len_after_edit).unwrap();
-        println!("AST: {:#?}\n", nodes);
+        println!("AST: {:#?}\n", &nodes[len_before_edit..len_after_edit]);
     }
 
-    let syntax_warnings: Vec<_> = source.nodes()[len_before_edit..len_after_edit]
+    let syntax_warnings: Vec<_> = nodes[len_before_edit..len_after_edit]
         .iter()
         .flat_map(|n| n.warnings())
         .map(|w| w.into())
