@@ -72,7 +72,7 @@ pub enum SyntaxKind {
     MinusEq,
     MutKW,
     Named,
-    NewLine,
+    LineBreak,
     Param,
     Params,
     Parenthesized,
@@ -120,6 +120,14 @@ pub enum SyntaxKind {
     TypedPattern,
     IsExpression,
     Code,
+    TypeAnnotation,
+    WhiteSpace,
+}
+
+impl SyntaxKind {
+    pub(crate) fn is_trivia(&self) -> bool {
+        matches!(self, Self::WhiteSpace | Self::Comment)
+    }
 }
 
 impl SyntaxKind {
@@ -213,7 +221,7 @@ impl SyntaxKind {
             SyntaxKind::ImportItem => "import item",
             SyntaxKind::MutKW => "mut",
             SyntaxKind::Named => "named binding",
-            SyntaxKind::NewLine => "newline",
+            SyntaxKind::LineBreak => "newline",
             SyntaxKind::Param => "parameter",
             SyntaxKind::Params => "parameter list",
             SyntaxKind::Parenthesized => "parenthesized expression",
@@ -241,6 +249,7 @@ impl SyntaxKind {
             SyntaxKind::Str => "string literal",
             SyntaxKind::Tilde => "~",
             SyntaxKind::TildeEq => "~=",
+            SyntaxKind::TypeAnnotation => "type",
             SyntaxKind::Lambda => "trailing lambda",
             SyntaxKind::Unary => "unary expression",
             SyntaxKind::Underscore => "_",
@@ -251,6 +260,7 @@ impl SyntaxKind {
             SyntaxKind::MatchArm => "match arm",
             SyntaxKind::MatchExpression => "match expression",
             SyntaxKind::TypedPattern => "type binding pattern",
+            SyntaxKind::WhiteSpace => "whitespace",
         }
     }
 

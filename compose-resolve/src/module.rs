@@ -10,7 +10,7 @@ impl From<NonZeroU64> for ModuleId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Module {
     pub name: EcoString,
     pub id: ModuleId,

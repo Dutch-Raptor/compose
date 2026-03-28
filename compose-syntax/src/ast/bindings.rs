@@ -1,7 +1,7 @@
 use crate::ast::pattern::Pattern;
 use crate::ast::{node, AstNode, Expr, Ident};
 use crate::kind::SyntaxKind;
-use crate::Span;
+use crate::{Span, SyntaxNode};
 
 node! {
     struct LetBinding
@@ -16,8 +16,7 @@ impl<'a> LetBinding<'a> {
         self.0
             .children()
             .skip_while(|n| n.kind() != SyntaxKind::Eq)
-            .nth(1)
-            .and_then(|n| n.cast())
+            .find_map(SyntaxNode::cast)
     }
 
     fn bindings(self) -> Vec<Ident<'a>> {

@@ -1,4 +1,4 @@
 use compose_macros::{ty};
 
-#[ty(cast, title = "Boolean")]
+#[ty(cast)]
 type bool;

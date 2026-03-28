@@ -23,7 +23,7 @@ impl<'a> ModuleImport<'a> {
             .take_while(|n| n.kind() != SyntaxKind::Colon);
         while let Some(child) = children.next() {
             if child.kind() == SyntaxKind::AsKW {
-                return children.next().and_then(SyntaxNode::cast);
+                return children.find_map(SyntaxNode::cast);
             }
         }
 
@@ -60,7 +60,7 @@ mod tests {
     #[test]
     fn simple_module_import() {
         assert_ast! {
-            "import \"foo\";",
+            "import \"foo\"",
             module as ModuleImport {
                 assert_eq!(module.source(), "foo");
                 assert_eq!(module.alias(), None);
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn module_with_alias() {
         assert_ast! {
-            "import \"foo\" as bar;",
+            "import \"foo\" as bar",
             module as ModuleImport {
                 assert_eq!(module.source(), "foo");
                 assert_eq!(module.items().count(), 0);
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn module_with_items() {
         assert_ast! {
-            "import \"foo\" as bar { baz, quz as quux };",
+            "import \"foo\" as bar { baz, quz as quux }",
             module as ModuleImport {
                 assert_eq!(module.source(), "foo");
                 module.items() => [

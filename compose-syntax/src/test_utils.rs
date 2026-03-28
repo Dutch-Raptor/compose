@@ -1,6 +1,6 @@
-use crate::{Lexer, Span, SyntaxError, SyntaxNode};
 use crate::file::FileId;
 use crate::kind::SyntaxKind;
+use crate::{Lexer, Span, SyntaxError, SyntaxNode};
 use compose_error_codes::ErrorCode;
 use extension_traits::extension;
 use std::num::NonZeroU16;
@@ -25,15 +25,27 @@ impl AstTester {
             pos: 0,
         }
     }
+
+    pub fn skip_whitespace(&mut self) {
+        while let Some(node) = self.nodes.get(self.pos)
+            && node.kind().is_trivia()
+        {
+            self.pos += 1;
+        }
+    }
+
+    pub fn advance(&mut self) {
+        self.pos += 1;
+        self.skip_whitespace();
+    }
 }
-
-
 
 #[macro_export]
 macro_rules! assert_ast {
     // Entry point: Parse then pass along to inner calls
     ($code:expr, $($tt:tt)*) => {{
         let mut p = $crate::test_utils::AstTester::new($code);
+        p.skip_whitespace();
         $crate::test_utils::assert_ast!(@top p, $($tt)*);
     }};
 
@@ -41,8 +53,9 @@ macro_rules! assert_ast {
     (@top $tester:ident, $var:ident as $ty:ty { $($inner:tt)* } $($rest:tt)*) => {
         #[allow(unused)]
         use $crate::ast::AstNode;
+        $tester.skip_whitespace();
         let idx = $tester.pos;
-        $tester.pos += 1 ;
+        $tester.advance();
         let node = &$tester.nodes[idx];
         let $var = node
             .cast::<$ty>()
@@ -135,7 +148,6 @@ macro_rules! assert_ast {
 }
 
 pub use assert_ast;
-
 
 pub fn test_parse(code: &str) -> SyntaxNode {
     let file_id = FileId::new("main.comp");
@@ -232,11 +244,15 @@ pub struct NodesTester {
 
 impl NodesTester {
     pub fn new(nodes: Vec<SyntaxNode>) -> Self {
-        Self {
+        let mut instance = Self {
             nodes,
             pos: 0,
             path: vec![],
-        }
+        };
+
+        instance.skip_trivia();
+
+        instance
     }
 
     pub fn with_path(mut self, path: Vec<SyntaxKind>) -> Self {
@@ -244,9 +260,28 @@ impl NodesTester {
         self
     }
 
+    fn advance(&mut self) -> &mut Self {
+        // skip trivia nodes
+        self.pos += 1;
+        self.skip_trivia();
+        self
+    }
+
+    fn skip_trivia(&mut self) {
+        while let Some(node) = self.nodes.get(self.pos)
+            && node.kind().is_trivia() {
+            self.pos += 1;
+        }
+    }
+
     #[track_caller]
     pub fn assert_next(&mut self, kind: SyntaxKind, text: &str) -> &mut Self {
-        let node = self.nodes.get(self.pos).or_else(|| panic!("No more nodes at {:?}. Expected: {kind:?}", self.path)).cloned().unwrap();
+        let node = self
+            .nodes
+            .get(self.pos)
+            .or_else(|| panic!("No more nodes at {:?}. Expected: {kind:?}", self.path))
+            .cloned()
+            .unwrap();
 
         assert_eq!(
             node.kind(),
@@ -265,15 +300,23 @@ impl NodesTester {
             self.path
         );
 
-        self.pos += 1;
-
+        self.advance();
         self
     }
 
-
     #[track_caller]
     pub fn assert_next_warning(&mut self, warning: ErrorCode) -> &mut Self {
-        let node = self.nodes.get(self.pos).or_else(|| panic!("No more nodes at {:?}. Expected warning: {warning:?}", self.path)).cloned().unwrap();
+        let node = self
+            .nodes
+            .get(self.pos)
+            .or_else(|| {
+                panic!(
+                    "No more nodes at {:?}. Expected warning: {warning:?}",
+                    self.path
+                )
+            })
+            .cloned()
+            .unwrap();
 
         assert_eq!(
             node.kind(),
@@ -300,7 +343,7 @@ impl NodesTester {
             self.path
         );
 
-        self.pos += 1;
+        self.advance();
 
         self
     }
@@ -311,7 +354,17 @@ impl NodesTester {
 
     #[track_caller]
     pub fn assert_next_error(&mut self, error: ErrorCode) -> &mut Self {
-        let node = self.nodes.get(self.pos).or_else(|| panic!("No more nodes at {:?}. Expected error: {error:?}", self.path)).cloned().unwrap();
+        let node = self
+            .nodes
+            .get(self.pos)
+            .or_else(|| {
+                panic!(
+                    "No more nodes at {:?}. Expected error: {error:?}",
+                    self.path
+                )
+            })
+            .cloned()
+            .unwrap();
 
         assert_eq!(
             node.kind(),
@@ -338,7 +391,7 @@ impl NodesTester {
             self.path
         );
 
-        self.pos += 1;
+        self.advance();
 
         self
     }
@@ -349,7 +402,12 @@ impl NodesTester {
         kind: SyntaxKind,
         test_children: impl FnOnce(&mut Self),
     ) -> &mut Self {
-        let node = self.nodes.get(self.pos).or_else(|| panic!("No more nodes at {:?}. Expected: {kind:?}", self.path)).cloned().unwrap();
+        let node = self
+            .nodes
+            .get(self.pos)
+            .or_else(|| panic!("No more nodes at {:?}. Expected: {kind:?}", self.path))
+            .cloned()
+            .unwrap();
 
         assert_eq!(
             node.kind(),
@@ -366,7 +424,7 @@ impl NodesTester {
             .with_path(self.path.iter().copied().chain(vec![kind]).collect());
 
         test_children(&mut tester);
-        self.pos += 1;
+        self.advance();
 
         self
     }
@@ -382,7 +440,6 @@ impl NodesTester {
         );
     }
 }
-
 
 /// Macro to assert the structure and content of the parsed syntax tree from source code.
 ///
@@ -560,7 +617,6 @@ macro_rules! assert_parse_tree {
 
 pub use assert_parse_tree;
 
-
 #[extension(pub trait LexerAssert)]
 impl<'a> Lexer<'a> {
     fn assert_next(&mut self, kind: SyntaxKind, text: &str, range: Range<usize>) -> &mut Lexer<'a> {
@@ -594,7 +650,7 @@ impl<'a> Lexer<'a> {
         self
     }
 
-    fn assert_end(&mut self, index: usize) -> &mut Lexer<'a>  {
+    fn assert_end(&mut self, index: usize) -> &mut Lexer<'a> {
         assert_eq!(
             self.next(),
             (

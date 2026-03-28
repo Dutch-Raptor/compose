@@ -82,8 +82,8 @@ impl Lexer<'_> {
     pub fn next(&mut self) -> (SyntaxKind, SyntaxNode) {
         debug_assert!(self.error.is_none());
 
-        self.newline = self.skip_whitespace(self.cursor());
         let start = self.cursor();
+        self.newline = false;
 
         let kind = match self.s.eat() {
             Some(c) => self.kind(start, c),
@@ -102,6 +102,7 @@ impl Lexer<'_> {
 
     fn kind(&mut self, start: usize, c: char) -> SyntaxKind {
         match c {
+            c if is_space(c) => self.whitespace(c),
             '/' if self.s.eat_if('/') => {
                 if self.s.eat_if('/') {
                     self.lex_doc_comment()
@@ -281,23 +282,18 @@ impl Lexer<'_> {
         SyntaxKind::DocComment
     }
 
-    fn skip_whitespace(&mut self, start: usize) -> bool {
-        self.s.eat_while(is_space);
+    fn whitespace(&mut self, c: char) -> SyntaxKind {
+        let more = self.s.eat_while(is_space);
 
-        // count newlines
-        let mut newline_count = 0;
-        let mut s = Scanner::new(self.s.from(start));
-        while let Some(c) = s.eat() {
-            if matches!(c, '\n' | '\x0B' | '\x0C' | '\r') {
-                // Handle \r\n and \r as a single newline.
-                if c == '\r' {
-                    s.eat_if('\n');
-                }
-                newline_count += 1;
-            }
+        if more.is_empty() && c == ' ' {
+            return SyntaxKind::WhiteSpace;
         }
 
-        newline_count > 0
+        let has_newline = more.chars().any(is_newline) || is_newline(c);
+
+        self.newline |= has_newline;
+
+        SyntaxKind::WhiteSpace
     }
 }
 
@@ -343,7 +339,7 @@ fn is_ident_start(c: char) -> bool {
 mod tests {
     use super::*;
     use crate::assert_tokens;
-    use crate::test_utils::{test_file_id, LexerAssert};
+    use crate::test_utils::{LexerAssert, test_file_id};
 
     #[test]
     fn test_int() {
@@ -417,8 +413,9 @@ mod tests {
 
         lexer.assert_next(SyntaxKind::Ident, "a", 0..1);
         assert!(!lexer.newline());
-        lexer.assert_next(SyntaxKind::Ident, "b", 2..3);
+        lexer.assert_next(SyntaxKind::WhiteSpace, "\n", 1..2);
         assert!(lexer.newline());
+        lexer.assert_next(SyntaxKind::Ident, "b", 2..3);
     }
 
     #[test]
@@ -436,6 +433,9 @@ mod tests {
     fn test_comment_kinds() {
         assert_tokens!("// regular comment", Comment("// regular comment", 0..18));
         assert_tokens!("/// doc comment", DocComment("/// doc comment", 0..15));
-        assert_tokens!("/* block\ncomment */", Comment("/* block\ncomment */", 0..19));
+        assert_tokens!(
+            "/* block\ncomment */",
+            Comment("/* block\ncomment */", 0..19)
+        );
     }
 }

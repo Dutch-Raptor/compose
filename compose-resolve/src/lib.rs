@@ -2,23 +2,33 @@ pub mod expr_id;
 pub mod module;
 pub mod scope;
 pub mod symbol;
+pub mod union_find;
 
 use crate::module::{Module, ModuleId};
-use crate::scope::{Frames, Scope, ScopeSource};
+use crate::scope::{Frames, Scope, ScopeId, ScopeSource};
 use crate::symbol::{SymbolKind, SymbolOrigin, SymbolTable, UnresolvedSymbol};
 use compose_library::diag::print_diagnostics;
 use compose_library::sink::Sink;
-use compose_library::{error, SourceDiagnostic, Value, World};
+use compose_library::{SourceDiagnostic, Value, World, error};
 use compose_syntax::ast::{
     Arg, AstNode, Code, DestructuringItem, Expr, Ident, ParamKind, Pattern, Statement,
 };
 use compose_syntax::{Label, Span};
-use compose_utils::defer;
 use compose_utils::id::IdStore;
+use compose_utils::{defer, trace_fn, trace_log};
 use ecow::eco_format;
 pub use expr_id::{ExprId, ExprIdTable};
 use std::ops::DerefMut;
 pub use symbol::{Symbol, SymbolId, SymbolUsage};
+
+pub struct ResolutionResult {
+    pub modules: Vec<Module>,
+    pub symbol_table: SymbolTable,
+    pub sink: Sink,
+    pub usages: Vec<SymbolUsage>,
+    pub unresolved_symbols: Vec<UnresolvedSymbol>,
+    pub scopes: Vec<Scope>,
+}
 
 pub struct NameResolver<'a, 'w> {
     symbol_table: SymbolTable,
@@ -28,6 +38,7 @@ pub struct NameResolver<'a, 'w> {
     symbol_ids: IdStore<SymbolId>,
     modules: Vec<Module>,
     module_ids: IdStore<ModuleId>,
+    scope_ids: IdStore<ScopeId>,
     current_module_idx: usize,
     global: Scope,
     unresolved_symbols: Vec<UnresolvedSymbol>,
@@ -38,6 +49,7 @@ pub struct NameResolver<'a, 'w> {
 impl<'a, 'w> NameResolver<'a, 'w> {
     pub fn new(expr_id_table: &'a ExprIdTable, world: &'w dyn World) -> Self {
         let mut module_ids = IdStore::new();
+        let mut scope_ids = IdStore::new();
 
         let first_module_id = module_ids.next();
 
@@ -52,11 +64,13 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             id: module_ids.next(),
         };
 
+
         let mut instance = Self {
             symbol_table: SymbolTable::new(),
             expr_id_table,
             world,
-            global: Scope::new_lexical(ScopeSource::module(first_module_id), None),
+            global: Scope::new_lexical(scope_ids.next(), ScopeSource::module(first_module_id), None),
+            scope_ids,
             frames: Frames::new(),
             symbol_ids: IdStore::new(),
             module_ids,
@@ -122,6 +136,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
     }
 
     fn bind_symbol_lexical(&mut self, symbol: Symbol) -> &mut Symbol {
+        trace_log!("binding symbol {symbol:?} in lexical scope");
         self.frames
             .bind_lexical(symbol.name.clone(), symbol.symbol_id);
         self.symbol_table.insert(symbol)
@@ -129,15 +144,8 @@ impl<'a, 'w> NameResolver<'a, 'w> {
 
     fn get(&self, name: impl AsRef<str>) -> Option<SymbolId> {
         let name = name.as_ref();
-        if let Some(id) = self.frames.get(name) {
-            return Some(id);
-        }
 
-        if let Some(id) = self.global.get(name) {
-            return Some(id);
-        }
-
-        None
+        self.frames.get(name).or_else(|| self.global.get(name))
     }
 
     fn symbol(&self, id: SymbolId) -> &Symbol {
@@ -162,7 +170,8 @@ impl<'a, 'w> NameResolver<'a, 'w> {
     }
 
     fn bind_symbol_flow(&mut self, symbol: Symbol) -> &mut Symbol {
-        self.frames.bind_flow(symbol.name.clone(), symbol.symbol_id);
+        trace_log!("binding symbol {symbol:?} in flow");
+        self.frames.bind_flow(symbol.name.clone(), symbol.symbol_id).expect("must be in flow scope when calling bind_symbol_flow");
 
         self.symbol_table.insert(symbol)
     }
@@ -181,6 +190,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
                     symbol_id: id,
                     expr_id,
                 });
+                trace_log!("usage of symbol {id:?} {name} in {expr_id:?}");
                 Ok(self.symbol(id))
             }
             None => {
@@ -189,6 +199,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
                     expr_id,
                     self.frames.current().source().clone(),
                 ));
+                trace_log!("unresolved symbol {name} in {expr_id:?}");
                 Err(self
                     .unresolved_symbols
                     .last_mut()
@@ -197,7 +208,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
         }
     }
 
-    pub fn resolve(&mut self) {
+    pub fn resolve(&mut self) -> ResolutionResult {
         let source = self
             .world
             .source(self.world.entry_point())
@@ -208,7 +219,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             .expect("Root node must be a code node");
 
         self.frames
-            .enter_frame(ScopeSource::module(self.current_module_id()));
+            .enter_frame(self.scope_ids.next(), ScopeSource::module(self.current_module_id()));
 
         for stmt in code.statements() {
             self.resolve_statement(stmt);
@@ -273,12 +284,21 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             print_diagnostics(self.world, &[diag], &[], false)
                 .expect("diagnostics must be printed");
         }
+        
+        ResolutionResult {
+            modules: self.modules.clone(),
+            symbol_table: self.symbol_table.clone(),
+            sink: self.sink.clone(),
+            usages: self.symbol_usage.clone(),
+            unresolved_symbols: self.unresolved_symbols.clone(),
+            scopes: self.frames.to_scopes(),
+        }
     }
 
     fn in_flow_guard(&mut self, source: ScopeSource) -> impl DerefMut<Target = Self> {
         let open_flow = !self.frames.in_flow();
         if open_flow {
-            self.frames.enter_flow(source);
+            self.frames.enter_flow(source, self.scope_ids.next());
         }
 
         defer(self, move |this| {
@@ -289,14 +309,14 @@ impl<'a, 'w> NameResolver<'a, 'w> {
     }
 
     fn new_flow_guard(&mut self, source: ScopeSource) -> impl DerefMut<Target = Self> {
-        self.frames.enter_flow(source);
+        self.frames.enter_flow(source, self.scope_ids.next());
         defer(self, |this| {
             this.frames.exit_flow();
         })
     }
 
     fn new_lexical_guard(&mut self, source: ScopeSource) -> impl DerefMut<Target = Self> {
-        self.frames.enter_lexical(source);
+        self.frames.enter_lexical(source, self.scope_ids.next());
         defer(self, |this| {
             this.frames.exit_lexical();
         })
@@ -360,6 +380,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
     }
 
     pub fn resolve_expression(&mut self, expression: Expr<'_>) {
+        trace_fn!("resolve expression", "expression: {}", expression.to_text());
         match expression {
             Expr::Unary(un) => self.resolve_expression(un.expr()),
             Expr::Unit(_) => {}

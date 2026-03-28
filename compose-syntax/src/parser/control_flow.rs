@@ -206,6 +206,7 @@ mod tests {
                         Ident("do_thing")
                         Args [ LeftParen("(") RightParen(")") ]
                     ]
+                    Semicolon(";")
                     RightBrace("}")
                 ]
             ]
@@ -247,6 +248,7 @@ mod tests {
                         Ident("do_thing")
                         Args [ LeftParen("(") RightParen(")") ]
                     ]
+                    Semicolon(";")
                 ]
             ]
         );

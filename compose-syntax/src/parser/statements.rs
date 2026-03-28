@@ -13,6 +13,7 @@ use compose_error_codes::{
 use compose_utils::trace_fn;
 use ecow::eco_format;
 use std::collections::HashSet;
+use crate::parser::ty::parse_type_annotation;
 
 pub(super) fn statement(p: &mut Parser) {
     trace_fn!("parse_statement");
@@ -108,9 +109,13 @@ pub fn let_binding(p: &mut Parser) {
             ));
 
         // eat tokens until we find an `=` or the end of this statement
-        p.recover_until(syntax_set!(Eq, End, NewLine, RightBrace));
+        p.recover_until(syntax_set!(Eq, End, LineBreak, RightBrace));
     } else {
         pattern::pattern(p, false, false, &mut HashSet::new());
+    }
+    
+    if p.eat_if(SyntaxKind::Colon) {
+        parse_type_annotation(p);
     }
 
     if p.eat_if(SyntaxKind::Eq) {
@@ -133,6 +138,7 @@ pub fn let_binding(p: &mut Parser) {
     p.wrap(m, SyntaxKind::LetBinding)
 }
 
+
 pub fn code(p: &mut Parser, end_set: SyntaxSet) {
     let mut pos = p.current_end();
     while !p.end() && !p.at_set(end_set) {
@@ -144,7 +150,7 @@ pub fn code(p: &mut Parser, end_set: SyntaxSet) {
         statement(p);
 
         // Expect the end of an expression. Either a semicolon or a newline.
-        if !p.end() && !p.skip_if(SyntaxKind::Semicolon) && !p.at_set(set::STMT_TERMINATOR) {
+        if !p.end() && !p.eat_if(SyntaxKind::Semicolon) && !p.at_set(set::STMT_TERMINATOR) {
             let mut engine = PatchEngine::new();
             let stmt_span = p
                 .last_node()
@@ -188,6 +194,7 @@ mod tests {
                 Eq("=")
                 Int("1")
             ]
+            Semicolon(";")
         );
     }
 
@@ -201,6 +208,7 @@ mod tests {
                 Eq("=")
                 Int("1")
             ]
+            Semicolon(";")
         );
     }
 
@@ -211,6 +219,7 @@ mod tests {
                 LetKW("let")
                 Ident("x")
             ]
+            Semicolon(";")
         );
     }
 
@@ -222,6 +231,7 @@ mod tests {
                 Eq("=")
                 Int("1")
             ]
+            Semicolon(";")
         );
     }
 
@@ -232,7 +242,7 @@ mod tests {
             r#"
             let x = 1;
             x += x * 2;
-            let y = x
+            let y = x;
             "#,
             // semicolons
             r#"
@@ -248,6 +258,7 @@ mod tests {
                     Eq("=")
                     Int("1")
                 ]
+                Semicolon(";")
                 Assignment [
                     Ident("x")
                     PlusEq("+=")
@@ -257,12 +268,14 @@ mod tests {
                         Int("2")
                     ]
                 ]
+                Semicolon(";")
                 LetBinding [
                     LetKW("let")
                     Ident("y")
                     Eq("=")
                     Ident("x")
                 ]
+                Semicolon(";")
             );
         }
     }
@@ -293,6 +306,23 @@ mod tests {
                 Eq("=")
                 Ident("x")
             ]
+        );
+    }
+    
+    #[test]
+    fn test_parse_let_with_ty() {
+        assert_parse_tree!("let x: i32 = 1;",
+            LetBinding [
+                LetKW("let")
+                Ident("x")
+                Colon(":")
+                TypeAnnotation [
+                    Ident("i32")
+                ]
+                Eq("=")
+                Int("1")
+            ]
+            Semicolon(";")
         );
     }
 }

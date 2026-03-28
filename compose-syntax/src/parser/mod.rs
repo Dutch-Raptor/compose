@@ -3,10 +3,11 @@ mod expressions;
 mod funcs;
 mod pattern;
 mod statements;
+mod ty;
 
 use crate::file::FileId;
 use crate::kind::SyntaxKind;
-use crate::node::{SyntaxNode};
+use crate::node::SyntaxNode;
 use crate::scanner::Scanner;
 use crate::set::{SyntaxSet, syntax_set};
 use crate::{Lexer, Span, SyntaxError};
@@ -242,7 +243,13 @@ impl<'s> Parser<'s> {
     /// Panics if the current token does not match `kind`. Use for invariant assumptions.
     #[track_caller]
     pub(crate) fn assert(&mut self, kind: SyntaxKind) {
-        assert_eq!(self.current(), kind, "Expected {:?} at {:?}", kind, self.token.node);
+        assert_eq!(
+            self.current(),
+            kind,
+            "Expected {:?} at {:?}",
+            kind,
+            self.token.node
+        );
         self.eat();
     }
 
@@ -280,14 +287,23 @@ impl<'s> Parser<'s> {
         self.last_err().unwrap()
     }
 
-    pub(crate) fn insert_error_at(&mut self, span: Span, message: impl Into<EcoString>) -> &mut SyntaxError {
-        let text = span.range().and_then(|r| self.get_text(r)).unwrap_or_default();
+    pub(crate) fn insert_error_at(
+        &mut self,
+        span: Span,
+        message: impl Into<EcoString>,
+    ) -> &mut SyntaxError {
+        let text = span
+            .range()
+            .and_then(|r| self.get_text(r))
+            .unwrap_or_default();
 
-        let error = SyntaxNode::error(
-            SyntaxError::new(message.into(), span),
+        let error = SyntaxNode::error(SyntaxError::new(message.into(), span), text);
+        trace_log!(
+            "inserting error: {:?}, text: {:?}, span: {:?}",
+            error,
             text,
+            span
         );
-        trace_log!("inserting error: {:?}, text: {:?}, span: {:?}", error, text, span);
         self.nodes.push(error);
 
         self.last_err().unwrap()
@@ -394,7 +410,7 @@ impl<'s> Parser<'s> {
     /// can act as a soft boundary and is considered recoverable.
     fn can_recover_with(&self, recover_set: SyntaxSet) -> bool {
         recover_set.contains(self.current())
-            || (recover_set.contains(SyntaxKind::NewLine) && self.had_leading_newline())
+            || (recover_set.contains(SyntaxKind::LineBreak) && self.had_leading_newline())
     }
 
     /// Like `expect_or_recover`, but returns an [ExpectResult] for further error handling.
@@ -477,14 +493,15 @@ impl<'s> Parser<'s> {
         let mut lexer = Lexer::new(text, file_id);
         lexer.jump(offset);
 
-        let token = Self::lex(&mut lexer);
+        let mut nodes = vec![];
+        let token = Self::lex(&mut lexer, &mut nodes);
 
         Self {
             text,
             lexer,
             token,
             balanced: true,
-            nodes: vec![],
+            nodes,
             last_pos: 0,
             memo: Default::default(),
         }
@@ -501,7 +518,6 @@ impl<'s> Parser<'s> {
     fn finish_into(self, kind: SyntaxKind) -> SyntaxNode {
         assert!(self.end());
         SyntaxNode::inner(kind, self.finish())
-
     }
 
     #[inline]
@@ -521,7 +537,9 @@ impl<'s> Parser<'s> {
     }
 
     pub(crate) fn last_node(&self) -> Option<&SyntaxNode> {
-        self.nodes.last()
+        let before_trivia = self.before_trivia();
+
+        self.nodes.get(before_trivia.0.saturating_sub(1))
     }
 
     pub(crate) fn last_node_mut(&mut self) -> Option<&mut SyntaxNode> {
@@ -587,20 +605,17 @@ impl<'s> Parser<'s> {
         Marker(self.nodes.len())
     }
 
+    fn before_trivia(&self) -> Marker {
+        Marker(self.nodes.len() - self.token.n_trivia)
+    }
+
     fn had_leading_newline(&self) -> bool {
         self.token.newline
     }
 
     pub(crate) fn eat(&mut self) {
         self.nodes.push(std::mem::take(&mut self.token.node));
-
-        let mut next = Self::lex(&mut self.lexer);
-        while next.kind == SyntaxKind::Error {
-            self.nodes.push(next.node);
-            next = Self::lex(&mut self.lexer)
-        }
-
-        self.token = next;
+        self.token = Self::lex(&mut self.lexer, &mut self.nodes);
     }
 
     pub(crate) fn eat_if(&mut self, kind: SyntaxKind) -> bool {
@@ -613,7 +628,7 @@ impl<'s> Parser<'s> {
 
     /// Move the parser forward without adding the node to the nodes vec
     pub(crate) fn skip(&mut self) {
-        self.token = Self::lex(&mut self.lexer);
+        self.token = Self::lex(&mut self.lexer, &mut self.nodes);
     }
 
     /// Move the parser forward without adding the node to the nodes vec
@@ -639,21 +654,28 @@ impl<'s> Parser<'s> {
         self.nodes.insert(from, SyntaxNode::inner(kind, children));
     }
 
-    fn lex(lexer: &mut Lexer) -> Token {
+    fn lex(lexer: &mut Lexer, nodes: &mut Vec<SyntaxNode>) -> Token {
         let prev_end = lexer.cursor();
-        let start = prev_end;
+        let mut start = prev_end;
         let (mut kind, mut node) = lexer.next();
+        let mut had_newline = false;
+        let mut n_trivia = 0;
 
-        while kind == SyntaxKind::Comment {
+        while kind.is_trivia() || kind == SyntaxKind::Error {
+            had_newline |= lexer.newline();
+            n_trivia += 1;
+            nodes.push(node);
+            start = lexer.cursor();
             (kind, node) = lexer.next();
         }
 
         Token {
             kind,
             node,
-            newline: lexer.newline(),
+            newline: had_newline,
             start,
             prev_end,
+            n_trivia,
         }
     }
 
@@ -751,4 +773,5 @@ pub(crate) struct Token {
 
     // The index into `text` of the end of the previous token
     pub(crate) prev_end: usize,
+    n_trivia: usize,
 }

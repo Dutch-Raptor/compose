@@ -12,9 +12,8 @@ pub mod test;
 mod vm;
 
 pub use crate::vm::Machine;
-use compose_library::diag::{IntoSourceDiagnostic, SourceDiagnostic, SourceResult, Warned, error};
+use compose_library::diag::{IntoSourceDiagnostic, SourceDiagnostic, SourceResult, Warned};
 use compose_library::{Value, Vm};
-use compose_syntax::ast::Statement;
 use compose_syntax::{Source, Span};
 use ecow::{EcoVec, eco_vec};
 pub use evaluated::Evaluated;
@@ -200,19 +199,14 @@ pub fn eval_source_range(
     }
 
     for node in nodes {
-        let statement: Statement = match node.cast() {
-            Some(expr) => expr,
-            None => {
-                let span = node.span();
-                let err = error!(span, "expected a statement, found {:?}", node);
-
-                return build_err(&syntax_warnings, vm, eco_vec![err]);
-            }
+        let Some(statement) = node.cast::<compose_syntax::ast::Statement>() else {
+            continue;
         };
+
         result = match statement.eval(vm) {
             Ok(value) => value.value,
             Err(err) => return build_err(&syntax_warnings, vm, err),
-        }
+        };
     }
 
     let mut warnings = vm.sink_mut().take_warnings();

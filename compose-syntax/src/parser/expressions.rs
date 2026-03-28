@@ -231,7 +231,7 @@ fn primary_expr(p: &mut Parser, ctx: ExprContext) {
         _ => err_expected_expression(
             p,
             Some(syntax_set!(
-                NewLine,
+                LineBreak,
                 Semicolon,
                 RightBrace,
                 RightParen,
@@ -545,7 +545,7 @@ fn parenthesized(p: &mut Parser) -> bool {
 
     if !p.expect_closing_delimiter(m, SyntaxKind::RightParen) {
         // If the closing parenthesis is missing or incorrect, try to recover
-        p.recover_until(syntax_set!(RightParen, NewLine, Semicolon));
+        p.recover_until(syntax_set!(RightParen, LineBreak, Semicolon));
         p.eat_if(SyntaxKind::RightParen);
         okay = false;
     }
@@ -690,10 +690,12 @@ mod tests {
                     Ident("println")
                     Args [ LeftParen("(") Str("\"hello\"") RightParen(")") ]
                 ]
+                Semicolon(";")
                 FuncCall [
                     Ident("do_other_stuff")
                     Args [ LeftParen("(") RightParen(")") ]
                 ]
+                Semicolon(";")
                 RightBrace("}")
             ]
         );
@@ -713,10 +715,12 @@ mod tests {
                     Ident("println")
                     Args [ LeftParen("(") Str("\"hello\"") RightParen(")") ]
                 ]
+                Semicolon(";")
                 FuncCall [
                     Ident("do_other_stuff")
                     Args [ LeftParen("(") RightParen(")") ]
                 ]
+                Semicolon(";")
                 Error(E0001_UNCLOSED_DELIMITER)
                 RightParen(")")
             ]
@@ -738,6 +742,7 @@ mod tests {
                     RightParen(")")
                 ]
             ]
+            Semicolon(";")
         );
     }
 

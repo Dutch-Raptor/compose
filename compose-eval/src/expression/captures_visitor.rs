@@ -322,7 +322,9 @@ mod tests {
                 print_diagnostics(&TestWorld::new(), &errors, &[]);
                 fail = true;
             }
-            visitor.visit_statement(node.cast::<ast::Statement>().expect("expected a statement"));
+            if let Some(statement) = node.cast::<ast::Statement>() {
+                visitor.visit_statement(statement);
+            }
         }
 
         if fail {

@@ -8,7 +8,7 @@ use {
 fn is_expression() {
     assert_eval(
         r#"
-    let two_is_even = 2 is Int x && x % 2 == 0;
+    let two_is_even = 2 is int x && x % 2 == 0;
 
     assert(two_is_even);
     "#,
@@ -19,7 +19,7 @@ fn is_expression() {
 fn is_expression_flow_scope_does_not_leak() {
     eval_code(
         r#"
-        let two_is_even = 2 is Int x && x % 2 == 0;
+        let two_is_even = 2 is int x && x % 2 == 0;
 
         x; // should not be in scope here
     "#,

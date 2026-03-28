@@ -6,14 +6,13 @@ For the documentation of the Compose language, see [the language docs](compose).
 */
 use crate::error::CliError;
 use clap::Parser;
-use compose_codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use compose_codespan_reporting::term;
+use compose_codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use compose_eval::Machine;
 use compose_library::diag::{write_diagnostics, SourceDiagnostic};
 use compose_library::World;
-use std::path::PathBuf;
-use compose_eval::Machine;
 use compose_resolve::{ExprIdTable, NameResolver};
-use compose_resolve::module::{Module, ModuleId};
+use std::path::PathBuf;
 
 mod error;
 mod explain;
@@ -21,8 +20,8 @@ mod file;
 mod repl;
 mod world;
 
-use compose_utils::ENABLE_TRACE;
 use crate::world::SystemWorld;
+use compose_utils::ENABLE_TRACE;
 
 #[derive(Debug, clap::Parser)]
 #[command(version)]
@@ -87,7 +86,6 @@ fn main() -> Result<(), CliError> {
         Command::Resolve(args) => {
             let file = args.file;
             let world = SystemWorld::from_file(file)?;
-            let mut vm = Machine::new(&world);
             let source = world.entry_point_source()?;
 
             if args.print_ast {

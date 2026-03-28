@@ -143,10 +143,10 @@ mod tests {
             "(1 + 2)..(3 * 4)",
             range as Range {
                 with start: Parenthesized = range.start().unwrap() => {
-                    assert_eq!(start.to_text(), "(1+2)");
+                    assert_eq!(start.to_text(), "(1 + 2)");
                 }
                 with end: Parenthesized = range.end().unwrap() => {
-                    assert_eq!(end.to_text(), "(3*4)");
+                    assert_eq!(end.to_text(), "(3 * 4)");
                 }
                 assert_eq!(range.is_inclusive(), false);
             }

@@ -419,7 +419,12 @@ name = "compose-types"
 version = "0.1.0"
 dependencies = [
  "compose-library",
+ "compose-resolve",
  "compose-syntax",
+ "compose-utils",
+ "ecow",
+ "fxhash",
+ "indexmap",
 ]
 
 [[package]]

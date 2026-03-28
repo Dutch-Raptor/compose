@@ -52,8 +52,8 @@ compose_doc! {
 /// # let array = [1, "a string", 3];
 /// match (array) {
 ///     [_, _] => "any 2 elements",
-///     [Int x, Int y, ..] => "array starting with 2 ints, bound to x and y",
-///     [Int x, ..] if x % 2 == 0 => "array starting with an even int, bound to x",
+///     [int x, int y, ..] => "array starting with 2 ints, bound to x and y",
+///     [int x, ..] if x % 2 == 0 => "array starting with an even int, bound to x",
 ///     [1, "a string", ..] => "array starting with 1 and a string",
 ///     other => "anything else, bound to variable `other`",
 /// };

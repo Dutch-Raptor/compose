@@ -184,19 +184,26 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn next(&mut self) -> Result<Option<SyntaxNode>, EcoString> {
-        match self.lexer.next() {
-            (SyntaxKind::End, _) => Ok(None),
-            (_, node) => {
-                if let Some(delimiter) = Delimiter::from_kind(node.kind()) {
-                    if delimiter.is_opening() {
-                        self.enter(delimiter);
-                    }
-                    if delimiter.is_closing() {
-                        self.exit(delimiter)?;
-                    }
-                }
-                Ok(Some(node))
+        let (mut kind, mut node) = self.lexer.next();
+        loop {
+            if kind.is_trivia() {
+                (kind, node) = self.lexer.next();
+                continue;
             }
+
+            if kind == SyntaxKind::End {
+                return Ok(None);
+            }
+
+            if let Some(delimiter) = Delimiter::from_kind(node.kind()) {
+                if delimiter.is_opening() {
+                    self.enter(delimiter);
+                }
+                if delimiter.is_closing() {
+                    self.exit(delimiter)?;
+                }
+            }
+            return Ok(Some(node));
         }
     }
 }

@@ -75,9 +75,10 @@ impl Source {
         // parse the newly added text
         let children = inner
             .root_node
-            .to_children()
+            .children()
             .into_iter()
-            .chain(iter::once(parse_with_offset(&new_text, id, current_len)))
+            .chain(parse_with_offset(&new_text, id, current_len).children())
+            .cloned()
             .collect();
         inner.root_node = SyntaxNode::inner(SyntaxKind::Code, children);
         inner.line_starts = line_starts(&new_text, 0).collect();

@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use ecow::EcoVec;
 use crate::diag::SourceDiagnostic;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Sink {
     pub warnings: EcoVec<SourceDiagnostic>,
     pub errors: EcoVec<SourceDiagnostic>,

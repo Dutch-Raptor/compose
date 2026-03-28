@@ -5,8 +5,8 @@ let a = [1, 2, 3] is [a, b, c] && a + b + c == 6;
     let a = a + 1 + b;
     a;
 
-    match (a is Int x) {
-        true if true is Bool y => x && y,
+    match (a is int x) {
+        true if true is bool y => x && y,
         false => x,
     }
 
@@ -19,15 +19,15 @@ let a = [1, 2, 3] is [a, b, c] && a + b + c == 6;
     }
 
     let mut b = 4;
-    for (y in 0..b) {
+    for (a in 0..b) {
         b = f(b: b, a, f, y);
     }
-    
+
     b;
-    
+
     if (a is Int x) {
         x;
-    } 
+    }
     else if (a is String x) {
         x;
     }

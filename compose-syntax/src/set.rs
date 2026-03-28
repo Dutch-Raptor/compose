@@ -43,7 +43,7 @@ pub const STMT: SyntaxSet = syntax_set![LetKW].union(ATOMIC_EXPR);
 pub const ARG_RECOVER: SyntaxSet = syntax_set![
     Comma,
     RightParen,
-    NewLine,
+    LineBreak,
 ];
 
 pub const UNARY_OP: SyntaxSet = syntax_set![Plus, Minus, Bang, Tilde, Star];
