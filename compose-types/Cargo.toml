@@ -4,8 +4,14 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-compose-library = { workspace = true }
-compose-syntax = { workspace = true }
+indexmap = {workspace = true}
+compose-syntax = {workspace = true}
+compose-typeinfo = {workspace = true}
+compose-library = {workspace = true}
+compose-utils= {workspace = true}
+compose-resolve = {workspace = true}
+fxhash = {workspace = true}
+ecow = {workspace = true}
 
 [lints]
 workspace = true

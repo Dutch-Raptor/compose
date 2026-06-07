@@ -1,5 +1,6 @@
 use crate::module::ModuleId;
-use crate::{ExprId, SymbolId};
+use crate::ExprId;
+use compose_typeinfo::SymbolId;
 use compose_utils::trace_log;
 use ecow::EcoString;
 use fxhash::FxHashMap;
@@ -59,7 +60,11 @@ impl Scope {
         }
     }
 
-    pub(crate) fn new_lexical(id: ScopeId, scope_source: ScopeSource, parent: Option<ScopeId>) -> Self {
+    pub(crate) fn new_lexical(
+        id: ScopeId,
+        scope_source: ScopeSource,
+        parent: Option<ScopeId>,
+    ) -> Self {
         Self {
             id,
             scope_source,

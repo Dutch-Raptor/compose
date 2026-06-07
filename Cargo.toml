@@ -4,6 +4,7 @@ members = [
     "compose-cli",
     "compose-eval",
     "compose-library",
+    "compose-typeinfo",
     "compose-syntax",
     "compose-editor",
     "compose-macros",
@@ -36,7 +37,9 @@ compose-library = { path = "compose-library" }
 compose-macros = { path = "compose-macros" }
 compose-resolve = { path = "compose-resolve" }
 compose-syntax = { path = "compose-syntax" }
+compose-typeinfo = { path = "compose-typeinfo" }
 compose-utils = { path = "compose-utils" }
+compose-types = { path = "compose-types" }
 compose-error-codes = { path = "compose-error-codes" }
 compose-error-codes-doc-tests = { path = "compose-error-codes-doc-tests" }
 compose-editor = { path = "compose-editor" }
@@ -47,7 +50,6 @@ itertools = "0.14.0"
 fxhash = "0.2.1"
 
 [workspace.lints.rust]
-unsafe_code = "deny"
 unused_must_use = "deny"
 unreachable_pub = "deny"
 #missing_docs = "deny" // enable this later for a full docs pass

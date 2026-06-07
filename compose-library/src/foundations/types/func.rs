@@ -1,21 +1,21 @@
-use crate::diag::{SourceResult, StrResult, bail};
+use crate::diag::{bail, SourceResult, StrResult};
 use crate::foundations::args::Args;
 use crate::vm::Vm;
 use compose_error_codes::E0010_UNCAPTURED_VARIABLE;
-use compose_library::diag::{Spanned, error};
-use compose_macros::{cast, ty};
-use compose_syntax::ast::{AstNode};
-use compose_syntax::{Label, Span, SyntaxNode, ast};
-use compose_utils::Static;
-use ecow::{EcoString, eco_format, eco_vec};
-use std::collections::HashMap;
-use std::fmt;
-use std::sync::LazyLock;
-use tap::Tap;
+use compose_library::diag::{error, Spanned};
 use compose_library::foundations::scope::Scope;
 use compose_library::gc::{Trace, UntypedRef};
 use compose_library::sink::Sink;
 use compose_library::Value;
+use compose_macros::{cast, ty};
+use compose_syntax::ast::AstNode;
+use compose_syntax::{ast, Label, Span, SyntaxNode};
+use compose_utils::Static;
+use ecow::{eco_format, eco_vec, EcoString};
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::LazyLock;
+use tap::Tap;
 
 #[derive(Clone, Debug, PartialEq)]
 #[ty(cast)]
@@ -162,11 +162,16 @@ pub struct NativeFuncData {
     pub name: &'static str,
     pub scope: LazyLock<&'static Scope>,
     pub fn_type: FuncType,
+    pub ty: LazyLock<compose_typeinfo::Ty>,
 }
 
 impl NativeFuncData {
     pub fn call(&self, vm: &mut dyn Vm, mut args: Args) -> SourceResult<Value> {
         (self.closure)(vm, &mut args)
+    }
+
+    pub fn ty(&self) -> &compose_typeinfo::Ty {
+        &self.ty
     }
 }
 
@@ -209,7 +214,9 @@ impl Closure {
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            let (first_name, first_span) = captures.next().expect("unresolved captures was checked to be non-empty");
+            let (first_name, first_span) = captures
+                .next()
+                .expect("unresolved captures was checked to be non-empty");
 
             let mut err = error!(*first_span, "closure uses outer variables that are not captured";
                 label_message: "outer variable `{first_name}` used here";

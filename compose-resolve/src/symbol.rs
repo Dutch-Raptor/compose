@@ -1,33 +1,10 @@
-use std::fmt::Display;
-use crate::ExprId;
 use crate::module::ModuleId;
+use crate::scope::ScopeSource;
+use crate::ExprId;
+use compose_typeinfo::SymbolId;
 use ecow::EcoString;
 use fxhash::FxHashMap;
-use std::num::NonZeroU64;
-use crate::scope::ScopeSource;
-
-/// A unique identifier for a symbol, represented as a `NonZeroU64`.
-///
-/// The `SymbolId` structure is used to uniquely identify symbols within
-/// a system.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct SymbolId(NonZeroU64);
-
-impl From<NonZeroU64> for SymbolId {
-    fn from(value: NonZeroU64) -> Self {
-        Self(value)
-    }
-}
-
-impl SymbolId {
-    pub fn new(id: u64) -> Option<Self> {
-        NonZeroU64::new(id).map(Self)
-    }
-
-    pub fn next(&self) -> Self {
-        Self(self.0.saturating_add(1))
-    }
-}
+use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
@@ -66,7 +43,12 @@ pub struct Symbol {
 }
 
 impl Symbol {
-    pub fn new(name: EcoString, symbol_id: SymbolId, module_id: ModuleId, symbol_origin: SymbolOrigin) -> Self {
+    pub fn new(
+        name: EcoString,
+        symbol_id: SymbolId,
+        module_id: ModuleId,
+        symbol_origin: SymbolOrigin,
+    ) -> Self {
         Self {
             name,
             symbol_id,
@@ -108,14 +90,14 @@ pub enum SymbolOrigin {
     Implicit,
 }
 
-
 impl SymbolOrigin {
     pub fn should_capture(&self) -> bool {
-        matches!(self,
+        matches!(
+            self,
             SymbolOrigin::Local(_)
-            | SymbolOrigin::Capture { .. }
-            | SymbolOrigin::Param(_)
-            | SymbolOrigin::Flow(_)
+                | SymbolOrigin::Capture { .. }
+                | SymbolOrigin::Param(_)
+                | SymbolOrigin::Flow(_)
         )
     }
     pub(crate) fn article(&self) -> &'static str {
@@ -199,7 +181,12 @@ pub struct UnresolvedSymbol {
 
 impl UnresolvedSymbol {
     pub fn new(name: EcoString, expr_id: ExprId, scope_source: ScopeSource) -> Self {
-        Self { name, expr_id, expected_kind: None, scope: scope_source }
+        Self {
+            name,
+            expr_id,
+            expected_kind: None,
+            scope: scope_source,
+        }
     }
 
     pub fn with_expected_kind(&mut self, expected_kind: SymbolKind) -> &mut Self {

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 compose-syntax = { workspace = true }
+compose-typeinfo = { workspace = true }
 compose-macros = { workspace = true }
 compose-utils = { workspace = true }
 compose-error-codes = { workspace = true }

@@ -7,6 +7,7 @@ edition.workspace = true
 indexmap = {workspace = true}
 compose-syntax = {workspace = true}
 compose-library = {workspace = true}
+compose-typeinfo = {workspace = true}
 compose-utils= {workspace = true}
 fxhash = {workspace = true}
 ecow = {workspace = true}

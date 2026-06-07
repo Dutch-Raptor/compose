@@ -3,3 +3,4 @@ syn::custom_keyword!(title);
 syn::custom_keyword!(cast);
 syn::custom_keyword!(scope);
 syn::custom_keyword!(parent);
+syn::custom_keyword!(interface);

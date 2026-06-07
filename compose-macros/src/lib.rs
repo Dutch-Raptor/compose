@@ -2,6 +2,7 @@
 #![allow(unreachable_pub)]
 mod cast;
 mod func;
+mod interface;
 mod kw;
 mod scope;
 mod ty;
@@ -28,6 +29,14 @@ pub fn cast(stream: BoundaryStream) -> BoundaryStream {
 pub fn ty(stream: BoundaryStream, item: BoundaryStream) -> BoundaryStream {
     let item = syn::parse_macro_input!(item as syn::Item);
     ty::ty(stream.into(), &item)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+#[proc_macro_attribute]
+pub fn interface(stream: BoundaryStream, item: BoundaryStream) -> BoundaryStream {
+    let item = syn::parse_macro_input!(item as syn::ItemTrait);
+    interface::interface(stream.into(), &item)
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

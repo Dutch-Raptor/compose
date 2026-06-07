@@ -1,5 +1,6 @@
 use crate::diag::{bail, StrResult};
 use crate::Value;
+use compose_library::foundations::type_info::ComposeDisplay;
 use compose_macros::func;
 use ecow::EcoString;
 use std::io::Write;
@@ -16,14 +17,20 @@ pub fn panic(vm: &mut dyn Vm, msg: Value) -> StrResult<()> {
 }
 
 #[func]
-pub fn print(vm: &mut dyn Vm, #[variadic] print_args: Vec<Value>) -> StrResult<()> {
+pub fn print(
+    vm: &mut dyn Vm,
+    #[variadic(interface = ComposeDisplay)] print_args: Vec<Value>,
+) -> StrResult<()> {
     vm.engine()
         .world
         .write(&mut |wtr: &mut dyn Write| write!(wtr, "{}", join_args(&print_args, vm)))
         .map_err(|e| e.to_string().into())
 }
 #[func]
-pub fn println(vm: &mut dyn Vm, #[variadic] print_args: Vec<Value>) -> StrResult<()> {
+pub fn println(
+    vm: &mut dyn Vm,
+    #[variadic(interface = ComposeDisplay)] print_args: Vec<Value>,
+) -> StrResult<()> {
     vm.engine()
         .world
         .write(&mut |wtr: &mut dyn Write| writeln!(wtr, "{}", join_args(&print_args, vm)))

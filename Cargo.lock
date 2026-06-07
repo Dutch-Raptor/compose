@@ -280,6 +280,7 @@ dependencies = [
  "compose-library",
  "compose-resolve",
  "compose-syntax",
+ "compose-types",
  "compose-utils",
  "indoc",
  "parking_lot 0.12.4",
@@ -373,6 +374,7 @@ dependencies = [
  "compose-error-codes",
  "compose-macros",
  "compose-syntax",
+ "compose-typeinfo",
  "compose-utils",
  "ecow",
  "indexmap",
@@ -396,6 +398,7 @@ version = "0.1.0"
 dependencies = [
  "compose-library",
  "compose-syntax",
+ "compose-typeinfo",
  "compose-utils",
  "ecow",
  "fxhash",
@@ -415,12 +418,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "compose-typeinfo"
+version = "0.1.0"
+dependencies = [
+ "compose-syntax",
+ "ecow",
+]
+
+[[package]]
 name = "compose-types"
 version = "0.1.0"
 dependencies = [
  "compose-library",
  "compose-resolve",
  "compose-syntax",
+ "compose-typeinfo",
  "compose-utils",
  "ecow",
  "fxhash",

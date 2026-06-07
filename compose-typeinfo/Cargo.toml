@@ -1,0 +1,11 @@
+[package]
+name = "compose-typeinfo"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+compose-syntax = { workspace = true }
+ecow = { workspace = true }
+
+[lints]
+workspace = true

@@ -19,6 +19,7 @@ mod index_access;
 mod pattern;
 mod match_expression;
 mod code;
+pub mod ty;
 
 use ecow::EcoString;
 use crate::node::SyntaxNode;

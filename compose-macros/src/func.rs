@@ -1,6 +1,7 @@
 use crate::kw;
 use crate::util::{
     bail, documentation, foundations, has_attr, parse_flag, parse_key_value, parse_string,
+    take_attr,
 };
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
@@ -86,9 +87,13 @@ fn create_func_data(func: &Func) -> TokenStream {
     };
 
     let closure = create_wrapper_closure(func);
+    let ty = create_type_info(func);
 
     let fn_type = match special.self_ {
-        Some(Param { binding: Binding::RefMut, ..}) => quote! { #foundations::types::func::FuncType::MethodMut },
+        Some(Param {
+            binding: Binding::RefMut,
+            ..
+        }) => quote! { #foundations::types::func::FuncType::MethodMut },
         Some(_) => quote! { #foundations::types::func::FuncType::Method },
         None => quote! { #foundations::types::func::FuncType::Associated },
     };
@@ -100,9 +105,114 @@ fn create_func_data(func: &Func) -> TokenStream {
             name: #name,
             closure: #closure,
             scope: ::std::sync::LazyLock::new(|| #scope),
-            fn_type: #fn_type
+            fn_type: #fn_type,
+            ty: ::std::sync::LazyLock::new(|| #ty),
         }
     }
+}
+
+fn create_type_info(func: &Func) -> TokenStream {
+    let ret = ty_tokens(&func.return_type);
+    let mut fixed_params = Vec::new();
+
+    for param in &func.params {
+        if param.variadic {
+            let variadic = match &param.interface {
+                Some(interface) => interface_ty_tokens(interface),
+                None => ty_tokens(&param.ty),
+            };
+
+            return quote! {
+                ::compose_typeinfo::Ty::VariadicFn {
+                    params: vec![#(#fixed_params),*],
+                    variadic: Box::new(#variadic),
+                    ret: Box::new(#ret),
+                }
+            };
+        }
+
+        fixed_params.push(ty_tokens(&param.ty));
+    }
+
+    quote! {
+        ::compose_typeinfo::Ty::Fn(vec![#(#fixed_params),*], Box::new(#ret))
+    }
+}
+
+fn interface_ty_tokens(interface: &Type) -> TokenStream {
+    match interface {
+        Type::Path(_) => quote! {
+            <dyn #interface as #foundations::type_info::NativeInterface>::interface_ty()
+        },
+        _ => quote! {
+            <#interface as #foundations::type_info::NativeInterface>::interface_ty()
+        },
+    }
+}
+
+fn ty_tokens(ty: &Type) -> TokenStream {
+    match ty {
+        Type::Tuple(tuple) if tuple.elems.is_empty() => quote! { ::compose_typeinfo::Ty::Unit },
+        Type::Reference(reference) => ty_tokens(&reference.elem),
+        Type::Path(path) => {
+            let Some(segment) = path.path.segments.last() else {
+                return quote! { ::compose_typeinfo::Ty::Error };
+            };
+            let ident = &segment.ident;
+            let name = ident.to_string();
+
+            match name.as_str() {
+                "bool" => quote! { ::compose_typeinfo::Ty::Bool },
+                "i64" | "usize" => quote! { ::compose_typeinfo::Ty::Int },
+                "f64" => quote! { ::compose_typeinfo::Ty::Float },
+                "EcoString" | "String" | "Str" => quote! { ::compose_typeinfo::Ty::Str },
+                "Value" => quote! { ::compose_typeinfo::Ty::Error },
+                "StrResult" | "SourceResult" => first_generic_ty(segment)
+                    .map(|inner| ty_tokens(inner))
+                    .unwrap_or_else(|| quote! { ::compose_typeinfo::Ty::Error }),
+                "Option" => first_generic_ty(segment)
+                    .map(|inner| {
+                        let inner = ty_tokens(inner);
+                        quote! {
+                            ::compose_typeinfo::Ty::App(
+                                ::compose_typeinfo::TypeName::std("Option"),
+                                vec![#inner],
+                            )
+                        }
+                    })
+                    .unwrap_or_else(|| quote! { ::compose_typeinfo::Ty::Error }),
+                "Vec" => first_generic_ty(segment)
+                    .map(|inner| {
+                        let inner = ty_tokens(inner);
+                        quote! {
+                            ::compose_typeinfo::Ty::App(
+                                ::compose_typeinfo::TypeName::std("Array"),
+                                vec![#inner],
+                            )
+                        }
+                    })
+                    .unwrap_or_else(|| quote! { ::compose_typeinfo::Ty::Error }),
+                _ => quote! {
+                    ::compose_typeinfo::Ty::App(
+                        ::compose_typeinfo::TypeName::std(stringify!(#ident)),
+                        Vec::new(),
+                    )
+                },
+            }
+        }
+        _ => quote! { ::compose_typeinfo::Ty::Error },
+    }
+}
+
+fn first_generic_ty(segment: &syn::PathSegment) -> Option<&Type> {
+    let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+        return None;
+    };
+
+    args.args.iter().find_map(|arg| match arg {
+        syn::GenericArgument::Type(ty) => Some(ty),
+        _ => None,
+    })
 }
 
 fn create_wrapper_closure(func: &Func) -> TokenStream {
@@ -212,6 +322,7 @@ struct Param {
     /// The name of the param as defined in Compose
     name: String,
     variadic: bool,
+    interface: Option<Type>,
     named: bool,
     docs: String,
 }
@@ -310,6 +421,7 @@ fn parse_param(
                 docs: documentation(&recv.attrs),
                 name: "self".to_string(),
                 variadic: false,
+                interface: None,
                 named: false,
             });
             return Ok(());
@@ -329,6 +441,7 @@ fn parse_param(
         "vm" => special_params.vm = true,
         _ => {
             let mut attrs = typed.attrs.clone();
+            let variadic = take_variadic(&mut attrs)?;
 
             params.push(Param {
                 binding: Binding::Owned,
@@ -336,13 +449,41 @@ fn parse_param(
                 ty: *typed.ty.clone(),
                 name: ident.to_string(),
                 docs: documentation(&attrs),
-                variadic: has_attr(&mut attrs, "variadic"),
+                variadic: variadic.is_some(),
+                interface: variadic.flatten(),
                 named: has_attr(&mut attrs, "named"),
             });
         }
     }
 
     Ok(())
+}
+
+fn take_variadic(attrs: &mut Vec<syn::Attribute>) -> Result<Option<Option<Type>>> {
+    let Some(attr) = take_attr(attrs, "variadic") else {
+        return Ok(None);
+    };
+
+    match attr.meta {
+        syn::Meta::Path(_) => Ok(Some(None)),
+        syn::Meta::List(list) => {
+            let meta: VariadicMeta = syn::parse2(list.tokens)?;
+            Ok(Some(meta.interface))
+        }
+        syn::Meta::NameValue(_) => bail!(attr.meta, "invalid variadic attribute"),
+    }
+}
+
+struct VariadicMeta {
+    interface: Option<Type>,
+}
+
+impl Parse for VariadicMeta {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        Ok(Self {
+            interface: parse_key_value::<kw::interface, Type>(input)?,
+        })
+    }
 }
 
 fn determine_name(ident: &Ident, name: Option<String>) -> String {

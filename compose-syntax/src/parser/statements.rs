@@ -1,6 +1,7 @@
 use crate::fix::FixBuilder;
 use crate::kind::SyntaxKind;
 use crate::parser::expressions::{code_expr_prec, code_expression};
+use crate::parser::ty::parse_type_annotation;
 use crate::parser::Parser;
 use crate::parser::{pattern, ExprContext};
 use crate::precedence::Precedence;
@@ -13,7 +14,6 @@ use compose_error_codes::{
 use compose_utils::trace_fn;
 use ecow::eco_format;
 use std::collections::HashSet;
-use crate::parser::ty::parse_type_annotation;
 
 pub(super) fn statement(p: &mut Parser) {
     trace_fn!("parse_statement");
@@ -113,7 +113,7 @@ pub fn let_binding(p: &mut Parser) {
     } else {
         pattern::pattern(p, false, false, &mut HashSet::new());
     }
-    
+
     if p.eat_if(SyntaxKind::Colon) {
         parse_type_annotation(p);
     }
@@ -125,11 +125,14 @@ pub fn let_binding(p: &mut Parser) {
         p.insert_error_before("expected `=` after binding name")
             .with_label_message("expected `=` here")
             .with_code(&E0007_MISSING_EQUALS_AFTER_LET_BINDING)
-            .with_hint(eco_format!("if you meant to initialize the binding, add `=`: `let {}{} = ...`",
+            .with_hint(eco_format!(
+                "if you meant to initialize the binding, add `=`: `let {}{} = ...`",
                 if was_mut { "mut " } else { "" },
                 pattern_text,
             ))
-            .with_hint(eco_format!("if you meant to leave it uninitialized, add a semicolon: `let {pattern_text};`"));
+            .with_hint(eco_format!(
+                "if you meant to leave it uninitialized, add a semicolon: `let {pattern_text};`"
+            ));
 
         // Assume that the user meant to initialize the binding.
         code_expression(p);
@@ -137,7 +140,6 @@ pub fn let_binding(p: &mut Parser) {
 
     p.wrap(m, SyntaxKind::LetBinding)
 }
-
 
 pub fn code(p: &mut Parser, end_set: SyntaxSet) {
     let mut pos = p.current_end();
@@ -160,8 +162,7 @@ pub fn code(p: &mut Parser, end_set: SyntaxSet) {
                 .insert_after(&stmt_span, ";")
                 .expect("only one patch will be added, so no conflicts");
 
-            p
-                .insert_error_before("expected a semicolon after a statement")
+            p.insert_error_before("expected a semicolon after a statement")
                 .with_code(&E0006_UNTERMINATED_STATEMENT)
                 .with_fix(
                     FixBuilder::new("write a semicolon to terminate this statement", stmt_span)
@@ -308,7 +309,7 @@ mod tests {
             ]
         );
     }
-    
+
     #[test]
     fn test_parse_let_with_ty() {
         assert_parse_tree!("let x: i32 = 1;",
@@ -321,6 +322,31 @@ mod tests {
                 ]
                 Eq("=")
                 Int("1")
+            ]
+            Semicolon(";")
+        );
+    }
+
+    #[test]
+    fn test_parse_let_with_generic_ty() {
+        assert_parse_tree!("let xs: Array<Int> = [];",
+            LetBinding [
+                LetKW("let")
+                Ident("xs")
+                Colon(":")
+                TypeAnnotation [
+                    Ident("Array")
+                    Lt("<")
+                    TypeAnnotation [
+                        Ident("Int")
+                    ]
+                    Gt(">")
+                ]
+                Eq("=")
+                Array [
+                    LeftBracket("[")
+                    RightBracket("]")
+                ]
             ]
             Semicolon(";")
         );

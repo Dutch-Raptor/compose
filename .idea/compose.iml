@@ -22,6 +22,7 @@
       <sourceFolder url="file://$MODULE_DIR$/compose-error-codes-doc-tests/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/compose-resolve/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/compose-types/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/compose-typeinfo/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

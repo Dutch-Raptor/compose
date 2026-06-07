@@ -2,24 +2,26 @@ pub mod expr_id;
 pub mod module;
 pub mod scope;
 pub mod symbol;
-pub mod union_find;
 
 use crate::module::{Module, ModuleId};
 use crate::scope::{Frames, Scope, ScopeId, ScopeSource};
 use crate::symbol::{SymbolKind, SymbolOrigin, SymbolTable, UnresolvedSymbol};
 use compose_library::diag::print_diagnostics;
 use compose_library::sink::Sink;
-use compose_library::{SourceDiagnostic, Value, World, error};
+use compose_library::{error, SourceDiagnostic, Value, World};
+use compose_syntax::ast::ty::TypeAnnotation;
 use compose_syntax::ast::{
     Arg, AstNode, Code, DestructuringItem, Expr, Ident, ParamKind, Pattern, Statement,
 };
 use compose_syntax::{Label, Span};
+pub use compose_typeinfo::SymbolId;
 use compose_utils::id::IdStore;
 use compose_utils::{defer, trace_fn, trace_log};
 use ecow::eco_format;
 pub use expr_id::{ExprId, ExprIdTable};
+use fxhash::FxHashMap;
 use std::ops::DerefMut;
-pub use symbol::{Symbol, SymbolId, SymbolUsage};
+pub use symbol::{Symbol, SymbolUsage};
 
 pub struct ResolutionResult {
     pub modules: Vec<Module>,
@@ -28,6 +30,7 @@ pub struct ResolutionResult {
     pub usages: Vec<SymbolUsage>,
     pub unresolved_symbols: Vec<UnresolvedSymbol>,
     pub scopes: Vec<Scope>,
+    pub expr_to_symbol: FxHashMap<ExprId, SymbolId>,
 }
 
 pub struct NameResolver<'a, 'w> {
@@ -36,6 +39,7 @@ pub struct NameResolver<'a, 'w> {
     world: &'w dyn World,
     frames: Frames,
     symbol_ids: IdStore<SymbolId>,
+    expr_to_symbol: FxHashMap<ExprId, SymbolId>,
     modules: Vec<Module>,
     module_ids: IdStore<ModuleId>,
     scope_ids: IdStore<ScopeId>,
@@ -44,6 +48,7 @@ pub struct NameResolver<'a, 'w> {
     unresolved_symbols: Vec<UnresolvedSymbol>,
     symbol_usage: Vec<SymbolUsage>,
     sink: Sink,
+    emit_diagnostics: bool,
 }
 
 impl<'a, 'w> NameResolver<'a, 'w> {
@@ -64,12 +69,15 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             id: module_ids.next(),
         };
 
-
         let mut instance = Self {
             symbol_table: SymbolTable::new(),
             expr_id_table,
             world,
-            global: Scope::new_lexical(scope_ids.next(), ScopeSource::module(first_module_id), None),
+            global: Scope::new_lexical(
+                scope_ids.next(),
+                ScopeSource::module(first_module_id),
+                None,
+            ),
             scope_ids,
             frames: Frames::new(),
             symbol_ids: IdStore::new(),
@@ -79,6 +87,8 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             modules: vec![global_module, module],
             symbol_usage: vec![],
             sink: Sink::default(),
+            expr_to_symbol: FxHashMap::default(),
+            emit_diagnostics: true,
         };
 
         // build the global scope
@@ -113,6 +123,10 @@ impl<'a, 'w> NameResolver<'a, 'w> {
         instance
     }
 
+    pub fn set_emit_diagnostics(&mut self, emit_diagnostics: bool) {
+        self.emit_diagnostics = emit_diagnostics;
+    }
+
     fn current_module_id(&self) -> ModuleId {
         self.modules[self.current_module_idx].id
     }
@@ -137,6 +151,11 @@ impl<'a, 'w> NameResolver<'a, 'w> {
 
     fn bind_symbol_lexical(&mut self, symbol: Symbol) -> &mut Symbol {
         trace_log!("binding symbol {symbol:?} in lexical scope");
+
+        if let Some(expr_id) = symbol.symbol_origin.expr_id() {
+            self.expr_to_symbol.insert(expr_id, symbol.symbol_id);
+        }
+
         self.frames
             .bind_lexical(symbol.name.clone(), symbol.symbol_id);
         self.symbol_table.insert(symbol)
@@ -171,7 +190,14 @@ impl<'a, 'w> NameResolver<'a, 'w> {
 
     fn bind_symbol_flow(&mut self, symbol: Symbol) -> &mut Symbol {
         trace_log!("binding symbol {symbol:?} in flow");
-        self.frames.bind_flow(symbol.name.clone(), symbol.symbol_id).expect("must be in flow scope when calling bind_symbol_flow");
+
+        if let Some(expr_id) = symbol.symbol_origin.expr_id() {
+            self.expr_to_symbol.insert(expr_id, symbol.symbol_id);
+        }
+
+        self.frames
+            .bind_flow(symbol.name.clone(), symbol.symbol_id)
+            .expect("must be in flow scope when calling bind_symbol_flow");
 
         self.symbol_table.insert(symbol)
     }
@@ -190,6 +216,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
                     symbol_id: id,
                     expr_id,
                 });
+                self.expr_to_symbol.insert(expr_id, id);
                 trace_log!("usage of symbol {id:?} {name} in {expr_id:?}");
                 Ok(self.symbol(id))
             }
@@ -218,8 +245,10 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             .cast::<Code<'_>>()
             .expect("Root node must be a code node");
 
-        self.frames
-            .enter_frame(self.scope_ids.next(), ScopeSource::module(self.current_module_id()));
+        self.frames.enter_frame(
+            self.scope_ids.next(),
+            ScopeSource::module(self.current_module_id()),
+        );
 
         for stmt in code.statements() {
             self.resolve_statement(stmt);
@@ -229,20 +258,22 @@ impl<'a, 'w> NameResolver<'a, 'w> {
 
         let mut sorted_unresolved = self.unresolved_symbols.clone();
         sorted_unresolved.sort_by(|a, b| a.expr_id.cmp(&b.expr_id));
-        for unresolved in self.unresolved_symbols.iter() {
-            let span = self
-                .expr_id_table
-                .get_span(unresolved.expr_id)
-                .expect("span to exist");
-            let name = unresolved.name.clone();
+        if self.emit_diagnostics {
+            for unresolved in self.unresolved_symbols.iter() {
+                let span = self
+                    .expr_id_table
+                    .get_span(unresolved.expr_id)
+                    .expect("span to exist");
+                let name = unresolved.name.clone();
 
-            let diag = SourceDiagnostic::error(span, eco_format!("unresolved symbol `{name}`"));
-            print_diagnostics(self.world, &[diag], &[], false)
+                let diag = SourceDiagnostic::error(span, eco_format!("unresolved symbol `{name}`"));
+                print_diagnostics(self.world, &[diag], &[], false)
+                    .expect("diagnostics must be printed");
+            }
+
+            print_diagnostics(self.world, &self.sink.errors, &self.sink.warnings, false)
                 .expect("diagnostics must be printed");
         }
-
-        print_diagnostics(self.world, &self.sink.errors, &self.sink.warnings, false)
-            .expect("diagnostics must be printed");
 
         let mut symbols = self.symbol_table.iter().collect::<Vec<_>>();
         symbols.sort_by_key(|(id, _)| *id);
@@ -281,10 +312,12 @@ impl<'a, 'w> NameResolver<'a, 'w> {
                 )
             }));
 
-            print_diagnostics(self.world, &[diag], &[], false)
-                .expect("diagnostics must be printed");
+            if self.emit_diagnostics {
+                print_diagnostics(self.world, &[diag], &[], false)
+                    .expect("diagnostics must be printed");
+            }
         }
-        
+
         ResolutionResult {
             modules: self.modules.clone(),
             symbol_table: self.symbol_table.clone(),
@@ -292,6 +325,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             usages: self.symbol_usage.clone(),
             unresolved_symbols: self.unresolved_symbols.clone(),
             scopes: self.frames.to_scopes(),
+            expr_to_symbol: self.expr_to_symbol.clone(),
         }
     }
 
@@ -323,9 +357,30 @@ impl<'a, 'w> NameResolver<'a, 'w> {
     }
 
     fn resolve_type(&mut self, ident: Ident<'_>) {
-        let Ok(symbol) = self.record_usage(ident) else {
+        let name = ident.get();
+        let expr_id = self
+            .expr_id_table
+            .get_expr_id(ident.span())
+            .expect("span to exist in exprId table");
+        let symbol_id = self
+            .get(name.as_str())
+            .or_else(|| primitive_type_alias(name.as_str()).and_then(|alias| self.get(alias)));
+
+        let Some(symbol_id) = symbol_id else {
+            self.unresolved_symbols.push(UnresolvedSymbol::new(
+                name.clone(),
+                expr_id,
+                self.frames.current().source().clone(),
+            ));
+            trace_log!("unresolved type symbol {name} in {expr_id:?}");
             return;
         };
+
+        self.symbol_usage.push(SymbolUsage { symbol_id, expr_id });
+        self.expr_to_symbol.insert(expr_id, symbol_id);
+        trace_log!("usage of type symbol {symbol_id:?} {name} in {expr_id:?}");
+
+        let symbol = self.symbol(symbol_id);
 
         if let SymbolKind::Type = symbol.symbol_kind {
             return;
@@ -345,7 +400,14 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             "expected a type, but found {origin_kind} `{name}`";
             label_message: "`{name}` is used as a type here";
             label: Label::secondary(origin_span, eco_format!("`{name}` was defined here as a {origin_kind}"))
-        ))
+            ))
+    }
+
+    fn resolve_type_annotation(&mut self, annotation: TypeAnnotation<'_>) {
+        self.resolve_type(annotation.ident());
+        for arg in annotation.args() {
+            self.resolve_type_annotation(arg);
+        }
     }
 
     pub fn resolve_pattern(&mut self, pat: Pattern<'_>, bind: &mut impl Fn(&mut Self, Ident<'_>)) {
@@ -420,9 +482,8 @@ impl<'a, 'w> NameResolver<'a, 'w> {
                 self.resolve_expression(call.callee());
             }
             Expr::FieldAccess(access) => self.resolve_expression(access.target()),
-            Expr::PathAccess(_) => {
-                // TODO: This will require doing module resolution and stuff
-                unimplemented!("implement module resolution")
+            Expr::PathAccess(path) => {
+                self.resolve_expression(path.target());
             }
             Expr::Parenthesized(par) => self.resolve_expression(par.expr()),
             Expr::Conditional(cond) => {
@@ -678,6 +739,10 @@ impl<'a, 'w> NameResolver<'a, 'w> {
                     self.resolve_expression(init);
                 }
 
+                if let Some(ty_annotation) = let_binding.type_annotation() {
+                    self.resolve_type_annotation(ty_annotation)
+                }
+
                 let bindings = let_binding.pattern().bindings();
                 for binding in bindings {
                     self.bind_ident_lexical(
@@ -690,10 +755,28 @@ impl<'a, 'w> NameResolver<'a, 'w> {
                 self.resolve_expression(assign.lhs());
                 self.resolve_expression(assign.rhs());
             }
-            Statement::Break(_) => {}
-            Statement::Return(_) => {}
+            Statement::Break(break_) => {
+                if let Some(value) = break_.value() {
+                    self.resolve_expression(value);
+                }
+            }
+            Statement::Return(ret) => {
+                if let Some(value) = ret.value() {
+                    self.resolve_expression(value);
+                }
+            }
             Statement::Continue(_) => {}
             Statement::ModuleImport(_) => {}
         }
+    }
+}
+
+fn primitive_type_alias(name: &str) -> Option<&'static str> {
+    match name {
+        "Int" | "i32" | "i64" => Some("int"),
+        "Bool" => Some("bool"),
+        "Str" | "str" => Some("String"),
+        "Unit" | "unit" => Some("()"),
+        _ => None,
     }
 }
