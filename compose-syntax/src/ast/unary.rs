@@ -15,7 +15,9 @@ impl<'a> Unary<'a> {
             .unwrap_or(UnOp::Plus)
     }
 
-    pub fn expr(self) -> Expr<'a> { self.0.cast_last() }
+    pub fn expr(self) -> Expr<'a> {
+        self.0.cast_last()
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -59,4 +61,3 @@ impl PrecedenceTrait for UnOp {
         }
     }
 }
-

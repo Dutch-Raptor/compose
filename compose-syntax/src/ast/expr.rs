@@ -1,13 +1,16 @@
+use crate::SyntaxNode;
 use crate::ast::atomics::Unit;
 use crate::ast::control_flow::Conditional;
 use crate::ast::map::MapLiteral;
 use crate::ast::match_expression::MatchExpression;
 use crate::ast::range::Range;
 use crate::ast::unary::Unary;
-use crate::ast::{Array, AstNode, Binary, ForLoop, Ident, IndexAccess, Int, IsExpression, Lambda, Parenthesized, WhileLoop};
+use crate::ast::{
+    Array, AstNode, Binary, ForLoop, Ident, IndexAccess, Int, IsExpression, Lambda, Parenthesized,
+    WhileLoop,
+};
 use crate::ast::{Bool, CodeBlock, FieldAccess, FuncCall, PathAccess, Str};
 use crate::kind::SyntaxKind;
-use crate::SyntaxNode;
 
 /// An expression. The base of Compose. Any "statement" is an expression.
 ///
@@ -70,7 +73,9 @@ impl<'a> AstNode<'a> for Expr<'a> {
             SyntaxKind::MapLiteral => Some(Self::Map(MapLiteral::from_untyped(node)?)),
             SyntaxKind::Lambda => Some(Self::Lambda(Lambda::from_untyped(node)?)),
             SyntaxKind::IndexAccess => Some(Self::IndexAccess(IndexAccess::from_untyped(node)?)),
-            SyntaxKind::MatchExpression => Some(Self::MatchExpression(MatchExpression::from_untyped(node)?)),
+            SyntaxKind::MatchExpression => {
+                Some(Self::MatchExpression(MatchExpression::from_untyped(node)?))
+            }
             SyntaxKind::IsExpression => Some(Self::IsExpression(IsExpression::from_untyped(node)?)),
             _ => None,
         }

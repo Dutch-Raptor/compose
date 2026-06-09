@@ -49,7 +49,7 @@ impl<R: Renderer> Editor<R> {
         self.buf = Rope::from_reader(reader)?;
         Ok(())
     }
-    
+
     pub fn contents(&self) -> String {
         self.buf.to_string()
     }
@@ -127,7 +127,7 @@ impl<R> Editor<R> {
     }
 
     /// Get a character iterator of the current line.
-    pub fn curr_ln_chars(&self) -> impl Iterator<Item=char> + '_ {
+    pub fn curr_ln_chars(&self) -> impl Iterator<Item = char> + '_ {
         trimmed(self.buf.line(self.focus.ln)).chars()
     }
 

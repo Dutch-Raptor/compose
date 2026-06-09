@@ -5,11 +5,11 @@
 //! cargo run --example term
 //! ```
 
-use compose_codespan_reporting as codespan_reporting;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term::termcolor::StandardStream;
 use codespan_reporting::term::{self, ColorArg};
+use compose_codespan_reporting as codespan_reporting;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -97,16 +97,16 @@ fn main() -> anyhow::Result<()> {
         Diagnostic::error()
             .with_message("unknown builtin: `NATRAL`")
             .with_labels(vec![
-                Label::primary(file_id1, 96..102).with_message("unknown builtin")
+                Label::primary(file_id1, 96..102).with_message("unknown builtin"),
             ])
             .with_notes(vec![
-                "there is a builtin with a similar name: `NATURAL`".to_owned()
+                "there is a builtin with a similar name: `NATURAL`".to_owned(),
             ]),
         // Unused parameter warning
         Diagnostic::warning()
             .with_message("unused parameter pattern: `n₂`")
             .with_labels(vec![
-                Label::primary(file_id1, 285..289).with_message("unused parameter")
+                Label::primary(file_id1, 285..289).with_message("unused parameter"),
             ])
             .with_notes(vec!["consider using a wildcard pattern: `_`".to_owned()]),
         // Unexpected type error

@@ -4,7 +4,7 @@ use compose_codespan_reporting::{
         Diagnostic, Label, Severity, SpannedNote, Subdiagnostic, Suggestion, SuggestionPart,
     },
     files::{SimpleFile, SimpleFiles},
-    term::{termcolor::Color, Chars, Config, DisplayStyle, Styles}
+    term::{Chars, Config, DisplayStyle, Styles, termcolor::Color},
 };
 
 mod support;

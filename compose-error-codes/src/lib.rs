@@ -9,7 +9,7 @@ pub struct ErrorCode {
     /// The error name (e.g. `InvalidCharacter`)
     pub name: &'static str,
     /// The error description
-    /// 
+    ///
     /// A markdown string that explains the error and how it can be avoided.
     pub description: &'static str,
 }
@@ -17,5 +17,5 @@ pub struct ErrorCode {
 impl Debug for ErrorCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}({})", self.code, self.name)
-    }   
+    }
 }

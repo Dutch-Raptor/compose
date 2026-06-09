@@ -1,6 +1,6 @@
 use crate::repr::separated_list;
-use compose_library::{foundations::types::Type, Value};
-use ecow::{eco_format, EcoString};
+use compose_library::{Value, foundations::types::Type};
+use ecow::{EcoString, eco_format};
 use std::fmt::Write;
 
 pub trait Reflect {

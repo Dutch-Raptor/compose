@@ -1,11 +1,11 @@
+use crate::evaluated::Evaluated;
 use crate::{Eval, Machine};
-use compose_library::diag::{bail, SourceResult};
+use compose_library::diag::{SourceResult, bail};
+use compose_library::foundations::types::MapValue;
 use compose_library::{Value, Vm};
 use compose_syntax::ast;
 use compose_syntax::ast::{AstNode, Expr};
 use std::collections::HashMap;
-use compose_library::foundations::types::MapValue;
-use crate::evaluated::Evaluated;
 
 impl Eval for ast::MapLiteral<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

@@ -1,16 +1,12 @@
 use crate::world::DocWorld;
-use compose_eval::{Machine};
+use compose_eval::Machine;
 use compose_library::diag::{SourceDiagnostic, Warned};
-
 
 pub(crate) fn eval_code(code: &str) -> EvalResult {
     let world = DocWorld::from_str(code);
     let mut vm = Machine::new(&world);
 
-    let Warned { value, warnings } = compose_eval::eval_source(
-        &world.source,
-        &mut vm,
-    );
+    let Warned { value, warnings } = compose_eval::eval_source(&world.source, &mut vm);
 
     let stdout = world.stdout.lock().expect("failed to lock stdout").clone();
 

@@ -1,9 +1,9 @@
+use crate::diag::SourceResult;
+use compose_library::Value;
 use compose_library::engine::Engine;
 use compose_library::foundations::args::Args;
 use compose_library::foundations::types::Func;
 use compose_library::gc::Heap;
-use compose_library::Value;
-use crate::diag::SourceResult;
 
 pub trait Vm<'a> {
     fn heap(&self) -> &Heap;

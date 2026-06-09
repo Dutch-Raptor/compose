@@ -1,8 +1,8 @@
-use crate::ast::macros::node;
-use crate::ast::{CodeBlock, Expr};
-use crate::ast::pattern::Pattern;
-use crate::kind::SyntaxKind;
 use crate::SyntaxNode;
+use crate::ast::macros::node;
+use crate::ast::pattern::Pattern;
+use crate::ast::{CodeBlock, Expr};
+use crate::kind::SyntaxKind;
 
 node! {
     struct Conditional
@@ -103,8 +103,8 @@ impl<'a> Condition<'a> {
 mod tests {
     use super::*;
     use crate::assert_ast;
-    use crate::ast::{FuncCall, Ident};
     use crate::ast::Str;
+    use crate::ast::{FuncCall, Ident};
 
     #[test]
     fn test_for_loop() {

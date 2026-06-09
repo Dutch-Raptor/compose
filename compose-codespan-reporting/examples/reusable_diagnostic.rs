@@ -1,8 +1,8 @@
-
-use compose_codespan_reporting as codespan_reporting;use codespan_reporting::diagnostic::{Diagnostic, Label};
+use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::StandardStream;
 use codespan_reporting::term::{self, ColorArg};
+use compose_codespan_reporting as codespan_reporting;
 use std::ops::Range;
 use structopt::StructOpt;
 

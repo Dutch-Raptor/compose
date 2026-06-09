@@ -1,18 +1,20 @@
+use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
 use crate::expression::captures_visitor::CapturesVisitor;
-use crate::expression::pattern::{destructure_pattern, PatternContext, PatternMatchResult};
+use crate::expression::pattern::{PatternContext, PatternMatchResult, destructure_pattern};
 use crate::vm::{FlowEvent, TrackedContainer};
 use crate::{Eval, Machine};
-use compose_library::diag::{bail, error, IntoSourceDiagnostic, SourceResult, Spanned};
-use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind, Pattern};
-use compose_syntax::{ast, Label};
-use ecow::EcoVec;
+use compose_library::Value;
+use compose_library::diag::{IntoSourceDiagnostic, SourceResult, Spanned, bail, error};
 use compose_library::foundations::args::Args;
 use compose_library::foundations::cast::IntoValue;
-use compose_library::foundations::scope::{Binding, BindingKind, Scope, VariableAccessError, Visibility};
+use compose_library::foundations::scope::{
+    Binding, BindingKind, Scope, VariableAccessError, Visibility,
+};
 use compose_library::foundations::types::Func;
 use compose_library::foundations::types::func::Closure;
-use compose_library::Value;
-use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
+use compose_syntax::ast::{AstNode, Expr, Ident, Param, ParamKind, Pattern};
+use compose_syntax::{Label, ast};
+use ecow::EcoVec;
 
 impl Eval for ast::Lambda<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -317,5 +319,4 @@ mod tests {
         "#,
         );
     }
-
 }

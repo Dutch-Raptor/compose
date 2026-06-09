@@ -10,12 +10,14 @@ impl<'a> Assignment<'a> {
     pub fn lhs(self) -> Expr<'a> {
         self.0.cast_first()
     }
-    
+
     pub fn op(self) -> AssignOp {
-        self.0.children().find_map(|n| AssignOp::from_kind(n.kind()))
+        self.0
+            .children()
+            .find_map(|n| AssignOp::from_kind(n.kind()))
             .unwrap_or(AssignOp::Assign)
     }
-    
+
     pub fn rhs(self) -> Expr<'a> {
         self.0.cast_last()
     }
@@ -47,18 +49,33 @@ impl AssignOp {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::assert_ast;
     use crate::ast::{Ident, Int};
-    use super::*;
 
     #[test]
     fn test_assign_op() {
         assert_eq!(AssignOp::from_kind(SyntaxKind::Eq), Some(AssignOp::Assign));
-        assert_eq!(AssignOp::from_kind(SyntaxKind::PlusEq), Some(AssignOp::AddAssign));
-        assert_eq!(AssignOp::from_kind(SyntaxKind::MinusEq), Some(AssignOp::SubAssign));
-        assert_eq!(AssignOp::from_kind(SyntaxKind::StarEq), Some(AssignOp::MulAssign));
-        assert_eq!(AssignOp::from_kind(SyntaxKind::SlashEq), Some(AssignOp::DivAssign));
-        assert_eq!(AssignOp::from_kind(SyntaxKind::AmpersandEq), Some(AssignOp::ModAssign));
+        assert_eq!(
+            AssignOp::from_kind(SyntaxKind::PlusEq),
+            Some(AssignOp::AddAssign)
+        );
+        assert_eq!(
+            AssignOp::from_kind(SyntaxKind::MinusEq),
+            Some(AssignOp::SubAssign)
+        );
+        assert_eq!(
+            AssignOp::from_kind(SyntaxKind::StarEq),
+            Some(AssignOp::MulAssign)
+        );
+        assert_eq!(
+            AssignOp::from_kind(SyntaxKind::SlashEq),
+            Some(AssignOp::DivAssign)
+        );
+        assert_eq!(
+            AssignOp::from_kind(SyntaxKind::AmpersandEq),
+            Some(AssignOp::ModAssign)
+        );
     }
 
     #[test]

@@ -39,11 +39,6 @@ impl VarNamer {
             .unwrap_or_else(|| format!("?T{}", var.0))
     }
 
-    /// Returns true if this variable has an explicit source name.
-    pub fn has_name(&self, var: TypeVar) -> bool {
-        self.names.contains_key(&var)
-    }
-
     /// Returns true if this variable is tied to a clear source binding.
     pub fn has_source_name(&self, var: TypeVar) -> bool {
         self.source_names.contains(&var)

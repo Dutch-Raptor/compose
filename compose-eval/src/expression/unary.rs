@@ -1,11 +1,11 @@
 use crate::access::Access;
+use crate::evaluated::Evaluated;
 use crate::{Eval, Machine};
-use compose_library::diag::{bail, At, SourceResult, StrResult};
-use compose_library::{Value};
+use compose_library::Value;
+use compose_library::diag::{At, SourceResult, StrResult, bail};
 use compose_library::foundations::ops;
 use compose_library::gc::Heap;
 use compose_syntax::ast::{AstNode, UnOp, Unary};
-use crate::evaluated::Evaluated;
 
 impl Eval for Unary<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

@@ -1,9 +1,9 @@
 use compose_error_codes::E0012_PREDICATE_MUST_RETURN_BOOLEAN;
 use compose_library::diag::{SourceResult, bail, error};
-use std::iter;
+use compose_library::foundations::args::Args;
 use compose_library::foundations::types::Func;
 use compose_library::{Value, Vm};
-use compose_library::foundations::args::Args;
+use std::iter;
 
 pub fn eval_predicate(
     vm: &mut dyn Vm,
@@ -32,7 +32,11 @@ pub fn eval_predicate(
     }
 }
 
-pub fn eval_func(vm: &mut dyn Vm, func: &Func, args: impl IntoIterator<Item = Value>) -> SourceResult<Value> {
+pub fn eval_func(
+    vm: &mut dyn Vm,
+    func: &Func,
+    args: impl IntoIterator<Item = Value>,
+) -> SourceResult<Value> {
     func.call(vm, Args::new(func.span, args))
 }
 

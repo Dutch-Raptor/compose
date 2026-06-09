@@ -1,8 +1,8 @@
-use crate::ast::{Assignment, AstNode, Expr, LetBinding};
+use crate::SyntaxNode;
 use crate::ast::macros::node;
 use crate::ast::module::ModuleImport;
+use crate::ast::{Assignment, AstNode, Expr, LetBinding};
 use crate::kind::SyntaxKind;
-use crate::SyntaxNode;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Statement<'a> {
@@ -12,20 +12,26 @@ pub enum Statement<'a> {
     Break(BreakStatement<'a>),
     Return(ReturnStatement<'a>),
     Continue(ContinueStatement<'a>),
-    ModuleImport(ModuleImport<'a>)
+    ModuleImport(ModuleImport<'a>),
 }
 
 impl<'a> AstNode<'a> for Statement<'a> {
     fn from_untyped(node: &'a SyntaxNode) -> Option<Self> {
         match node.kind() {
             SyntaxKind::LetBinding => Some(Statement::Let(LetBinding::from_untyped(node)?)),
-            SyntaxKind::Assignment => {
-                Some(Statement::Assign(Assignment::from_untyped(node)?))
+            SyntaxKind::Assignment => Some(Statement::Assign(Assignment::from_untyped(node)?)),
+            SyntaxKind::BreakStatement => {
+                Some(Statement::Break(BreakStatement::from_untyped(node)?))
             }
-            SyntaxKind::BreakStatement => Some(Statement::Break(BreakStatement::from_untyped(node)?)),
-            SyntaxKind::ReturnStatement => Some(Statement::Return(ReturnStatement::from_untyped(node)?)),
-            SyntaxKind::ContinueStatement => Some(Statement::Continue(ContinueStatement::from_untyped(node)?)),
-            SyntaxKind::ModuleImport => Some(Statement::ModuleImport(ModuleImport::from_untyped(node)?)),
+            SyntaxKind::ReturnStatement => {
+                Some(Statement::Return(ReturnStatement::from_untyped(node)?))
+            }
+            SyntaxKind::ContinueStatement => {
+                Some(Statement::Continue(ContinueStatement::from_untyped(node)?))
+            }
+            SyntaxKind::ModuleImport => {
+                Some(Statement::ModuleImport(ModuleImport::from_untyped(node)?))
+            }
             _ => Expr::from_untyped(node).map(Statement::Expr),
         }
     }

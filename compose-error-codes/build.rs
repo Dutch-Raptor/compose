@@ -72,7 +72,8 @@ fn main() {
             r#"
                 &{name},
             "#,
-        ).expect("writing to a string is infallible");
+        )
+        .expect("writing to a string is infallible");
     }
 
     write!(
@@ -93,9 +94,8 @@ fn main() {
     "#
     )
     .expect("writing to a string is infallible");
-    
-    fs::write(Path::new(&out_dir).join("Error_Codes"), out)
-        .expect("failed to write Error_Codes");
+
+    fs::write(Path::new(&out_dir).join("Error_Codes"), out).expect("failed to write Error_Codes");
 }
 
 fn escape(s: &str) -> String {

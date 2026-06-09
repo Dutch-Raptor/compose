@@ -1,7 +1,7 @@
-use compose_library::Value;
-use compose_syntax::Span;
 use crate::Machine;
 use crate::vm::Tracked;
+use compose_library::Value;
+use compose_syntax::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Evaluated {
@@ -16,7 +16,11 @@ pub struct Evaluated {
 
 impl Evaluated {
     pub fn new(value: Value, mutable: bool) -> Self {
-        Self { value, mutable, origin: None }
+        Self {
+            value,
+            mutable,
+            origin: None,
+        }
     }
 
     pub fn mutable(value: Value) -> Self {
@@ -39,7 +43,10 @@ impl Evaluated {
     }
 
     pub fn with_origin(self, origin: Span) -> Self {
-        Self { origin: Some(origin), ..self }
+        Self {
+            origin: Some(origin),
+            ..self
+        }
     }
 
     pub fn with_value(self, value: Value) -> Self {
@@ -47,7 +54,10 @@ impl Evaluated {
     }
 
     pub fn make_mutable(self) -> Self {
-        Self { mutable: true, ..self }
+        Self {
+            mutable: true,
+            ..self
+        }
     }
 
     pub fn value(&self) -> &Value {

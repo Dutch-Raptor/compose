@@ -20,7 +20,6 @@ pub fn compose_doc(input: BoundaryStream) -> BoundaryStream {
             .with_no_color()
             .with_code_block_error_mode(ErrorHandlingMode::EmitAsTests)
             .with_output_block_error_mode(ErrorHandlingMode::EmitAsTests),
-
     ) {
         Ok(t) => t,
         Err(e) => {

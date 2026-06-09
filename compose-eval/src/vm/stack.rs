@@ -1,8 +1,8 @@
-use std::fmt::{Debug, Formatter};
+use crate::Machine;
+use compose_library::Library;
 use compose_library::foundations::scope::{Binding, Scopes, VariableAccessError};
 use compose_library::gc::{Trace, UntypedRef};
-use compose_library::Library;
-use crate::Machine;
+use std::fmt::{Debug, Formatter};
 
 #[derive(Clone)]
 pub struct StackFrames<'a> {
@@ -80,9 +80,7 @@ pub struct TrackMarker(usize);
 
 impl<'a> StackFrame<'a> {
     pub fn track(&mut self, value: &impl Trace) {
-        value.visit_refs(&mut |key| {
-            self.tracked.push(key)
-        });
+        value.visit_refs(&mut |key| self.tracked.push(key));
     }
 
     pub fn marker(&self) -> TrackMarker {

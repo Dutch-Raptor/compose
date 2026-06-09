@@ -1,4 +1,4 @@
-use compose_macros::{ty};
+use compose_macros::ty;
 
 #[ty(cast)]
 type bool;

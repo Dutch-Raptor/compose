@@ -12,10 +12,10 @@ mod range_iter;
 mod string_iter;
 
 use crate::{
-    foundations::support::eval_func,
-    diag::{SourceDiagnostic, StrResult, UnSpanned},
     Value,
-    foundations::support::eval_predicate
+    diag::{SourceDiagnostic, StrResult, UnSpanned},
+    foundations::support::eval_func,
+    foundations::support::eval_predicate,
 };
 pub use array_iter::*;
 use compose_library::foundations::types::{ArrayValue, Func, MapValue, Str};

@@ -1,8 +1,8 @@
 use crate::diag::StrResult;
+use compose_library::Value;
 use compose_library::diag::bail;
 use compose_library::foundations::types::{Array, ArrayValue, MapValue};
 use compose_library::gc::Heap;
-use compose_library::Value;
 
 pub trait Comparison {
     fn equals(&self, other: &Self, heap: &Heap) -> compose_library::diag::StrResult<bool>;

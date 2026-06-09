@@ -1,10 +1,10 @@
 use crate::kind::SyntaxKind;
-use crate::parser::expressions::code_expression;
 use crate::parser::Parser;
-use crate::parser::{expressions, ExprContext};
+use crate::parser::expressions::code_expression;
+use crate::parser::{ExprContext, expressions};
 use crate::precedence::Precedence;
-use crate::set::syntax_set;
 use crate::set;
+use crate::set::syntax_set;
 use compose_error_codes::E0311_MATCH_ARM_PATTERNS_BIND_DIFFERENT_VARIABLES;
 use compose_utils::trace_fn;
 use ecow::eco_format;
@@ -146,14 +146,14 @@ fn destructure_map<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
     trace_fn!("parse_destructure_map");
     let m = p.marker();
     p.assert(SyntaxKind::LeftBrace);
-    
+
     let mut sink = false;
     while !p.current().is_terminator() {
         if !p.at_set(set::DESTRUCTURING_ITEM) {
             p.unexpected("expected a destructuring item", None);
             continue;
         }
-        
+
         destructuring_item(p, seen, &mut sink);
 
         if !p.current().is_terminator() {
@@ -165,8 +165,6 @@ fn destructure_map<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
 
     p.wrap(m, SyntaxKind::Destructuring);
 }
-
-
 
 fn destructure_array<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
     trace_fn!("parse_destructure_array");
@@ -222,7 +220,12 @@ fn destructuring_item<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, sink:
     }
 }
 
-fn pattern_leaf<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, reassignment: bool, in_typed_pattern: bool) {
+fn pattern_leaf<'s>(
+    p: &mut Parser<'s>,
+    seen: &mut HashSet<&'s str>,
+    reassignment: bool,
+    in_typed_pattern: bool,
+) {
     trace_fn!("parse_pattern_leaf");
     if p.current().is_keyword() {
         p.token.node.expected("pattern");
@@ -255,7 +258,8 @@ fn pattern_leaf<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, reassignmen
     }
 
     // Do not allow nested typed bindings
-    let at_typed_binding = last_kind == SyntaxKind::Ident && p.at_set(set::PATTERN) && !in_typed_pattern;
+    let at_typed_binding =
+        last_kind == SyntaxKind::Ident && p.at_set(set::PATTERN) && !in_typed_pattern;
 
     if at_typed_binding {
         binding_text = p.current_text();

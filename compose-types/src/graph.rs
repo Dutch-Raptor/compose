@@ -47,39 +47,6 @@ pub struct InferenceStep {
     pub reason: InferenceReason,
 }
 
-// ── TypePosition ──────────────────────────────────────────────────────────────
-
-/// Where inside a parent type a child variable lives.
-/// Used in error messages: "B is the element type of Vec<B>".
-#[derive(Debug, Clone)]
-pub enum TypePosition {
-    /// Index into a generic type's type arguments.
-    /// e.g. Vec<B> → GenericArg { type_name: "Vec", index: 0 }
-    GenericArg { type_name: SymbolId, index: usize },
-    /// Parameter position in a function type.
-    FnParam { index: usize },
-    /// Return position in a function type.
-    FnReturn,
-}
-
-impl TypePosition {
-    pub fn describe(&self) -> String {
-        match self {
-            TypePosition::GenericArg {
-                type_name,
-                index: 0,
-            } => {
-                format!("element type of `{type_name:?}`")
-            }
-            TypePosition::GenericArg { type_name, index } => {
-                format!("generic argument {index} of `{type_name:?}`")
-            }
-            TypePosition::FnParam { index } => format!("parameter {index} of function"),
-            TypePosition::FnReturn => "return type of function".to_string(),
-        }
-    }
-}
-
 // ── Inference Edges ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -87,15 +54,6 @@ pub enum EdgeKind {
     /// This variable was bound to a concrete type.
     /// Added during unification when bind_with_evidence() is called.
     BoundTo { ty: Ty, step: InferenceStep },
-
-    /// This variable is structurally contained inside a parent variable.
-    /// Added during collection when a generic type is instantiated.
-    /// e.g. B is the element type of Vec<B> where Vec<B> is assigned to A.
-    StructuralChild {
-        parent: TypeVar,
-        position: TypePosition,
-        step: InferenceStep,
-    },
 
     /// This variable was linked to another variable by an equality constraint.
     Related { step: InferenceStep },
@@ -154,25 +112,6 @@ impl InferenceGraph {
         });
     }
 
-    /// Record a structural parent-child relationship between two variables.
-    /// Called during constraint collection when a generic is instantiated.
-    pub fn record_structural_child(
-        &mut self,
-        child_var: TypeVar,
-        parent_var: TypeVar,
-        position: TypePosition,
-        step: InferenceStep,
-    ) {
-        self.edges.push(InferenceEdge {
-            from: child_var,
-            kind: EdgeKind::StructuralChild {
-                parent: parent_var,
-                position,
-                step,
-            },
-        });
-    }
-
     /// Record that a variable's value was discarded by a semicolon.
     /// Called during unit-coercion solving when a concrete type is discarded.
     pub fn record_discard(
@@ -209,9 +148,8 @@ impl InferenceGraph {
 
     /// Collect the full chronological inference trail for a variable.
     ///
-    /// Walks BoundTo edges (direct narrowings) and StructuralChild edges
-    /// (links to parent variables), recursing into parents to collect their
-    /// steps too. The result is sorted by source position.
+    /// Walks direct narrowings and equality relations. The result is sorted by
+    /// source position.
     pub fn collect_trail(&self, start_var: TypeVar) -> Vec<TrailEntry> {
         let mut trail = Vec::new();
         let mut visited = HashSet::new();
@@ -249,23 +187,6 @@ impl InferenceGraph {
                     });
                 }
 
-                EdgeKind::StructuralChild {
-                    parent,
-                    position,
-                    step,
-                } => {
-                    trail.push(TrailEntry {
-                        var,
-                        step: step.clone(),
-                        role: TrailRole::StructuralIntroduction {
-                            parent: *parent,
-                            position: position.clone(),
-                        },
-                    });
-                    // Walk up to collect the parent's story too.
-                    self.collect_trail_inner(*parent, trail, visited);
-                }
-
                 EdgeKind::Related { step } => {
                     trail.push(TrailEntry {
                         var,
@@ -299,12 +220,6 @@ impl InferenceGraph {
             if edge.from == from_var {
                 edge.from = to_var;
             }
-            // Also update any StructuralChild parent references.
-            if let EdgeKind::StructuralChild { parent, .. } = &mut edge.kind {
-                if *parent == from_var {
-                    *parent = to_var;
-                }
-            }
         }
         // Transfer origin if `to_var` doesn't have one yet.
         if let Some(origin) = self.origins.remove(&from_var) {
@@ -328,11 +243,6 @@ pub enum TrailRole {
     Introduction,
     /// The variable was bound to a concrete type.
     Narrowing { ty: Ty },
-    /// The variable was introduced as a structural component of a parent.
-    StructuralIntroduction {
-        parent: TypeVar,
-        position: TypePosition,
-    },
     /// The variable was related to another variable by a source construct.
     Relation,
 }

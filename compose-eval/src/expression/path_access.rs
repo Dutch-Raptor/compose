@@ -1,8 +1,8 @@
+use crate::evaluated::Evaluated;
 use crate::{Eval, Machine};
 use compose_library::diag::SourceResult;
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
-use crate::evaluated::Evaluated;
 
 impl Eval for ast::PathAccess<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -10,7 +10,7 @@ impl Eval for ast::PathAccess<'_> {
         let member = self.member();
 
         let target = target_expr.eval(vm)?;
-        
+
         let ctx = vm.syntax_ctx();
 
         let span = member.span();

@@ -1,10 +1,10 @@
+use compose_library::foundations::scope::{Binding, Scope, Scopes};
+use compose_library::{Library, Value};
 use compose_syntax::ast::{Arg, AstNode, Expr, Ident, ParamKind, Statement};
-use compose_syntax::{ast, Span};
+use compose_syntax::{Span, ast};
 use ecow::EcoString;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use compose_library::foundations::scope::{Binding, Scope, Scopes};
-use compose_library::{Library, Value};
 
 /// Visits a closure and determines which variables are captured implicitly.
 #[derive(Debug)]
@@ -121,7 +121,6 @@ impl<'a> CapturesVisitor<'a> {
                 // and in simple ast walking, that is really hard to resolve correctly.
                 // Any capture errors in the body will be caught when the outer body is evaluated.
             }
-
             Expr::ForLoop(for_loop) => {
                 // Created in outer scope
                 self.internal.enter_flow();
@@ -289,7 +288,7 @@ impl<'a> CapturesVisitor<'a> {
 #[cfg(test)]
 mod tests {
     use crate::expression::captures_visitor::CapturesVisitor;
-    use crate::test::{print_diagnostics, TestWorld};
+    use crate::test::{TestWorld, print_diagnostics};
     use compose_library::diag::SourceDiagnostic;
     use compose_library::foundations::scope::{Scope, Scopes};
     use compose_syntax::ast;
@@ -308,7 +307,6 @@ mod tests {
         existing.define("c", 0i64);
         let mut visitor = CapturesVisitor::new(&scopes, None, &existing);
         let world = TestWorld::from_str(text);
-
 
         let source = world.entrypoint_src();
         let mut fail = false;
@@ -395,7 +393,7 @@ mod tests {
 
     #[test]
     fn closure_with_named_parameters_captures_default_values() {
-        test("let f = { x: x, y: y, z: z => f(); }", &["x", "y", "z"]);
+        test("let f = { x = x, y = y, z = z => f(); }", &["x", "y", "z"]);
     }
 
     #[test]
@@ -440,10 +438,7 @@ mod tests {
 
     #[test]
     fn if_flow_binding_does_not_require_capture_of_bound_names() {
-        test(
-            "if ([1, 2] is [x, y] && y == 2) { x + y + z; }",
-            &["z"],
-        );
+        test("if ([1, 2] is [x, y] && y == 2) { x + y + z; }", &["z"]);
     }
 
     #[test]

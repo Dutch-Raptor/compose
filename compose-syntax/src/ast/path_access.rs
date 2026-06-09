@@ -9,7 +9,7 @@ impl<'a> PathAccess<'a> {
     pub fn target(self) -> Expr<'a> {
         self.0.cast_first()
     }
-    
+
     pub fn member(self) -> Ident<'a> {
         self.0.cast_last()
     }

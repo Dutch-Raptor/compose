@@ -4,7 +4,7 @@ pub mod intern;
 pub mod registry;
 pub mod ty;
 
-pub use bounds::{BoundEntry, InterfaceTable, PrimitiveTy, TypeParamEnv};
+pub use bounds::{InterfaceTable, PrimitiveTy};
 pub use ids::SymbolId;
 pub use intern::{InterfaceName, Name, TypeName};
 pub use registry::{FieldInfo, FunctionInfo, InterfaceInfo, MethodInfo, TypeInfoRegistry};

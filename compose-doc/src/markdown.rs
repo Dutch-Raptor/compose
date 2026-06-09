@@ -1,7 +1,7 @@
-use crate::block::{parse_block_header, BlockHeader};
-use crate::diag::{diagnostics_to_string, line_starts, offset_to_line, At, Error};
-use crate::realise::{eval_code, EvalResult};
-use compose_error_codes::{lookup, ErrorCode};
+use crate::block::{BlockHeader, parse_block_header};
+use crate::diag::{At, Error, diagnostics_to_string, line_starts, offset_to_line};
+use crate::realise::{EvalResult, eval_code};
+use compose_error_codes::{ErrorCode, lookup};
 use compose_library::diag::SourceDiagnostic;
 use pulldown_cmark::{CodeBlockKind, Event, OffsetIter, Options, Parser, Tag};
 use std::cmp::PartialEq;

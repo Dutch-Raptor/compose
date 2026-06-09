@@ -8,10 +8,10 @@ use crate::scope::{Frames, Scope, ScopeId, ScopeSource};
 use crate::symbol::{SymbolKind, SymbolOrigin, SymbolTable, UnresolvedSymbol};
 use compose_library::diag::print_diagnostics;
 use compose_library::sink::Sink;
-use compose_library::{error, SourceDiagnostic, Value, World};
-use compose_syntax::ast::ty::TypeAnnotation;
+use compose_library::{SourceDiagnostic, Value, World, error};
+use compose_syntax::ast::ty::Type;
 use compose_syntax::ast::{
-    Arg, AstNode, Code, DestructuringItem, Expr, Ident, ParamKind, Pattern, Statement,
+    Arg, AstNode, Code, DestructuringItem, Expr, FnItem, Ident, ParamKind, Pattern, Statement,
 };
 use compose_syntax::{Label, Span};
 pub use compose_typeinfo::SymbolId;
@@ -250,9 +250,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             ScopeSource::module(self.current_module_id()),
         );
 
-        for stmt in code.statements() {
-            self.resolve_statement(stmt);
-        }
+        self.resolve_code(code.items().collect(), code.statements().collect());
 
         self.frames.exit_frame();
 
@@ -403,10 +401,24 @@ impl<'a, 'w> NameResolver<'a, 'w> {
             ))
     }
 
-    fn resolve_type_annotation(&mut self, annotation: TypeAnnotation<'_>) {
+    fn resolve_type_annotation(&mut self, annotation: Type<'_>) {
         self.resolve_type(annotation.ident());
-        for arg in annotation.args() {
-            self.resolve_type_annotation(arg);
+        if let Some(args) = annotation.args() {
+            for arg in args.items() {
+                self.resolve_type_annotation(arg);
+            }
+        }
+    }
+
+    fn bind_type_param(&mut self, ty: Type<'_>) {
+        let expr_id = self.expr_id(ty.ident().span());
+        self.bind_ident_lexical(ty.ident(), SymbolOrigin::Param(expr_id))
+            .with_kind(SymbolKind::Type);
+
+        if let Some(args) = ty.args() {
+            for arg in args.items() {
+                self.bind_type_param(arg);
+            }
         }
     }
 
@@ -465,9 +477,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
                     self.current_module_id(),
                     self.expr_id_table.get_expr_id(code.span()).unwrap(),
                 ));
-                for stmt in code.statements() {
-                    self_.resolve_statement(stmt);
-                }
+                self_.resolve_code(code.items().collect(), code.statements().collect());
             }
             Expr::Str(_) => {}
             Expr::Bool(_) => {}
@@ -678,9 +688,7 @@ impl<'a, 'w> NameResolver<'a, 'w> {
                     }
                 }
 
-                for stmt in lambda.statements() {
-                    self_.resolve_statement(stmt);
-                }
+                self_.resolve_code(lambda.items().collect(), lambda.statements().collect());
             }
             Expr::IndexAccess(idx) => {
                 self.resolve_expression(idx.target());
@@ -731,6 +739,76 @@ impl<'a, 'w> NameResolver<'a, 'w> {
         }
     }
 
+    fn declare_fn_items(&mut self, items: &[FnItem<'_>]) {
+        for item in items {
+            self.declare_fn_item(*item);
+        }
+    }
+
+    fn declare_fn_item(&mut self, item: FnItem<'_>) {
+        let function_expr_id = self.expr_id(item.name().span());
+        self.bind_ident_lexical(item.name(), SymbolOrigin::Local(function_expr_id))
+            .with_kind(SymbolKind::Function);
+    }
+
+    fn resolve_code(&mut self, items: Vec<FnItem<'_>>, statements: Vec<Statement<'_>>) {
+        self.declare_fn_items(&items);
+
+        for item in items {
+            self.resolve_fn_item(item);
+        }
+
+        for statement in statements {
+            self.resolve_statement(statement);
+        }
+    }
+
+    fn resolve_fn_item(&mut self, item: FnItem<'_>) {
+        let source = ScopeSource::expr(
+            self.current_module_id(),
+            self.expr_id_table.get_expr_id(item.span()).unwrap(),
+        );
+        let mut self_ = self.new_lexical_guard(source);
+
+        for ty in item.type_args().items() {
+            self_.bind_type_param(ty);
+        }
+
+        for param in item.params().children() {
+            if let Some(annotation) = param.type_annotation() {
+                self_.resolve_type_annotation(annotation);
+            }
+
+            if let ParamKind::Named(named) = param.kind() {
+                self_.resolve_expression(named.expr());
+            }
+        }
+
+        if let Some(return_type) = item.return_type() {
+            self_.resolve_type_annotation(return_type);
+        }
+
+        for param in item.params().children() {
+            match param.kind() {
+                ParamKind::Pos(pattern) => {
+                    self_.resolve_pattern(pattern, &mut |this, ident| {
+                        let expr_id = this.expr_id(ident.span());
+                        this.bind_ident_lexical(ident, SymbolOrigin::Param(expr_id));
+                    });
+                }
+                ParamKind::Named(named) => {
+                    let origin = SymbolOrigin::Param(self_.expr_id(named.name().span()));
+                    self_.bind_ident_lexical(named.name(), origin);
+                }
+            }
+        }
+
+        self_.resolve_code(
+            item.body().items().collect(),
+            item.body().statements().collect(),
+        );
+    }
+
     pub fn resolve_statement(&mut self, statement: Statement<'_>) {
         match statement {
             Statement::Expr(expr) => self.resolve_expression(expr),
@@ -778,5 +856,145 @@ fn primitive_type_alias(name: &str) -> Option<&'static str> {
         "Str" | "str" => Some("String"),
         "Unit" | "unit" => Some("()"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use compose_library::Library;
+    use compose_library::diag::{FileError, FileResult};
+    use compose_syntax::{FileId, Source};
+    use std::collections::HashMap;
+    use std::io::{Read, Write};
+    use std::sync::Mutex;
+
+    struct TestWorld {
+        entrypoint: FileId,
+        source: Mutex<HashMap<FileId, Source>>,
+        library: Library,
+    }
+
+    impl TestWorld {
+        fn from_str(text: &str) -> Self {
+            let entrypoint = FileId::fake("test.cmps");
+            let source = Source::new(entrypoint, text.to_owned());
+            let mut sources = HashMap::new();
+            sources.insert(entrypoint, source);
+            Self {
+                entrypoint,
+                source: Mutex::new(sources),
+                library: Library::default(),
+            }
+        }
+
+        fn entry_source(&self) -> Source {
+            self.source(self.entrypoint).expect("test source exists")
+        }
+    }
+
+    impl World for TestWorld {
+        fn entry_point(&self) -> FileId {
+            self.entrypoint
+        }
+
+        fn source(&self, file_id: FileId) -> FileResult<Source> {
+            self.source
+                .lock()
+                .expect("source lock")
+                .get(&file_id)
+                .cloned()
+                .ok_or_else(|| FileError::NotFound(file_id.path().0.clone()))
+        }
+
+        fn library(&self) -> &Library {
+            &self.library
+        }
+
+        fn write(
+            &self,
+            _f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>,
+        ) -> std::io::Result<()> {
+            Ok(())
+        }
+
+        fn read(
+            &self,
+            _f: &mut dyn FnMut(&mut dyn Read) -> std::io::Result<()>,
+        ) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn resolve(text: &str) -> ResolutionResult {
+        let world = TestWorld::from_str(text);
+        let source = world.entry_source();
+        let mut expr_ids = ExprIdTable::new();
+        expr_ids.visit_node(source.root_node());
+
+        let mut resolver = NameResolver::new(&expr_ids, &world);
+        resolver.set_emit_diagnostics(false);
+        resolver.resolve()
+    }
+
+    #[test]
+    fn resolves_fn_item_name_params_and_type_params() {
+        let resolution = resolve(
+            r#"
+            fn id<T>(value: T) -> T {
+                value
+            }
+
+            let out: Int = id(1);
+            "#,
+        );
+
+        assert!(
+            resolution.unresolved_symbols.is_empty(),
+            "expected all fn item symbols to resolve, got {:#?}",
+            resolution.unresolved_symbols
+        );
+
+        assert!(
+            resolution
+                .symbol_table
+                .iter()
+                .any(|(_, symbol)| symbol.name.as_str() == "id"
+                    && symbol.symbol_kind == SymbolKind::Function),
+            "expected `id` to be registered as a function"
+        );
+        assert!(
+            resolution
+                .symbol_table
+                .iter()
+                .any(|(_, symbol)| symbol.name.as_str() == "T"
+                    && symbol.symbol_kind == SymbolKind::Type),
+            "expected generic parameter `T` to be registered as a type"
+        );
+    }
+
+    #[test]
+    fn fn_items_are_block_scoped_and_order_independent() {
+        let resolution = resolve(
+            r#"
+            let out: Int = {
+                local(1);
+
+                fn local(value: Int) -> Int {
+                    value
+                }
+            };
+
+            local(1);
+            "#,
+        );
+
+        assert_eq!(
+            resolution.unresolved_symbols.len(),
+            1,
+            "expected only the use outside the block to be unresolved, got {:#?}",
+            resolution.unresolved_symbols
+        );
+        assert_eq!(resolution.unresolved_symbols[0].name.as_str(), "local");
     }
 }

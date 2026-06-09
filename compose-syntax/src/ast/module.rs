@@ -1,6 +1,6 @@
 use crate::ast::macros::node;
 use crate::ast::{AstNode, Expr, Ident, Str};
-use crate::{SyntaxKind, SyntaxNode, ast, Span};
+use crate::{Span, SyntaxKind, SyntaxNode, ast};
 use ecow::EcoString;
 
 node! {
@@ -54,8 +54,8 @@ impl<'a> ImportItem<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::assert_ast;
     use super::*;
+    use crate::assert_ast;
 
     #[test]
     fn simple_module_import() {

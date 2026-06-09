@@ -9,10 +9,10 @@
 //! cargo run --example custom_files
 //! ```
 
-use compose_codespan_reporting as codespan_reporting;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use compose_codespan_reporting as codespan_reporting;
 use std::ops::Range;
 
 fn main() -> anyhow::Result<()> {
@@ -42,8 +42,8 @@ fn main() -> anyhow::Result<()> {
 
 /// A module containing the file implementation
 mod files {
-    use compose_codespan_reporting as codespan_reporting;
     use codespan_reporting::files;
+    use compose_codespan_reporting as codespan_reporting;
     use std::ops::Range;
 
     /// A file that is backed by an `Arc<String>`.

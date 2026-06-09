@@ -1,5 +1,5 @@
-mod trace;
 pub mod id;
+mod trace;
 
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
@@ -39,12 +39,8 @@ impl<T> Hash for Static<T> {
     }
 }
 
-
 /// Automatically calls a deferred function when the returned handle is dropped.
-pub fn defer<T, F: FnOnce(&mut T)>(
-    thing: &mut T,
-    deferred: F,
-) -> impl DerefMut<Target = T> {
+pub fn defer<T, F: FnOnce(&mut T)>(thing: &mut T, deferred: F) -> impl DerefMut<Target = T> {
     struct DeferHandle<'a, T, F: FnOnce(&mut T)> {
         thing: &'a mut T,
         deferred: Option<F>,
@@ -70,5 +66,8 @@ pub fn defer<T, F: FnOnce(&mut T)>(
         }
     }
 
-    DeferHandle { thing, deferred: Some(deferred) }
+    DeferHandle {
+        thing,
+        deferred: Some(deferred),
+    }
 }

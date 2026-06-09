@@ -35,7 +35,11 @@ impl Patch {
     pub fn shifted(self, delta: isize) -> Result<Patch, PatchError> {
         fn shift_pos(pos: usize, delta: isize) -> Result<usize, PatchError> {
             let new = pos as isize + delta;
-            if new < 0 { Err(PatchError::OutOfBounds) } else { Ok(new as usize) }
+            if new < 0 {
+                Err(PatchError::OutOfBounds)
+            } else {
+                Ok(new as usize)
+            }
         }
 
         Ok(match self {
@@ -96,17 +100,13 @@ pub struct PatchEngine {
     patches: Vec<Patch>,
 }
 
-impl PatchEngine {
-}
+impl PatchEngine {}
 
 #[derive(Debug, Clone)]
 pub enum PatchError {
     SpanWithoutRange,
     OutOfBounds,
-    Conflict {
-        a: Arc<Patch>,
-        b: Arc<Patch>,
-    }
+    Conflict { a: Arc<Patch>, b: Arc<Patch> },
 }
 
 impl PatchEngine {
@@ -190,7 +190,11 @@ impl PatchEngine {
         self.apply_all_with_offset(source, 0)
     }
 
-    pub fn apply_all_with_offset(mut self, snippet: &str, base_offset: usize) -> Result<String, PatchError> {
+    pub fn apply_all_with_offset(
+        mut self,
+        snippet: &str,
+        base_offset: usize,
+    ) -> Result<String, PatchError> {
         self.check_conflicts()?;
 
         let mut result = snippet.to_string();

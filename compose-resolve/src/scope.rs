@@ -1,5 +1,5 @@
-use crate::module::ModuleId;
 use crate::ExprId;
+use crate::module::ModuleId;
 use compose_typeinfo::SymbolId;
 use compose_utils::trace_log;
 use ecow::EcoString;

@@ -5,7 +5,7 @@ pub struct Cursor {
     pub ln: usize,
     pub col: usize,
 }
- 
+
 pub(crate) fn trimmed(rope: RopeSlice) -> RopeSlice {
     let rope_len = rope.len_chars();
     if rope_len == 0 {

@@ -1,7 +1,8 @@
-use crate::ast::{node, AstNode, Expr, Ident, Statement};
+use crate::ast::pattern::Pattern;
+use crate::ast::ty::{Type, TypeArgs};
+use crate::ast::{AstNode, CodeBlock, Expr, Ident, Statement, node};
 use crate::kind::SyntaxKind;
 use crate::{Span, SyntaxNode};
-use crate::ast::pattern::Pattern;
 
 node! {
     struct Lambda
@@ -21,6 +22,39 @@ impl<'a> Lambda<'a> {
             .children()
             .skip_while(|n| n.kind() != SyntaxKind::Arrow)
             .filter_map(SyntaxNode::cast)
+    }
+
+    pub fn items(self) -> impl Iterator<Item = FnItem<'a>> {
+        self.0
+            .children()
+            .skip_while(|n| n.kind() != SyntaxKind::Arrow)
+            .filter_map(SyntaxNode::cast)
+    }
+}
+
+node! {
+    struct FnItem
+}
+
+impl<'a> FnItem<'a> {
+    pub fn name(self) -> Ident<'a> {
+        self.0.cast_first()
+    }
+
+    pub fn type_args(self) -> TypeArgs<'a> {
+        self.0.cast_first()
+    }
+
+    pub fn params(self) -> Params<'a> {
+        self.0.cast_first()
+    }
+
+    pub fn return_type(self) -> Option<Type<'a>> {
+        self.0.children().rev().find_map(SyntaxNode::cast)
+    }
+
+    pub fn body(self) -> CodeBlock<'a> {
+        self.0.cast_first()
     }
 }
 
@@ -83,6 +117,14 @@ node! {
 impl<'a> Param<'a> {
     pub fn kind(self) -> ParamKind<'a> {
         self.0.cast_first()
+    }
+
+    pub fn type_annotation(self) -> Option<Type<'a>> {
+        fn find_type(node: &SyntaxNode) -> Option<Type<'_>> {
+            node.cast().or_else(|| node.children().find_map(find_type))
+        }
+
+        self.0.children().find_map(find_type)
     }
 
     pub fn is_ref(self) -> bool {
@@ -163,13 +205,13 @@ impl<'a> Named<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::assert_ast;
     use crate::ast::FuncCall;
     use crate::ast::binary::{BinOp, Binary};
+    use crate::ast::ty::Type;
 
     #[test]
     fn trailing_lambda() {
@@ -208,6 +250,63 @@ mod tests {
                         ]
                     }
                 ]
+            }
+        )
+    }
+
+    #[test]
+    fn fn_item() {
+        assert_ast!(
+            r#"
+            fn add<T>(a: T, b: T) -> T { a + b }
+            "#,
+            item as FnItem {
+                with name: Ident = item.name() => {
+                    assert_eq!(name.get(), "add");
+                }
+                item.type_args().items() => [
+                    ty as Type {
+                        with ident: Ident = ty.ident() => {
+                            assert_eq!(ident.get(), "T");
+                        }
+                    }
+                ]
+                with params: Params = item.params() => {
+                    params.children() => [
+                        param as Param {
+                            with pat: Pattern = param.kind() => {
+                                with ident: Ident = pat => {
+                                    assert_eq!(ident.get(), "a");
+                                }
+                            }
+                        }
+                        param as Param {
+                            with pat: Pattern = param.kind() => {
+                                with ident: Ident = pat => {
+                                    assert_eq!(ident.get(), "b");
+                                }
+                            }
+                        }
+                    ]
+                }
+                with return_type: Type = item.return_type().unwrap() => {
+                    with ident: Ident = return_type.ident() => {
+                        assert_eq!(ident.get(), "T");
+                    }
+                }
+                with body: CodeBlock = item.body() => {
+                    body.statements() => [
+                        binary as Binary {
+                            with lhs: Ident = binary.lhs() => {
+                                assert_eq!(lhs.get(), "a");
+                            }
+                            with rhs: Ident = binary.rhs() => {
+                                assert_eq!(rhs.get(), "b");
+                            }
+                            assert_eq!(binary.op(), BinOp::Add);
+                        }
+                    ]
+                }
             }
         )
     }

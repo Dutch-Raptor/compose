@@ -1,7 +1,7 @@
 use compose_syntax::{Span, SyntaxNode};
+use compose_utils::id::IdStore;
 use indexmap::IndexMap;
 use std::num::NonZeroU64;
-use compose_utils::id::IdStore;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ExprId(NonZeroU64);
@@ -38,7 +38,7 @@ impl From<NonZeroU64> for ExprId {
 pub struct ExprIdTable {
     span_to_expr_id: IndexMap<Span, ExprId>,
     expr_id_to_span: IndexMap<ExprId, Span>,
-    id_store: IdStore<ExprId>,   
+    id_store: IdStore<ExprId>,
 }
 
 impl ExprIdTable {

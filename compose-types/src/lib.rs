@@ -9,7 +9,6 @@ pub mod namer;
 pub mod subst;
 pub mod ty;
 pub mod unify;
-pub mod zonk;
 
 // Re-export the most commonly used types at the module level.
 pub use collect::{InferenceEngine, TypeCheckResult, TypeInfo, type_check};

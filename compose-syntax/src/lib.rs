@@ -1,30 +1,29 @@
 #![allow(dead_code)]
+pub mod ast;
+mod file;
+mod fix;
+mod kind;
 mod lexer;
 mod node;
-mod span;
-mod file;
-mod kind;
-pub mod test_utils;
-mod source;
 mod parser;
-mod set;
-pub mod ast;
+mod patch;
 mod precedence;
 mod scanner;
-mod patch;
-mod fix;
+mod set;
+mod source;
+mod span;
+pub mod test_utils;
 
-pub use lexer::Lexer;
-pub use node::SyntaxNode;
-pub use node::SyntaxError;
-pub use node::SyntaxErrorSeverity;
+pub use file::FileId;
+pub use fix::{Fix, FixBuilder, FixDisplay};
 pub use kind::*;
-pub use span::Span;
+pub use lexer::Lexer;
 pub use node::Label;
 pub use node::LabelType;
-pub use file::FileId;
+pub use node::SyntaxError;
+pub use node::SyntaxErrorSeverity;
+pub use node::SyntaxNode;
 pub use parser::parse;
-pub use source::Source;
 pub use patch::{Patch, PatchEngine};
-pub use fix::{Fix, FixDisplay, FixBuilder};
-
+pub use source::Source;
+pub use span::Span;

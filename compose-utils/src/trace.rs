@@ -1,7 +1,7 @@
 #![allow(clippy::print_stdout)]
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 
 /// Global toggle to enable or disable tracing.
@@ -47,13 +47,15 @@ impl TraceFnGuard {
         let id = CALL_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         if enabled {
-            with_indent(|i| format!(
-                "{}[#{}]↳ Enter: {} {}",
-                "  ".repeat(i),
-                id,
-                name,
-                message.unwrap_or("")
-            ));
+            with_indent(|i| {
+                format!(
+                    "{}[#{}]↳ Enter: {} {}",
+                    "  ".repeat(i),
+                    id,
+                    name,
+                    message.unwrap_or("")
+                )
+            });
             indent_inc();
         }
 
@@ -72,19 +74,17 @@ impl Drop for TraceFnGuard {
             indent_dec();
             if let Some(start) = self.start_time {
                 let duration = start.elapsed();
-                with_indent(|i| format!(
-                    "{}[#{}]↳ Exit:  {} (took {:.2?})",
-                    "  ".repeat(i),
-                    self.id,
-                    self.name,
-                    duration
-                ));
+                with_indent(|i| {
+                    format!(
+                        "{}[#{}]↳ Exit:  {} (took {:.2?})",
+                        "  ".repeat(i),
+                        self.id,
+                        self.name,
+                        duration
+                    )
+                });
             } else {
-                with_indent(|i| format!(
-                    "{}↳ Exit:  {}",
-                    "  ".repeat(i),
-                    self.name
-                ));
+                with_indent(|i| format!("{}↳ Exit:  {}", "  ".repeat(i), self.name));
             }
         }
     }

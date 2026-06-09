@@ -1,6 +1,5 @@
 use syn::{Attribute, Result};
 
-
 /// Return an error at the given item.
 macro_rules! bail {
     (callsite, $($tts:tt)*) => {
@@ -23,8 +22,8 @@ macro_rules! bail {
 pub(crate) use bail;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use syn::parse::{Parse, ParseStream};
 use syn::Token;
+use syn::parse::{Parse, ParseStream};
 use syn::token::Token;
 
 /// Extract documentation comments from an attribute list.
@@ -87,8 +86,6 @@ impl quote::ToTokens for foundations {
     }
 }
 
-
-
 /// Parse a metadata key-value pair, separated by `=`.
 pub fn parse_key_value<K: Token + Default + Parse, V: Parse>(
     input: ParseStream<'_>,
@@ -112,9 +109,7 @@ pub fn parse_key_value_array<K: Token + Default + Parse, V: Parse>(
 }
 
 /// Parse a metadata key-string pair, separated by `=`.
-pub fn parse_string<K: Token + Default + Parse>(
-    input: ParseStream<'_>,
-) -> Result<Option<String>> {
+pub fn parse_string<K: Token + Default + Parse>(input: ParseStream<'_>) -> Result<Option<String>> {
     Ok(parse_key_value::<K, syn::LitStr>(input)?.map(|s| s.value()))
 }
 
@@ -138,14 +133,12 @@ pub fn parse_flag<K: Token + Default + Parse>(input: ParseStream<'_>) -> Result<
     Ok(false)
 }
 
-
 /// Parse a comma if there is one.
 pub fn eat_comma(input: ParseStream<'_>) {
     if input.peek(Token![,]) {
         let _: Token![,] = input.parse().expect("expected comma");
     }
 }
-
 
 /// A generic parseable array.
 struct Array<T>(Vec<T>);
@@ -167,7 +160,6 @@ impl<T: Parse> Parse for Array<T> {
         Ok(Self(elems))
     }
 }
-
 
 /// Parse a bare `type Name;` item.
 #[allow(dead_code)]
@@ -195,10 +187,7 @@ pub fn has_attr(attrs: &mut Vec<Attribute>, target: &str) -> bool {
 }
 
 /// Whether an attribute list has a specified attribute.
-pub fn take_attr(
-    attrs: &mut Vec<Attribute>,
-    target: &str,
-) -> Option<Attribute> {
+pub fn take_attr(attrs: &mut Vec<Attribute>, target: &str) -> Option<Attribute> {
     attrs
         .iter()
         .position(|attr| attr.path().is_ident(target))

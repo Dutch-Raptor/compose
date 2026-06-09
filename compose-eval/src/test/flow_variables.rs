@@ -1,7 +1,7 @@
 #[cfg(test)]
 use {
     crate::test::{assert_eval, eval_code},
-    compose_error_codes::E0011_UNBOUND_VARIABLE
+    compose_error_codes::E0011_UNBOUND_VARIABLE,
 };
 
 #[test]

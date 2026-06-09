@@ -269,7 +269,8 @@ impl NodesTester {
 
     fn skip_trivia(&mut self) {
         while let Some(node) = self.nodes.get(self.pos)
-            && node.kind().is_trivia() {
+            && node.kind().is_trivia()
+        {
             self.pos += 1;
         }
     }

@@ -1,7 +1,7 @@
 use crate::gc::HeapRef;
+use compose_library::Value;
 use compose_library::gc::{Heap, UntypedRef};
 use compose_library::vm::Vm;
-use compose_library::Value;
 use compose_macros::func;
 use compose_macros::{scope, ty};
 use std::fmt::{Debug, Display, Formatter};
@@ -30,11 +30,11 @@ impl Boxed {
     pub fn new(vm: &mut dyn Vm, value: Value) -> Self {
         Self(vm.heap_mut().alloc(value))
     }
-    
+
     #[func]
     pub fn shallow_clone(&self, vm: &mut dyn Vm) -> Self {
         let inner = self.0.get_unwrap(vm.heap()).clone();
-        
+
         Self(vm.heap_mut().alloc(inner))
     }
 }

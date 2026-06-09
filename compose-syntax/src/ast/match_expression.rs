@@ -1,6 +1,6 @@
-use crate::ast::macros::node;
 use crate::ast::Expr;
 use crate::ast::Pattern;
+use crate::ast::macros::node;
 use crate::{SyntaxKind, SyntaxNode};
 
 node! {

@@ -1,14 +1,13 @@
-mod reflect;
-mod into_value;
 mod into_result;
+mod into_value;
+mod reflect;
 
 use crate::diag::{Spanned, StrResult};
-use crate::{foundations::types::UnitValue, Value};
+use crate::{Value, foundations::types::UnitValue};
 use compose_macros::cast;
 pub use into_result::*;
 pub use into_value::*;
 pub use reflect::*;
-
 
 pub trait FromValue<V = Value>: Sized {
     fn from_value(value: V) -> StrResult<Self>;

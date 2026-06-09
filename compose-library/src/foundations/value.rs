@@ -1,20 +1,20 @@
 use crate::diag::{At, SourceResult, Spanned};
+use compose_library::Vm;
 use compose_library::diag::{StrResult, bail, error};
+use compose_library::foundations::args::Args;
+use compose_library::foundations::cast::FromValue;
+use compose_library::foundations::iterator::IterValue;
+use compose_library::foundations::scope::NativeScope;
+use compose_library::foundations::types::*;
+use compose_library::gc::Heap;
 use compose_library::repr::Repr;
+use compose_library::sink::Sink;
+use compose_library::world::SyntaxContext;
 use compose_macros::func;
 use compose_macros::scope;
 use compose_syntax::Span;
 use ecow::{EcoString, eco_format};
 use std::{fmt, iter};
-use compose_library::foundations::args::Args;
-use compose_library::foundations::cast::FromValue;
-use compose_library::foundations::iterator::IterValue;
-use compose_library::foundations::scope::NativeScope;
-use compose_library::foundations::types::{*};
-use compose_library::gc::Heap;
-use compose_library::sink::Sink;
-use compose_library::Vm;
-use compose_library::world::SyntaxContext;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -97,7 +97,6 @@ impl Value {
 }
 
 impl Value {
-
     pub fn unit() -> Value {
         Value::Unit(UnitValue)
     }
@@ -175,7 +174,13 @@ impl Value {
         }
     }
 
-    pub fn index(&self, index: Value, target_span: Span, index_span: Span, heap: &Heap) -> SourceResult<Option<Value>> {
+    pub fn index(
+        &self,
+        index: Value,
+        target_span: Span,
+        index_span: Span,
+        heap: &Heap,
+    ) -> SourceResult<Option<Value>> {
         match self {
             Value::Array(arr) => arr.index(index, index_span, heap),
             _ => bail!(target_span, "cannot index into `{}`", self.ty()),
@@ -202,7 +207,6 @@ impl Value {
             ),
         }
     }
-    
 }
 
 impl fmt::Display for Value {

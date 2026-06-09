@@ -1,10 +1,10 @@
-use compose_library::{Value, Vm};
-use ecow::EcoVec;
-use std::sync::{Arc, Mutex};
 use compose_library::diag::SourceResult;
 use compose_library::foundations::iterator::ValueIterator;
 use compose_library::foundations::types::Array;
 use compose_library::gc::{Trace, UntypedRef};
+use compose_library::{Value, Vm};
+use ecow::EcoVec;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct ArrayIter {
@@ -37,7 +37,6 @@ impl ArrayIter {
             index: Arc::new(Mutex::new(0)),
         }
     }
-    
 }
 
 impl From<EcoVec<Value>> for ArrayIter {

@@ -5,6 +5,7 @@ pub enum SyntaxKind {
     AmpersandEq,
     Apostrophe,
     Args,
+    ThinArrow,
     Arrow,
     AsKW,
     Assignment,
@@ -49,7 +50,6 @@ pub enum SyntaxKind {
     FuncCall,
     Gt,
     GtEq,
-    GtGt,
     Hash,
     Hat,
     HatEq,
@@ -67,7 +67,6 @@ pub enum SyntaxKind {
     LoopKW,
     Lt,
     LtEq,
-    LtLt,
     Minus,
     MinusEq,
     MutKW,
@@ -120,8 +119,11 @@ pub enum SyntaxKind {
     TypedPattern,
     IsExpression,
     Code,
-    TypeAnnotation,
+    Type,
     WhiteSpace,
+    FnKw,
+    TypeArgs,
+    FnItem,
 }
 
 impl SyntaxKind {
@@ -134,17 +136,24 @@ impl SyntaxKind {
     pub(crate) fn is_terminator(&self) -> bool {
         matches!(
             self,
-            Self::End | Self::Semicolon | Self::RightBrace | Self::RightParen | Self::RightBracket
+            Self::End
+                | Self::Semicolon
+                | Self::RightBrace
+                | Self::RightParen
+                | Self::RightBracket
+                | Self::Gt
         )
     }
 
     pub(crate) fn descriptive_name(&self) -> &'static str {
-        match self { SyntaxKind::Amp => "&",
+        match self {
+            SyntaxKind::Amp => "&",
             SyntaxKind::AmpAmp => "&&",
             SyntaxKind::AmpersandEq => "&=",
             SyntaxKind::Apostrophe => "'",
             SyntaxKind::Args => "argument list",
             SyntaxKind::Array => "array",
+            SyntaxKind::ThinArrow => "->",
             SyntaxKind::Arrow => "=>",
             SyntaxKind::AsKW => "as",
             SyntaxKind::Assignment => "assignment",
@@ -192,7 +201,6 @@ impl SyntaxKind {
             SyntaxKind::FuncCall => "function call",
             SyntaxKind::Gt => ">",
             SyntaxKind::GtEq => ">=",
-            SyntaxKind::GtGt => ">>",
             SyntaxKind::Hash => "#",
             SyntaxKind::Hat => "^",
             SyntaxKind::HatEq => "^=",
@@ -212,7 +220,6 @@ impl SyntaxKind {
             SyntaxKind::LoopKW => "loop",
             SyntaxKind::Lt => "<",
             SyntaxKind::LtEq => "<=",
-            SyntaxKind::LtLt => "<<",
             SyntaxKind::MapEntry => "map entry",
             SyntaxKind::MapLiteral => "map literal",
             SyntaxKind::Minus => "-",
@@ -249,7 +256,7 @@ impl SyntaxKind {
             SyntaxKind::Str => "string literal",
             SyntaxKind::Tilde => "~",
             SyntaxKind::TildeEq => "~=",
-            SyntaxKind::TypeAnnotation => "type",
+            SyntaxKind::Type => "type",
             SyntaxKind::Lambda => "trailing lambda",
             SyntaxKind::Unary => "unary expression",
             SyntaxKind::Underscore => "_",
@@ -261,6 +268,9 @@ impl SyntaxKind {
             SyntaxKind::MatchExpression => "match expression",
             SyntaxKind::TypedPattern => "type binding pattern",
             SyntaxKind::WhiteSpace => "whitespace",
+            SyntaxKind::FnKw => "fn",
+            SyntaxKind::TypeArgs => "type params",
+            SyntaxKind::FnItem => "function",
         }
     }
 
@@ -273,6 +283,8 @@ impl SyntaxKind {
             Self::RightParen => Some(Self::LeftParen),
             Self::RightBracket => Some(Self::LeftBracket),
             Self::Pipe => Some(Self::Pipe),
+            Self::Gt => Some(Self::Lt),
+            Self::Lt => Some(Self::Gt),
             _ => None,
         }
     }
@@ -280,7 +292,7 @@ impl SyntaxKind {
     pub(crate) fn is_closing_delimiter(&self) -> bool {
         matches!(
             self,
-            Self::RightBrace | Self::RightParen | Self::RightBracket
+            Self::RightBrace | Self::RightParen | Self::RightBracket | Self::Gt
         )
     }
 
@@ -294,6 +306,8 @@ impl SyntaxKind {
                 | Self::RightParen
                 | Self::RightBracket
                 | Self::Pipe
+                | Self::Gt
+                | Self::Lt
         )
     }
     pub(crate) fn is_keyword(&self) -> bool {
@@ -318,6 +332,7 @@ impl SyntaxKind {
                 | Self::WhileKW
                 | Self::PubKW
                 | Self::MatchKW
+                | Self::FnKw
         )
     }
 }

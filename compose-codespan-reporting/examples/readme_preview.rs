@@ -7,11 +7,11 @@
 //! cargo run --example readme_preview svg > compose-codespan-reporting/assets/readme_preview.svg
 //! ```
 
-use compose_codespan_reporting as codespan_reporting;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use codespan_reporting::term::{self, ColorArg};
+use compose_codespan_reporting as codespan_reporting;
 use std::io::{self, Write};
 use structopt::StructOpt;
 

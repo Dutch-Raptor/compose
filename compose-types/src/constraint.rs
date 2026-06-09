@@ -2,7 +2,6 @@ use crate::{
     intern::InterfaceName,
     ty::{LiteralKind, Ty},
 };
-use compose_resolve::SymbolId;
 use compose_syntax::Span;
 
 // ── Constraint Origins ────────────────────────────────────────────────────────
@@ -44,10 +43,6 @@ pub enum ConstraintOrigin {
     },
     /// Explicit type annotation: `let x: i32 = ...`
     Annotation { annotated_span: Span },
-    /// The tail expression determines the block's type.
-    BlockTail { span: Span },
-    /// A block with no tail expression is Unit.
-    EmptyBlock { span: Span },
     /// A binary operator requires specific operand types.
     BinaryOp {
         op_span: Span,
@@ -69,8 +64,6 @@ impl ConstraintOrigin {
             ConstraintOrigin::BranchArm { this_arm_span, .. } => *this_arm_span,
             ConstraintOrigin::MethodCall { arg_span, .. } => *arg_span,
             ConstraintOrigin::Annotation { annotated_span } => *annotated_span,
-            ConstraintOrigin::BlockTail { span } => *span,
-            ConstraintOrigin::EmptyBlock { span } => *span,
             ConstraintOrigin::BinaryOp { op_span, .. } => *op_span,
         }
     }
@@ -80,37 +73,11 @@ impl ConstraintOrigin {
 
 #[derive(Debug, Clone)]
 pub enum BoundOrigin {
-    /// A function was called that requires `T: Interface` on one of its params.
-    FunctionBound {
-        fn_name: SymbolId,
-        param_name: SymbolId,
-        /// Span of the bound declaration in the function signature.
-        bound_decl_span: Span,
-        call_span: Span,
-    },
     /// A value was used where `dyn Interface` was expected.
     DynCoercion {
         expected_span: Span,
         value_span: Span,
     },
-    /// A method was called on a type variable, implying the interface
-    /// that method belongs to.
-    MethodCall {
-        method_name: SymbolId,
-        interface: InterfaceName,
-        call_span: Span,
-        receiver_span: Span,
-    },
-}
-
-impl BoundOrigin {
-    pub fn primary_span(&self) -> Span {
-        match self {
-            BoundOrigin::FunctionBound { call_span, .. } => *call_span,
-            BoundOrigin::DynCoercion { value_span, .. } => *value_span,
-            BoundOrigin::MethodCall { call_span, .. } => *call_span,
-        }
-    }
 }
 
 // ── Constraints ───────────────────────────────────────────────────────────────

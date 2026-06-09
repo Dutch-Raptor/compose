@@ -72,7 +72,9 @@ impl NormalKeybinding {
                         clipboard.set_text(txt.to_string()).unwrap();
                         editor.delete();
                     } else {
-                        clipboard.set_text(editor.remove_line(editor.focus.ln)).unwrap();
+                        clipboard
+                            .set_text(editor.remove_line(editor.focus.ln))
+                            .unwrap();
                     }
                 }
             }
@@ -84,7 +86,7 @@ impl NormalKeybinding {
                     }
                 }
             }
-            
+
             KeyCode::Tab => {
                 editor.clamp();
                 let soft = 4 - editor.focus.col % 4;

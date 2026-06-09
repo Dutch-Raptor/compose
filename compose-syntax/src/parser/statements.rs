@@ -1,12 +1,13 @@
 use crate::fix::FixBuilder;
 use crate::kind::SyntaxKind;
-use crate::parser::expressions::{code_expr_prec, code_expression};
-use crate::parser::ty::parse_type_annotation;
 use crate::parser::Parser;
-use crate::parser::{pattern, ExprContext};
+use crate::parser::expressions::{code_expr_prec, code_expression};
+use crate::parser::funcs::fn_item;
+use crate::parser::ty::parse_type;
+use crate::parser::{ExprContext, pattern};
 use crate::precedence::Precedence;
-use crate::set::{syntax_set, SyntaxSet, ASSIGN_OP};
-use crate::{set, PatchEngine, SyntaxNode};
+use crate::set::{ASSIGN_OP, SyntaxSet, syntax_set};
+use crate::{PatchEngine, SyntaxNode, set};
 use compose_error_codes::{
     E0003_EXPECTED_BINDING_AFTER_LET, E0006_UNTERMINATED_STATEMENT,
     E0007_MISSING_EQUALS_AFTER_LET_BINDING,
@@ -50,6 +51,17 @@ pub(super) fn statement(p: &mut Parser) {
 
         p.wrap(m, SyntaxKind::Assignment)
     }
+}
+
+pub(super) fn item(p: &mut Parser) {
+    trace_fn!("parse_item");
+
+    if p.at(SyntaxKind::FnKw) {
+        fn_item(p);
+        return;
+    }
+
+    statement(p);
 }
 
 pub fn continue_statement(p: &mut Parser) {
@@ -115,7 +127,7 @@ pub fn let_binding(p: &mut Parser) {
     }
 
     if p.eat_if(SyntaxKind::Colon) {
-        parse_type_annotation(p);
+        parse_type(p);
     }
 
     if p.eat_if(SyntaxKind::Eq) {
@@ -149,10 +161,16 @@ pub fn code(p: &mut Parser, end_set: SyntaxSet) {
         }
 
         trace_fn!("code", "loop pos= {}", pos);
-        statement(p);
+        item(p);
 
         // Expect the end of an expression. Either a semicolon or a newline.
-        if !p.end() && !p.eat_if(SyntaxKind::Semicolon) && !p.at_set(set::STMT_TERMINATOR) {
+        let last_node = p.last_node();
+        let is_definition_item = last_node.is_some_and(|node| node.kind() == SyntaxKind::FnItem);
+        if !is_definition_item
+            && !p.end()
+            && !p.eat_if(SyntaxKind::Semicolon)
+            && !p.at_set(set::STMT_TERMINATOR)
+        {
             let mut engine = PatchEngine::new();
             let stmt_span = p
                 .last_node()
@@ -317,7 +335,7 @@ mod tests {
                 LetKW("let")
                 Ident("x")
                 Colon(":")
-                TypeAnnotation [
+                Type [
                     Ident("i32")
                 ]
                 Eq("=")
@@ -334,13 +352,15 @@ mod tests {
                 LetKW("let")
                 Ident("xs")
                 Colon(":")
-                TypeAnnotation [
+                Type [
                     Ident("Array")
-                    Lt("<")
-                    TypeAnnotation [
-                        Ident("Int")
+                    TypeArgs [
+                        Lt("<")
+                        Type [
+                            Ident("Int")
+                        ]
+                        Gt(">")
                     ]
-                    Gt(">")
                 ]
                 Eq("=")
                 Array [

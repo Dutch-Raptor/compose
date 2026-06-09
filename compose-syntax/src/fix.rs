@@ -15,7 +15,7 @@ pub struct Fix {
 pub enum FixDisplay {
     Inline {
         /// The span to attach the label to
-        span: Span
+        span: Span,
     },
     Footer,
 }
@@ -27,8 +27,7 @@ pub struct FixBuilder {
     span: Span,
 }
 
-impl FixBuilder {
-}
+impl FixBuilder {}
 
 impl<'src> FixBuilder {
     pub fn new(message: impl Into<EcoString>, span: Span) -> Self {
@@ -46,7 +45,7 @@ impl<'src> FixBuilder {
     }
 
     pub fn insert_before(&mut self, node: &impl HasSpan, text: &str) -> &mut FixBuilder {
-        _ =self.engine.insert_before(node, text);
+        _ = self.engine.insert_before(node, text);
         self
     }
 

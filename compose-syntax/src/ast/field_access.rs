@@ -1,20 +1,23 @@
-use crate::ast::{Expr, Ident};
 use crate::ast::macros::node;
+use crate::ast::{Expr, Ident};
 
-node!{
+node! {
     struct FieldAccess
 }
 
 impl<'a> FieldAccess<'a> {
-    pub fn target(self) -> Expr<'a> { self.0.cast_first() }
-    pub fn field(self) -> Ident<'a> { self.0.cast_last() }
+    pub fn target(self) -> Expr<'a> {
+        self.0.cast_first()
+    }
+    pub fn field(self) -> Ident<'a> {
+        self.0.cast_last()
+    }
 }
-
 
 #[cfg(test)]
 mod tests {
-    use crate::assert_ast;
     use super::*;
+    use crate::assert_ast;
 
     #[test]
     fn field_access() {

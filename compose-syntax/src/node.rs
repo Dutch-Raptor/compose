@@ -118,7 +118,7 @@ impl SyntaxNode {
             Repr::Inner(i) => i.children.iter(),
         }
     }
-    
+
     pub fn to_children(&self) -> Vec<SyntaxNode> {
         match &self.0 {
             Repr::Leaf(_) | Repr::Error(_) => vec![],
@@ -231,7 +231,6 @@ impl SyntaxNode {
         }
     }
 }
-
 
 impl Default for SyntaxNode {
     fn default() -> Self {

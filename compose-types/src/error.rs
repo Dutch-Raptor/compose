@@ -1,12 +1,11 @@
 use crate::{
-    bounds::BoundEntry,
+    InferenceGraph,
     constraint::{BoundOrigin, ConstraintOrigin},
     graph::{EdgeKind, InferenceReason, TrailEntry},
     intern::InterfaceName,
     namer::VarNamer,
     subst::Substitution,
     ty::{LiteralKind, Ty, TypeVar},
-    InferenceGraph,
 };
 use compose_syntax::Span;
 
@@ -48,19 +47,6 @@ pub enum TypeError {
         interface_args: Vec<Ty>,
         origin: BoundOrigin,
         span: Span,
-    },
-
-    /// A method/operation inside a generic function requires a bound
-    /// not declared in the function's signature.
-    MissingBoundInSignature {
-        /// The type parameter variable.
-        type_param: TypeVar,
-        /// The interface that was required but not declared.
-        required: InterfaceName,
-        origin: BoundOrigin,
-        span: Span,
-        /// The bounds that *were* declared — shown in the diagnostic.
-        declared_bounds: Vec<BoundEntry>,
     },
 }
 
@@ -128,11 +114,6 @@ impl Diagnostic {
         self
     }
 
-    fn note(mut self, message: impl Into<String>) -> Self {
-        self.notes.push(message.into());
-        self
-    }
-
     fn suggest(
         mut self,
         span: Span,
@@ -190,13 +171,6 @@ impl<'a> DiagnosticRenderer<'a> {
                 span,
                 ..
             } => self.render_bound_not_satisfied(ty, interface, origin, *span),
-            TypeError::MissingBoundInSignature {
-                type_param,
-                required,
-                origin,
-                span,
-                declared_bounds,
-            } => self.render_missing_bound(type_param, required, origin, *span, declared_bounds),
         }
     }
 
@@ -320,13 +294,6 @@ impl<'a> DiagnosticRenderer<'a> {
                     let name = self.namer.name_for(entry.var);
                     format!("`{name}` inferred as `{ty}` from this expression")
                 }
-                TrailRole::StructuralIntroduction { parent, position } => {
-                    let parent_name = self.namer.name_for(*parent);
-                    format!(
-                        "`{parent_name}` constructed here — its {} is not yet known",
-                        position.describe()
-                    )
-                }
                 TrailRole::Relation => continue,
             };
 
@@ -405,80 +372,9 @@ impl<'a> DiagnosticRenderer<'a> {
             .primary(span, format!("`{ty}` does not implement `{interface}`"));
 
         match origin {
-            BoundOrigin::FunctionBound {
-                fn_name,
-                param_name,
-                bound_decl_span,
-                call_span,
-            } => {
-                diag = diag
-                    .secondary(
-                        *bound_decl_span,
-                        format!("`{param_name:?}: {interface}` required by `{fn_name:?}` here"),
-                    )
-                    .secondary(*call_span, "called here");
-            }
             BoundOrigin::DynCoercion { expected_span, .. } => {
                 diag = diag.secondary(*expected_span, format!("`dyn {interface}` expected here"));
             }
-            BoundOrigin::MethodCall {
-                method_name,
-                call_span,
-                ..
-            } => {
-                diag = diag.secondary(
-                    *call_span,
-                    format!("method `{method_name:?}` requires `{interface}`"),
-                );
-            }
-        }
-
-        diag
-    }
-
-    fn render_missing_bound(
-        &self,
-        type_param: &TypeVar,
-        required: &InterfaceName,
-        origin: &BoundOrigin,
-        span: Span,
-        declared_bounds: &[BoundEntry],
-    ) -> Diagnostic {
-        let name = self.namer.name_for(*type_param);
-
-        let mut diag = Diagnostic::error(format!("`{name}` does not implement `{required}`"))
-            .primary(span, format!("requires `{name}: {required}`"));
-
-        match origin {
-            BoundOrigin::MethodCall { method_name, .. } => {
-                diag = diag.secondary(
-                    span,
-                    format!("method `{method_name:?}` requires `{required}`"),
-                );
-            }
-            _ => {}
-        }
-
-        if declared_bounds.is_empty() {
-            diag = diag
-                .note(format!("`{name}` has no bounds in the function signature"))
-                .suggest(
-                    declared_bounds
-                        .first()
-                        .map(|b| b.declared_at)
-                        .unwrap_or(span),
-                    format!("add the required bound: `{name}: {required}`"),
-                    format!("{name}: {required}"),
-                );
-        } else {
-            let bounds_str = declared_bounds
-                .iter()
-                .map(|b| b.interface.to_string())
-                .collect::<Vec<_>>()
-                .join(" + ");
-            diag = diag.note(format!(
-                "`{name}` only has these bounds: `{bounds_str}` — `{required}` is not among them"
-            ));
         }
 
         diag

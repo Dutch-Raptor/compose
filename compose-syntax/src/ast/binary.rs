@@ -1,4 +1,4 @@
-use crate::ast::{node, Expr};
+use crate::ast::{Expr, node};
 use crate::kind::SyntaxKind;
 use crate::precedence::{Precedence, PrecedenceTrait};
 
@@ -51,8 +51,6 @@ impl BinOp {
             SyntaxKind::Amp => Self::BitAnd,
             SyntaxKind::Pipe => Self::BitOr,
             SyntaxKind::Hat => Self::BitXor,
-            SyntaxKind::LtLt => Self::BitShl,
-            SyntaxKind::GtGt => Self::BitShr,
 
             _ => return None,
         })
@@ -133,7 +131,7 @@ impl<'a> Binary<'a> {
 mod tests {
     use super::*;
     use crate::assert_ast;
-    use crate::ast::{Int};
+    use crate::ast::Int;
 
     #[test]
     fn test_binop() {

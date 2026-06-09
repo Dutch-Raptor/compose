@@ -1,8 +1,8 @@
 use compose_library::gc::trigger::GcEvent;
+use compose_library::gc::{Heap, Trace};
 use slotmap::SecondaryMap;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
-use compose_library::gc::{Heap, Trace};
 
 impl Heap {
     pub fn maybe_gc(&mut self, root: &impl Trace) -> Option<CleanResult> {
@@ -53,9 +53,9 @@ impl Heap {
             total_allocated,
             gc_duration,
         };
-        
+
         self.policy.after_gc(&result, &self.metadata());
-        
+
         result
     }
 }

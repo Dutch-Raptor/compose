@@ -1,5 +1,7 @@
 use crate::kind::SyntaxKind;
+use crate::parser::expressions::block;
 use crate::parser::statements::code;
+use crate::parser::ty::{parse_type, parse_type_args};
 use crate::parser::{ExprContext, Parser};
 use crate::parser::{expressions, pattern};
 use crate::precedence::Precedence;
@@ -9,6 +11,44 @@ use crate::set::{ARG_RECOVER, syntax_set};
 use compose_error_codes::E0009_ARGS_MISSING_COMMAS;
 use compose_utils::trace_fn;
 use std::collections::HashSet;
+
+pub fn fn_item(p: &mut Parser) {
+    trace_fn!("fn_item");
+    let m = p.marker();
+
+    p.assert(SyntaxKind::FnKw);
+
+    p.assert(SyntaxKind::Ident);
+
+    if p.at(SyntaxKind::Lt) {
+        parse_type_args(p);
+    }
+
+    let params_start_m = p.marker();
+    p.expect(SyntaxKind::LeftParen);
+
+    while !p.current().is_terminator() {
+        param(p, &mut HashSet::new(), false);
+
+        if !p.current().is_terminator() && !p.eat_if(SyntaxKind::Comma) {
+            p.insert_error_before("expected a comma between the function arguments")
+                .with_code(&E0009_ARGS_MISSING_COMMAS)
+                .with_label_message("help: insert a comma here");
+        }
+    }
+
+    p.expect_closing_delimiter(params_start_m, SyntaxKind::RightParen);
+
+    p.wrap(params_start_m, SyntaxKind::Params);
+
+    if p.eat_if(SyntaxKind::ThinArrow) {
+        parse_type(p);
+    }
+
+    block(p);
+
+    p.wrap(m, SyntaxKind::FnItem);
+}
 
 pub fn args(p: &mut Parser) {
     trace_fn!("parse_args");
@@ -63,7 +103,7 @@ pub(crate) fn lambda(p: &mut Parser) {
 
     let param_marker = p.marker();
     while !p.at_set(syntax_set!(Arrow, End)) {
-        param(p, &mut seen);
+        param(p, &mut seen, true);
 
         if !p.at(SyntaxKind::Arrow) && !p.eat_if(SyntaxKind::Comma) {
             p.insert_error_before("expected a comma between the function parameters")
@@ -190,7 +230,7 @@ pub fn closure_params(p: &mut Parser) -> bool {
 
     if !wrapped_in_parens {
         // Only allow one param if not wrapped
-        param(p, &mut seen);
+        param(p, &mut seen, true);
     } else {
         while !p.current().is_terminator() {
             if !p.at_set(set::PARAM) {
@@ -199,7 +239,7 @@ pub fn closure_params(p: &mut Parser) -> bool {
                 continue;
             }
 
-            param(p, &mut seen);
+            param(p, &mut seen, true);
 
             if !p.current().is_terminator() {
                 okay &= p.expect_or_recover(SyntaxKind::Comma, ARG_RECOVER);
@@ -221,24 +261,30 @@ pub fn closure_params(p: &mut Parser) -> bool {
     okay
 }
 
-fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>) {
+fn param<'s>(p: &mut Parser<'s>, seen: &mut HashSet<&'s str>, optional_type_annotations: bool) {
     trace_fn!("parse_param");
     let m = p.marker();
 
     p.eat_if(SyntaxKind::RefKW);
     p.eat_if(SyntaxKind::MutKW);
 
-    let was_at_pat = p.at_set(set::PATTERN);
     let pat_m = p.marker();
 
     pattern::pattern(p, false, false, seen);
 
-    // Parse named params like `a: 1`
-    if p.eat_if(SyntaxKind::Colon) {
-        if was_at_pat && p[pat_m].kind() != SyntaxKind::Ident {
-            p[m].expected("identifier");
-        }
+    let at_type_annot = p.at(SyntaxKind::Colon);
+    if !at_type_annot && !optional_type_annotations {
+        p.insert_error_here("type annotations are required here");
+    }
 
+    if at_type_annot {
+        p.assert(SyntaxKind::Colon);
+
+        parse_type(p);
+    }
+
+    // Parse default parameters `a: int = 4`
+    if p.eat_if(SyntaxKind::Eq) {
         expressions::code_expression(p);
         p.wrap(pat_m, SyntaxKind::Named)
     }
@@ -318,12 +364,12 @@ mod tests {
     #[test]
     fn test_parse_closure_named_param() {
         assert_parse_tree!(
-            "{a: b => () }",
+            "{a = b => () }",
             Lambda [
                 LeftBrace("{")
                 Params [
                     Param [
-                        Named [ Ident("a") Colon(":") Ident("b") ]
+                        Named [ Ident("a") Eq("=") Ident("b") ]
                     ]
                 ]
                 Arrow("=>")
@@ -372,7 +418,7 @@ mod tests {
     #[test]
     fn test_parse_args_named() {
         assert_parse_tree!(
-            "f(a: b)",
+            "f(a : b)",
             FuncCall [
                 Ident("f")
                 Args [
@@ -609,5 +655,55 @@ mod tests {
                 ]
             ]
         )
+    }
+
+    #[test]
+    fn test_parse_fn_item() {
+        assert_parse_tree!("fn add<Foo<T>>(a: T, b: T) -> T { a + b }",
+            FnItem [
+                FnKw("fn")
+                Ident("add")
+                TypeArgs [
+                    Lt("<")
+                    Type [
+                        Ident("Foo")
+                        TypeArgs [
+                            Lt("<")
+                            Type [
+                                Ident("T")
+                            ]
+                            Gt(">")
+                        ]
+                    ]
+                    Gt(">")
+                ]
+                Params [
+                    LeftParen("(")
+                    Param [
+                        Ident("a")
+                        Colon(":")
+                        Type [
+                            Ident("T")
+                        ]
+                    ]
+                    Comma(",")
+                    Param [
+                        Ident("b")
+                        Colon(":")
+                        Type [
+                            Ident("T")
+                        ]
+                    ]
+                    RightParen(")")
+                ]
+                ThinArrow("->")
+                Type [
+                    Ident("T")
+                ]
+                CodeBlock [
+                    ...
+                ]
+            ]
+        );
     }
 }

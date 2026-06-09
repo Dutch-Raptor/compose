@@ -1,15 +1,15 @@
+use crate::evaluated::Evaluated;
 use crate::vm::ErrorMode;
 use crate::{Eval, Machine};
-use compose_library::diag::{bail, At, SourceResult, Spanned, Trace, TracePoint};
-use compose_syntax::ast::AstNode;
-use compose_syntax::{ast, Label, Span};
-use ecow::{eco_format, EcoString, EcoVec};
-use extension_traits::extension;
+use compose_library::Value;
+use compose_library::diag::{At, SourceResult, Spanned, Trace, TracePoint, bail};
 use compose_library::foundations::args::{Arg, Args};
 use compose_library::foundations::scope::{NativeScope, UnboundItem};
 use compose_library::foundations::types::{Func, Type};
-use compose_library::Value;
-use crate::evaluated::Evaluated;
+use compose_syntax::ast::AstNode;
+use compose_syntax::{Label, Span, ast};
+use ecow::{EcoString, EcoVec, eco_format};
+use extension_traits::extension;
 
 impl Eval for ast::FuncCall<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

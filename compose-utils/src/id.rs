@@ -29,7 +29,7 @@ impl<I: Id> IdStore<I> {
         self.values = self.values.saturating_add(1);
         I::from_nonzero_u64(id)
     }
-    
+
     pub fn current(&self) -> I {
         I::from_nonzero_u64(self.values)
     }

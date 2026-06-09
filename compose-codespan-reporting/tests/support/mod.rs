@@ -1,7 +1,7 @@
-use compose_codespan_reporting as codespan_reporting;
 use codespan_reporting::diagnostic::Diagnostic;
 use codespan_reporting::files::Files;
-use codespan_reporting::term::{emit, Config};
+use codespan_reporting::term::{Config, emit};
+use compose_codespan_reporting as codespan_reporting;
 
 use termcolor::{Buffer, WriteColor};
 

@@ -26,11 +26,10 @@ impl<'a> MapEntry<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::ast::Str;
     use crate::assert_ast;
+    use crate::ast::Str;
     use crate::ast::{Ident, Int, MapEntry, MapLiteral};
 
     #[test]

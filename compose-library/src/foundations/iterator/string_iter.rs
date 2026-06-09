@@ -1,10 +1,10 @@
+use compose_library::Value;
 use compose_library::diag::SourceResult;
-use compose_library::vm::Vm;
-use compose_library::{Value};
-use ecow::EcoString;
-use std::sync::{Arc, Mutex};
 use compose_library::foundations::cast::IntoValue;
 use compose_library::foundations::iterator::ValueIterator;
+use compose_library::vm::Vm;
+use ecow::EcoString;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct StringIterator {
@@ -18,7 +18,7 @@ impl PartialEq for StringIterator {
             return false;
         }
 
-        // Load the positions of each iterator. 
+        // Load the positions of each iterator.
         let pos_a = self.byte_pos.lock().expect("Poisoned");
         let pos_b = self.byte_pos.lock().expect("Poisoned");
 
@@ -32,7 +32,10 @@ impl PartialEq for StringIterator {
 
 impl StringIterator {
     pub fn new(s: EcoString) -> Self {
-        Self { s, byte_pos: Arc::new(Mutex::new(0)) }
+        Self {
+            s,
+            byte_pos: Arc::new(Mutex::new(0)),
+        }
     }
 }
 
@@ -45,7 +48,7 @@ impl ValueIterator for StringIterator {
         }
 
         let Some(c) = self.s[*idx..].chars().next() else {
-            return Ok(None)
+            return Ok(None);
         };
 
         *idx += c.len_utf8();

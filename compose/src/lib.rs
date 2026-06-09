@@ -230,10 +230,10 @@ assert_eq!(Value::Int(5), value);
 
 To learn more about embedding Compose in your application, check out the [embedding] documentation.
 */
+pub mod cli;
+pub mod embedding;
 pub mod implementation;
 pub mod language;
-pub mod embedding;
-pub mod cli;
 
 pub use compose_eval::{eval_source, eval_source_range, test};
 pub use compose_library::{SourceResult, World, diag::SourceDiagnostic, diag::Warned};

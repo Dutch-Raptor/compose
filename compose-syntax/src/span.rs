@@ -1,9 +1,9 @@
+use crate::SyntaxNode;
 use crate::file::{FileId, VirtualPath};
 use std::fmt::{Debug, Formatter};
 use std::num::{NonZeroU16, NonZeroU64};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
-use crate::SyntaxNode;
 
 /// Defines a range in a source file.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -94,9 +94,9 @@ impl Span {
 
         Some(start..end)
     }
-    
+
     pub fn len(self) -> Option<usize> {
-        self.range().map(|r| r.len())   
+        self.range().map(|r| r.len())
     }
 
     pub fn join(left: Span, right: Span) -> Span {

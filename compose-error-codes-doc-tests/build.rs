@@ -15,7 +15,12 @@ fn main() {
                 .with_code_block_error_mode(ErrorHandlingMode::EmitAsTests)
                 .with_output_block_error_mode(ErrorHandlingMode::EmitAsTests),
         )
-            .unwrap_or_else(|e| panic!("failed to convert markdown for {} at {}: {}", code.name, e.line, e.message));
+        .unwrap_or_else(|e| {
+            panic!(
+                "failed to convert markdown for {} at {}: {}",
+                code.name, e.line, e.message
+            )
+        });
 
         let ty_name = format!(
             "DOC_{}_{}",

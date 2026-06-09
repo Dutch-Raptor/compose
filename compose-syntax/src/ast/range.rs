@@ -1,5 +1,5 @@
-use crate::ast::macros::node;
 use crate::ast::Expr;
+use crate::ast::macros::node;
 use crate::{SyntaxKind, SyntaxNode};
 
 node! {
@@ -22,7 +22,7 @@ impl<'a> Range<'a> {
                 break;
             }
         }
-        
+
         children.find_map(SyntaxNode::cast)
     }
 

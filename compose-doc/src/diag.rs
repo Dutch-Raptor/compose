@@ -1,20 +1,23 @@
+use crate::DiagMode;
 use compose_codespan_reporting::term::Config;
 use compose_codespan_reporting::term::termcolor::{Ansi, NoColor, WriteColor};
-use compose_library::diag::{write_diagnostics, SourceDiagnostic};
 use compose_library::World;
-use crate::DiagMode;
+use compose_library::diag::{SourceDiagnostic, write_diagnostics};
 
 pub(crate) trait At<T> {
     fn at(self, line_nr: usize) -> Result<T, Error>;
 }
 
-impl<T, E> At<T> for Result<T, E> where E: std::fmt::Display {
+impl<T, E> At<T> for Result<T, E>
+where
+    E: std::fmt::Display,
+{
     fn at(self, line_nr: usize) -> Result<T, Error> {
         self.map_err(|e| Error {
             message: e.to_string(),
             line: line_nr,
         })
-    }   
+    }
 }
 
 #[derive(Debug)]

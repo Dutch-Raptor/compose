@@ -3,8 +3,8 @@ mod equality;
 use crate::Value;
 use crate::diag::StrResult;
 pub use compose_library::foundations::ops::equality::*;
-use ecow::eco_format;
 use compose_library::gc::Heap;
+use ecow::eco_format;
 
 macro_rules! type_error {
     ($fmt:expr, $($value:expr),* $(,)?) => {

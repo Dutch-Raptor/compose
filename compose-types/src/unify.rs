@@ -1,6 +1,6 @@
 use crate::{
-    bounds::{InterfaceTable, TypeParamEnv},
-    constraint::{partition, BoundOrigin, Constraint, ConstraintOrigin},
+    bounds::InterfaceTable,
+    constraint::{BoundOrigin, Constraint, ConstraintOrigin, partition},
     error::TypeError,
     graph::{InferenceGraph, InferenceReason, InferenceStep},
     subst::Substitution,
@@ -15,9 +15,6 @@ pub struct Unifier<'env> {
     pub subst: Substitution,
     pub errors: Vec<TypeError>,
     pub graph: InferenceGraph,
-    /// Active only while checking a generic function body.
-    /// None at call sites.
-    pub type_param_env: Option<&'env TypeParamEnv>,
     pub interface_table: &'env InterfaceTable,
 }
 
@@ -27,14 +24,8 @@ impl<'env> Unifier<'env> {
             subst: Substitution::default(),
             errors: Vec::new(),
             graph: InferenceGraph::default(),
-            type_param_env: None,
             interface_table,
         }
-    }
-
-    pub fn with_type_param_env(mut self, env: &'env TypeParamEnv) -> Self {
-        self.type_param_env = Some(env);
-        self
     }
 
     // ── Main entry point ──────────────────────────────────────────────────────
@@ -131,7 +122,7 @@ impl<'env> Unifier<'env> {
                     _ => {}
                 }
 
-                let step = inference_step_from_origin(origin, &Ty::Var(v2), span);
+                let step = inference_step_from_origin(origin, &Ty::Var(v2));
                 self.subst.union_vars(c1, c2, step, &mut self.graph);
                 Ok(())
             }
@@ -231,7 +222,7 @@ impl<'env> Unifier<'env> {
             return Ok(());
         }
 
-        let step = inference_step_from_origin(origin, &ty, span);
+        let step = inference_step_from_origin(origin, &ty);
         self.subst
             .bind_with_evidence(canonical, ty, step, &mut self.graph)
             .map_err(|e| TypeError::InfiniteType {
@@ -390,29 +381,10 @@ impl<'env> Unifier<'env> {
             // Unresolved type variable.
             Ty::Var(v) => {
                 let canonical = self.subst.canonical(v);
-                match self.type_param_env {
-                    // Inside a generic function body — check declared bounds.
-                    Some(env) => {
-                        if !env.satisfies(&canonical, &interface) {
-                            let declared = env.bounds_for(&canonical).to_vec();
-                            self.errors.push(TypeError::MissingBoundInSignature {
-                                type_param: canonical,
-                                required: interface,
-                                origin,
-                                span,
-                                declared_bounds: declared,
-                            });
-                        }
-                        // else: bound satisfied by declaration — ok.
-                    }
-                    // Not inside a generic function — truly ambiguous.
-                    None => {
-                        self.errors.push(TypeError::AmbiguousType {
-                            var: canonical,
-                            span,
-                        });
-                    }
-                }
+                self.errors.push(TypeError::AmbiguousType {
+                    var: canonical,
+                    span,
+                });
             }
 
             // Concrete type — check the interface table.
@@ -434,7 +406,7 @@ impl<'env> Unifier<'env> {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Build an InferenceStep from a constraint origin and the type being bound.
-fn inference_step_from_origin(origin: &ConstraintOrigin, ty: &Ty, span: Span) -> InferenceStep {
+fn inference_step_from_origin(origin: &ConstraintOrigin, ty: &Ty) -> InferenceStep {
     let (step_span, reason) = match origin {
         ConstraintOrigin::MethodCall {
             arg_span,
@@ -492,7 +464,6 @@ fn inference_step_from_origin(origin: &ConstraintOrigin, ty: &Ty, span: Span) ->
         ConstraintOrigin::BinaryOp { op_span, .. } => {
             (*op_span, InferenceReason::BinaryOp { op_span: *op_span })
         }
-        _ => (span, InferenceReason::Annotation),
     };
 
     InferenceStep {

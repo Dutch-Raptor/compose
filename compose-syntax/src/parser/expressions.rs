@@ -1250,7 +1250,7 @@ mod tests {
     #[test]
     fn parse_expr_with_braces() {
         assert_parse_tree!(
-            "{ x: { x: }, y: { y: { 2 }} => { println(x, { y }) } }()",
+            "{ x = { x: }, y = { y: { 2 }} => { println(x, { y }) } }()",
             FuncCall [
                 Lambda [
                     LeftBrace("{")
@@ -1258,7 +1258,7 @@ mod tests {
                         Param [
                             Named [
                                 Ident("x")
-                                Colon(":")
+                                Eq("=")
                                 MapLiteral [
                                     LeftBrace("{")
                                     MapEntry [
@@ -1273,7 +1273,7 @@ mod tests {
                         Param [
                             Named [
                                 Ident("y")
-                                Colon(":")
+                                Eq("=")
                                 MapLiteral [
                                     LeftBrace("{")
                                     MapEntry [

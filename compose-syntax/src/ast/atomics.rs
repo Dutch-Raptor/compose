@@ -1,6 +1,6 @@
-use crate::ast::macros::node;
-use crate::ast::{Expr, Statement};
 use crate::SyntaxNode;
+use crate::ast::macros::node;
+use crate::ast::{Expr, FnItem, Statement};
 use ecow::EcoString;
 use std::ops::Deref;
 use unscanny::Scanner;
@@ -60,6 +60,10 @@ node! {
 }
 
 impl<'a> CodeBlock<'a> {
+    pub fn items(self) -> impl DoubleEndedIterator<Item = FnItem<'a>> {
+        self.0.children().filter_map(SyntaxNode::cast)
+    }
+
     pub fn statements(self) -> impl DoubleEndedIterator<Item = Statement<'a>> {
         self.0.children().filter_map(SyntaxNode::cast)
     }

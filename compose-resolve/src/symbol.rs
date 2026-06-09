@@ -1,6 +1,6 @@
+use crate::ExprId;
 use crate::module::ModuleId;
 use crate::scope::ScopeSource;
-use crate::ExprId;
 use compose_typeinfo::SymbolId;
 use ecow::EcoString;
 use fxhash::FxHashMap;

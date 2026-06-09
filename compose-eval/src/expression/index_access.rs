@@ -1,11 +1,11 @@
+use crate::evaluated::Evaluated;
 use crate::vm::Tracked;
 use crate::{Eval, Machine};
+use compose_library::Vm;
 use compose_library::diag::SourceResult;
-use compose_library::{Vm};
 use compose_library::foundations::cast::IntoValue;
 use compose_syntax::ast;
 use compose_syntax::ast::AstNode;
-use crate::evaluated::Evaluated;
 
 impl Eval for ast::IndexAccess<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

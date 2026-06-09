@@ -1,0 +1,137 @@
+
+running 1 test
+[#1]↳ Enter: code loop pos= 2
+  [#2]↳ Enter: parse_statement 
+    [#3]↳ Enter: parse_code_expr_prec Statement 2
+      [#4]↳ Enter: parse_primary_expr 
+        [#5]↳ Enter: fn_item 
+          [#6]↳ Enter: parse_type_args 
+            [#7]↳ Enter: parse_type_args 
+            [#7]↳ Exit:  parse_type_args (took 27.50µs)
+          [#6]↳ Exit:  parse_type_args (took 46.40µs)
+          [#8]↳ Enter: parse_param 
+            [#9]↳ Enter: parse_pattern 
+              [#10]↳ Enter: parse_pattern_leaf 
+                [#11]↳ Enter: parse_code_expr_prec AtomicExpr 16
+                  [#12]↳ Enter: parse_primary_expr 
+                  [#12]↳ Exit:  parse_primary_expr (took 3.50µs)
+                  [#13]↳ Enter: parse_code_expr_prec loop Colon
+                  [#13]↳ Exit:  parse_code_expr_prec loop (took 2.60µs)
+                [#11]↳ Exit:  parse_code_expr_prec (took 20.30µs)
+              [#10]↳ Exit:  parse_pattern_leaf (took 38.20µs)
+            [#9]↳ Exit:  parse_pattern (took 45.70µs)
+          [#8]↳ Exit:  parse_param (took 57.10µs)
+          [#14]↳ Enter: parse_param 
+            [#15]↳ Enter: parse_pattern 
+              [#16]↳ Enter: parse_pattern_leaf 
+                [#17]↳ Enter: parse_code_expr_prec AtomicExpr 22
+                  [#18]↳ Enter: parse_primary_expr 
+                  [#18]↳ Exit:  parse_primary_expr (took 3.00µs)
+                  [#19]↳ Enter: parse_code_expr_prec loop Colon
+                  [#19]↳ Exit:  parse_code_expr_prec loop (took 4.00µs)
+                [#17]↳ Exit:  parse_code_expr_prec (took 17.50µs)
+              [#16]↳ Exit:  parse_pattern_leaf (took 24.30µs)
+            [#15]↳ Exit:  parse_pattern (took 31.60µs)
+          [#14]↳ Exit:  parse_param (took 39.50µs)
+          [#20]↳ Enter: parse_block 
+            [#21]↳ Enter: code loop pos= 35
+              [#22]↳ Enter: parse_statement 
+                [#23]↳ Enter: parse_code_expr_prec Statement 35
+                  [#24]↳ Enter: parse_primary_expr 
+                  [#24]↳ Exit:  parse_primary_expr (took 3.70µs)
+                  [#25]↳ Enter: parse_code_expr_prec loop Plus
+                    [#26]↳ Enter: parse_code_expr_prec Expr 39
+                      [#27]↳ Enter: parse_primary_expr 
+                      [#27]↳ Exit:  parse_primary_expr (took 3.10µs)
+                      [#28]↳ Enter: parse_code_expr_prec loop RightBrace
+                      [#28]↳ Exit:  parse_code_expr_prec loop (took 5.40µs)
+                    [#26]↳ Exit:  parse_code_expr_prec (took 20.30µs)
+                  [#25]↳ Exit:  parse_code_expr_prec loop (took 30.50µs)
+                  [#29]↳ Enter: parse_code_expr_prec loop RightBrace
+                  [#29]↳ Exit:  parse_code_expr_prec loop (took 2.70µs)
+                [#23]↳ Exit:  parse_code_expr_prec (took 49.90µs)
+              [#22]↳ Exit:  parse_statement (took 55.90µs)
+            [#21]↳ Exit:  code (took 61.10µs)
+          [#20]↳ Exit:  parse_block (took 73.70µs)
+        [#5]↳ Exit:  fn_item (took 268.60µs)
+      [#4]↳ Exit:  parse_primary_expr (took 279.90µs)
+      [#30]↳ Enter: parse_code_expr_prec loop End
+      [#30]↳ Exit:  parse_code_expr_prec loop (took 8.00µs)
+    [#3]↳ Exit:  parse_code_expr_prec (took 296.90µs)
+  [#2]↳ Exit:  parse_statement (took 312.80µs)
+[#1]↳ Exit:  code (took 332.30µs)
+test parser::funcs::tests::test_parse_fn_item ... FAILED
+
+failures:
+
+failures:
+    parser::funcs::tests::test_parse_fn_item
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out; finished in 0.00s
+
+
+running 1 test
+[#1]↳ Enter: code loop pos= 2
+  [#2]↳ Enter: parse_statement 
+    [#3]↳ Enter: parse_code_expr_prec Statement 2
+      [#4]↳ Enter: parse_primary_expr 
+        [#5]↳ Enter: fn_item 
+          [#6]↳ Enter: parse_type_args 
+            [#7]↳ Enter: parse_type_args 
+            [#7]↳ Exit:  parse_type_args (took 23.40µs)
+          [#6]↳ Exit:  parse_type_args (took 40.80µs)
+          [#8]↳ Enter: parse_param 
+            [#9]↳ Enter: parse_pattern 
+              [#10]↳ Enter: parse_pattern_leaf 
+                [#11]↳ Enter: parse_code_expr_prec AtomicExpr 16
+                  [#12]↳ Enter: parse_primary_expr 
+                  [#12]↳ Exit:  parse_primary_expr (took 3.20µs)
+                  [#13]↳ Enter: parse_code_expr_prec loop Colon
+                  [#13]↳ Exit:  parse_code_expr_prec loop (took 4.20µs)
+                [#11]↳ Exit:  parse_code_expr_prec (took 18.60µs)
+              [#10]↳ Exit:  parse_pattern_leaf (took 34.60µs)
+            [#9]↳ Exit:  parse_pattern (took 42.20µs)
+          [#8]↳ Exit:  parse_param (took 51.50µs)
+          [#14]↳ Enter: parse_param 
+            [#15]↳ Enter: parse_pattern 
+              [#16]↳ Enter: parse_pattern_leaf 
+                [#17]↳ Enter: parse_code_expr_prec AtomicExpr 22
+                  [#18]↳ Enter: parse_primary_expr 
+                  [#18]↳ Exit:  parse_primary_expr (took 24.00µs)
+                  [#19]↳ Enter: parse_code_expr_prec loop Colon
+                  [#19]↳ Exit:  parse_code_expr_prec loop (took 2.40µs)
+                [#17]↳ Exit:  parse_code_expr_prec (took 34.20µs)
+              [#16]↳ Exit:  parse_pattern_leaf (took 40.00µs)
+            [#15]↳ Exit:  parse_pattern (took 44.80µs)
+          [#14]↳ Exit:  parse_param (took 52.20µs)
+          [#20]↳ Enter: parse_block 
+            [#21]↳ Enter: code loop pos= 35
+              [#22]↳ Enter: parse_statement 
+                [#23]↳ Enter: parse_code_expr_prec Statement 35
+                  [#24]↳ Enter: parse_primary_expr 
+                  [#24]↳ Exit:  parse_primary_expr (took 3.20µs)
+                  [#25]↳ Enter: parse_code_expr_prec loop Plus
+                    [#26]↳ Enter: parse_code_expr_prec Expr 39
+                      [#27]↳ Enter: parse_primary_expr 
+                      [#27]↳ Exit:  parse_primary_expr (took 2.90µs)
+                      [#28]↳ Enter: parse_code_expr_prec loop RightBrace
+                      [#28]↳ Exit:  parse_code_expr_prec loop (took 5.10µs)
+                    [#26]↳ Exit:  parse_code_expr_prec (took 18.50µs)
+                  [#25]↳ Exit:  parse_code_expr_prec loop (took 25.60µs)
+                  [#29]↳ Enter: parse_code_expr_prec loop RightBrace
+                  [#29]↳ Exit:  parse_code_expr_prec loop (took 2.50µs)
+                [#23]↳ Exit:  parse_code_expr_prec (took 41.30µs)
+              [#22]↳ Exit:  parse_statement (took 46.10µs)
+            [#21]↳ Exit:  code (took 50.90µs)
+          [#20]↳ Exit:  parse_block (took 58.20µs)
+        [#5]↳ Exit:  fn_item (took 254.10µs)
+      [#4]↳ Exit:  parse_primary_expr (took 265.00µs)
+      [#30]↳ Enter: parse_code_expr_prec loop End
+      [#30]↳ Exit:  parse_code_expr_prec loop (took 2.50µs)
+    [#3]↳ Exit:  parse_code_expr_prec (took 275.80µs)
+  [#2]↳ Exit:  parse_statement (took 290.00µs)
+[#1]↳ Exit:  code (took 310.60µs)
+test parser::funcs::tests::test_parse_fn_item ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 120 filtered out; finished in 0.00s
+

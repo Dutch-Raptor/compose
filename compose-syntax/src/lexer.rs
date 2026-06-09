@@ -115,6 +115,7 @@ impl Lexer<'_> {
             '=' if self.s.eat_if('=') => SyntaxKind::EqEq,
             '!' if self.s.eat_if('=') => SyntaxKind::BangEq,
             '+' if self.s.eat_if('=') => SyntaxKind::PlusEq,
+            '-' | '\u{2212}' if self.s.eat_if('>') => SyntaxKind::ThinArrow,
             '-' | '\u{2212}' if self.s.eat_if('=') => SyntaxKind::MinusEq,
             '*' if self.s.eat_if('=') => SyntaxKind::StarEq,
             '/' if self.s.eat_if('=') => SyntaxKind::SlashEq,
@@ -131,12 +132,8 @@ impl Lexer<'_> {
                 SyntaxKind::DotsEq
             }
             '.' if self.s.eat_if('.') => SyntaxKind::Dots,
-
-            '<' if self.s.eat_if('<') => SyntaxKind::LtLt,
             '<' if self.s.eat_if('=') => SyntaxKind::LtEq,
-            '>' if self.s.eat_if('>') => SyntaxKind::GtGt,
             '>' if self.s.eat_if('=') => SyntaxKind::GtEq,
-
             '|' if self.s.eat_if('|') => SyntaxKind::PipePipe,
             '|' if self.s.eat_if('=') => SyntaxKind::PipeEq,
             '&' if self.s.eat_if('&') => SyntaxKind::AmpAmp,
@@ -323,6 +320,7 @@ fn keyword(ident: &str) -> Option<SyntaxKind> {
         "while" => SyntaxKind::WhileKW,
         "match" => SyntaxKind::MatchKW,
         "is" => SyntaxKind::IsKW,
+        "fn" => SyntaxKind::FnKw,
         _ => return None,
     })
 }

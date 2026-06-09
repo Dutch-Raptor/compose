@@ -1,5 +1,5 @@
-use crate::diag::{bail, StrResult};
 use crate::Value;
+use crate::diag::{StrResult, bail};
 use compose_library::foundations::type_info::ComposeDisplay;
 use compose_macros::func;
 use ecow::EcoString;

@@ -41,7 +41,7 @@ fn create(ty: &Type, item: Option<&syn::Item>) -> TokenStream {
             type #ident,
         }
     });
-    
+
     let scope = if meta.scope {
         quote! { <#ident as #foundations::scope::NativeScope>::scope() }
     } else {

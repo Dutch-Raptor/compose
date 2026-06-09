@@ -1,5 +1,5 @@
-use std::num::NonZeroU64;
 use ecow::EcoString;
+use std::num::NonZeroU64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleId(NonZeroU64);

@@ -1,10 +1,13 @@
-use crate::{Machine};
+use crate::Machine;
 use compose_error_codes::ErrorCode;
 use compose_library::diag::compose_codespan_reporting::term::termcolor::{
     ColorChoice, StandardStream,
 };
-use compose_library::diag::{FileError, FileResult, SourceDiagnostic, SourceResult, Warned, write_diagnostics, write_diagnostics_to_string};
-use compose_library::{Library, Value, World, };
+use compose_library::diag::{
+    FileError, FileResult, SourceDiagnostic, SourceResult, Warned, write_diagnostics,
+    write_diagnostics_to_string,
+};
+use compose_library::{Library, Value, World};
 use compose_syntax::{FileId, Source};
 use ecow::{EcoVec, eco_format, eco_vec};
 use std::collections::HashMap;
@@ -116,7 +119,10 @@ impl World for TestWorld {
         let mut buffer: Vec<u8> = Vec::new();
         f(&mut buffer)?;
         let output = String::from_utf8(buffer).expect("Invalid UTF-8");
-        self.stdout.lock().expect("failed to lock stdout").push_str(&output);
+        self.stdout
+            .lock()
+            .expect("failed to lock stdout")
+            .push_str(&output);
         Ok(())
     }
 
@@ -159,11 +165,8 @@ pub fn eval_code_with_vm(vm: &mut Machine, world: &TestWorld, input: &str) -> Te
     let source = world.entrypoint_src();
     let len_after_edit = source.root_node().children().len();
 
-    let Warned { value, warnings } = crate::eval_source_range(
-        &source,
-        len_before_edit..len_after_edit,
-        vm,
-    );
+    let Warned { value, warnings } =
+        crate::eval_source_range(&source, len_before_edit..len_after_edit, vm);
 
     TestResult {
         value,
@@ -241,7 +244,9 @@ impl TestResult {
 
                 if !unexpected_errors.is_empty() {
                     error.push_str("unexpected errors occurred: \n");
-                    error.push_str(write_diagnostics_to_string(&self.world, &unexpected_errors, &[]).as_str());
+                    error.push_str(
+                        write_diagnostics_to_string(&self.world, &unexpected_errors, &[]).as_str(),
+                    );
                 }
 
                 if !missing_expected_errors.is_empty() || !unexpected_errors.is_empty() {
@@ -290,12 +295,22 @@ impl TestResult {
     }
 
     pub fn assert_stdout(&self, expected: &str) {
-        let stdout = self.world.stdout.lock().expect("failed to lock stdout").clone();
+        let stdout = self
+            .world
+            .stdout
+            .lock()
+            .expect("failed to lock stdout")
+            .clone();
         assert_eq!(stdout, expected);
     }
 
     pub fn assert_stdout_predicate(&self, predicate: impl FnOnce(&str) -> bool) {
-        let stdout = self.world.stdout.lock().expect("failed to lock stdout").clone();
+        let stdout = self
+            .world
+            .stdout
+            .lock()
+            .expect("failed to lock stdout")
+            .clone();
         assert!(predicate(&stdout));
     }
 }

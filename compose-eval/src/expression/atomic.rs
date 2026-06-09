@@ -1,9 +1,9 @@
-use crate::vm::Machine;
 use crate::Eval;
+use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
+use crate::vm::Machine;
 use compose_library::diag::SourceResult;
 use compose_library::foundations::cast::IntoValue;
 use compose_syntax::ast;
-use crate::evaluated::{Evaluated, ValueEvaluatedExtensions};
 
 impl Eval for ast::Int<'_> {
     fn eval(self, _vm: &mut Machine) -> SourceResult<Evaluated> {
@@ -25,8 +25,8 @@ impl Eval for ast::Bool<'_> {
 
 #[cfg(test)]
 mod tests {
-    use compose_library::Value;
     use crate::test::assert_eval;
+    use compose_library::Value;
 
     #[test]
     fn test_int() {

@@ -1,5 +1,5 @@
 use crate::ast::pattern::Pattern;
-use crate::ast::ty::TypeAnnotation;
+use crate::ast::ty::Type;
 use crate::ast::{AstNode, Expr, Ident, node};
 use crate::kind::SyntaxKind;
 use crate::{Span, SyntaxNode};
@@ -63,7 +63,7 @@ impl<'a> LetBinding<'a> {
             .map(|n| n.span())
     }
 
-    pub fn type_annotation(self) -> Option<TypeAnnotation<'a>> {
+    pub fn type_annotation(self) -> Option<Type<'a>> {
         self.0.children().find_map(SyntaxNode::cast)
     }
 }

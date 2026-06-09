@@ -28,7 +28,7 @@ where
     T: Into<PathBuf>,
 {
     fn from(value: T) -> Self {
-        VirtualPath::new(value)   
+        VirtualPath::new(value)
     }
 }
 
@@ -42,7 +42,7 @@ impl VirtualPath {
     pub fn display(&self) -> String {
         self.0.display().to_string()
     }
-    
+
     pub fn as_path(&self) -> &PathBuf {
         &self.0
     }
@@ -77,7 +77,7 @@ impl FileId {
 
         let id = FileId(num);
         let leaked = Box::leak(Box::new(path));
-        
+
         let mut interner = INTERNER.write().unwrap();
         interner.to_id.insert(leaked, id);
         interner.from_id.push(leaked);

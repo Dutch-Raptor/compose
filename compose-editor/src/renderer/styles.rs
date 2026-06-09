@@ -3,7 +3,6 @@ use std::io::Write;
 use super::RenderData;
 use crate::Result;
 
-
 pub trait Header<W> {
     fn rows(&self) -> usize;
     fn draw(&mut self, write: &mut W, data: &RenderData) -> Result<()>;

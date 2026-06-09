@@ -389,7 +389,11 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                 .iter()
                 .map(|(idx, style, multilabel)| match multilabel {
                     // change any top labels to left labels if they start at the start of the line
-                    MultiLabel::Top(start) if *start <= source.len() - source.trim_start().len() => (*idx, *style, MultiLabel::Left),
+                    MultiLabel::Top(start)
+                        if *start <= source.len() - source.trim_start().len() =>
+                    {
+                        (*idx, *style, MultiLabel::Left)
+                    }
                     other => (*idx, *style, other.clone()),
                 })
                 .collect::<Vec<_>>();
@@ -586,31 +590,69 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                 MultiLabel::Bottom(range, message) => (*label_style, range, Some(message)),
             };
 
-
-
             // Finish the top or bottom caret
             match bottom_message {
                 None => {
                     self.outer_gutter(outer_padding)?;
                     self.border_left()?;
-                    self.multi_label_inner_gutter(severity, num_multi_labels, multi_labels, multi_label_index, label_style, false)?;
+                    self.multi_label_inner_gutter(
+                        severity,
+                        num_multi_labels,
+                        multi_labels,
+                        multi_label_index,
+                        label_style,
+                        false,
+                    )?;
                     self.label_multi_top_caret(severity, label_style, source, *range)?
-                },
+                }
                 Some(message) => {
                     if message.is_empty() {
                         self.outer_gutter(outer_padding)?;
                         self.border_left()?;
-                        self.multi_label_inner_gutter(severity, num_multi_labels, multi_labels, multi_label_index, label_style, false)?;
-                        self.label_multi_bottom_caret(severity, label_style, source, *range, message)?
+                        self.multi_label_inner_gutter(
+                            severity,
+                            num_multi_labels,
+                            multi_labels,
+                            multi_label_index,
+                            label_style,
+                            false,
+                        )?;
+                        self.label_multi_bottom_caret(
+                            severity,
+                            label_style,
+                            source,
+                            *range,
+                            message,
+                        )?
                     }
                     for (line_no, line) in message.lines().enumerate() {
                         self.outer_gutter(outer_padding)?;
                         self.border_left()?;
                         if line_no == 0 {
-                            self.multi_label_inner_gutter(severity, num_multi_labels, multi_labels, multi_label_index, label_style, false)?;
-                            self.label_multi_bottom_caret(severity, label_style, source, *range, line)?
+                            self.multi_label_inner_gutter(
+                                severity,
+                                num_multi_labels,
+                                multi_labels,
+                                multi_label_index,
+                                label_style,
+                                false,
+                            )?;
+                            self.label_multi_bottom_caret(
+                                severity,
+                                label_style,
+                                source,
+                                *range,
+                                line,
+                            )?
                         } else {
-                            self.multi_label_inner_gutter(severity, num_multi_labels, multi_labels, multi_label_index, label_style, true)?;
+                            self.multi_label_inner_gutter(
+                                severity,
+                                num_multi_labels,
+                                multi_labels,
+                                multi_label_index,
+                                label_style,
+                                true,
+                            )?;
                             self.render_part_as_replacement_using_metrics(source, 0..*range, " ")?;
                             self.set_color(self.styles().label(severity, label_style))?;
                             write!(self, "    ")?;
@@ -626,7 +668,15 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
         Ok(())
     }
 
-    fn multi_label_inner_gutter(&mut self, severity: Severity, num_multi_labels: usize, multi_labels: &[(usize, LabelStyle, MultiLabel)], multi_label_index: usize, label_style: LabelStyle, newline_continuation: bool) -> Result<(), Error> {
+    fn multi_label_inner_gutter(
+        &mut self,
+        severity: Severity,
+        num_multi_labels: usize,
+        multi_labels: &[(usize, LabelStyle, MultiLabel)],
+        multi_label_index: usize,
+        label_style: LabelStyle,
+        newline_continuation: bool,
+    ) -> Result<(), Error> {
         // Write inner gutter.
         //
         // ```text
@@ -651,7 +701,9 @@ impl<'writer, 'config> Renderer<'writer, 'config> {
                             underline = Some((*ls, VerticalBound::Top));
                             self.label_multi_top_left(severity, label_style)?
                         }
-                        MultiLabel::Bottom(..) if multi_label_index == *i && !newline_continuation => {
+                        MultiLabel::Bottom(..)
+                            if multi_label_index == *i && !newline_continuation =>
+                        {
                             underline = Some((*ls, VerticalBound::Bottom));
                             self.label_multi_bottom_left(severity, label_style)?;
                         }

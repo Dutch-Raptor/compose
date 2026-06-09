@@ -1,14 +1,14 @@
-use std::io::{Read, Write};
-use std::sync::Mutex;
 use compose_library::diag::FileResult;
 use compose_library::{Library, World};
 use compose_syntax::{FileId, Source};
+use std::io::{Read, Write};
+use std::sync::Mutex;
 
 #[derive(Debug)]
 pub(crate) struct DocWorld {
     pub source: Source,
     library: Library,
-    pub stdout: Mutex<String>
+    pub stdout: Mutex<String>,
 }
 
 impl Clone for DocWorld {
@@ -16,9 +16,9 @@ impl Clone for DocWorld {
         Self {
             source: self.source.clone(),
             library: self.library.clone(),
-            stdout: Mutex::new(self.stdout.lock().expect("failed to lock stdout").clone())
+            stdout: Mutex::new(self.stdout.lock().expect("failed to lock stdout").clone()),
         }
-    }   
+    }
 }
 
 impl DocWorld {
@@ -29,7 +29,7 @@ impl DocWorld {
         Self {
             source,
             library: Library::default(),
-            stdout: Mutex::new(String::new())
+            stdout: Mutex::new(String::new()),
         }
     }
 }
@@ -48,11 +48,17 @@ impl World for DocWorld {
         &self.library
     }
 
-    fn write(&self, f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
+    fn write(
+        &self,
+        f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
         let mut buffer: Vec<u8> = Vec::new();
         f(&mut buffer)?;
         let output = String::from_utf8(buffer).expect("Invalid UTF-8");
-        self.stdout.lock().expect("failed to lock stdout").push_str(&output);
+        self.stdout
+            .lock()
+            .expect("failed to lock stdout")
+            .push_str(&output);
         Ok(())
     }
 

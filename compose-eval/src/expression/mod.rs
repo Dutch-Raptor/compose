@@ -1,30 +1,30 @@
-use crate::vm::Machine;
 use crate::Eval;
+use crate::vm::Machine;
 use compose_library::diag::SourceResult;
 use compose_syntax::ast::{AstNode, Expr};
 
+mod array;
 mod assignment;
 mod atomic;
 mod binary;
 mod bindings;
 mod block;
 mod call;
+mod captures_visitor;
 mod closure;
 mod control_flow;
 mod field_access;
+mod index_access;
+mod map;
+mod match_expression;
 mod parenthesized;
 mod path_access;
-mod unary;
-mod array;
-mod range;
-mod map;
-mod index_access;
 mod pattern;
-mod match_expression;
-mod captures_visitor;
+mod range;
+mod unary;
 
-pub use closure::eval_lambda;
 use crate::evaluated::Evaluated;
+pub use closure::eval_lambda;
 
 impl Eval for Expr<'_> {
     fn eval(self, vm: &mut Machine) -> SourceResult<Evaluated> {

@@ -1,11 +1,11 @@
 use crate::diag::SourceResult;
-use compose_library::diag::{bail, StrResult};
-use ecow::eco_format;
-use std::sync::{Arc, Mutex};
+use compose_library::diag::{StrResult, bail};
 use compose_library::foundations::cast::IntoValue;
 use compose_library::foundations::iterator::ValueIterator;
 use compose_library::foundations::types::{Range, Str};
 use compose_library::{Value, Vm};
+use ecow::eco_format;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq)]
 enum RangeIterType {
@@ -61,14 +61,14 @@ impl PartialEq for RangeIter {
         if self.max != other.max {
             return false;
         }
-        
+
         let cur = self.current.lock().unwrap();
         let other_cur = other.current.lock().unwrap();
-        
+
         if *cur != *other_cur {
             return false;
         }
-        
+
         true
     }
 }
@@ -76,18 +76,22 @@ impl PartialEq for RangeIter {
 impl RangeIter {
     pub fn new(range: &Range) -> StrResult<Self> {
         let (cur, max, inclusive) = match range {
-            Range::Int(r) => {
-                (r.start.map(RangeIterType::Int), r.end.map(RangeIterType::Int), r.include_end)
-            }
-            Range::Char(r) => {
-                (r.start.map(|char| RangeIterType::Char(char as u32)), r.end.map(|char| RangeIterType::Char(char as u32)), r.include_end)
-            }
+            Range::Int(r) => (
+                r.start.map(RangeIterType::Int),
+                r.end.map(RangeIterType::Int),
+                r.include_end,
+            ),
+            Range::Char(r) => (
+                r.start.map(|char| RangeIterType::Char(char as u32)),
+                r.end.map(|char| RangeIterType::Char(char as u32)),
+                r.include_end,
+            ),
         };
-        
+
         let Some(cur) = cur else {
             bail!("Range iterator must have a start value.");
         };
-        
+
         Ok(Self {
             current: Arc::new(Mutex::new(cur)),
             max_inclusive: inclusive,

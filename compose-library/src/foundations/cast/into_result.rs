@@ -1,6 +1,6 @@
+use compose_library::Value;
 use compose_library::diag::{At, SourceResult, StrResult};
 use compose_library::foundations::cast::into_value::IntoValue;
-use compose_library::Value;
 use compose_syntax::Span;
 
 pub trait IntoResult {

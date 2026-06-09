@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use compose_library::diag::{eco_format, SourceDiagnostic};
+use compose_library::diag::{SourceDiagnostic, eco_format};
 use compose_library::{Value, World};
 use compose_resolve::symbol::{SymbolKind, SymbolOrigin, SymbolTable};
 use compose_resolve::{ExprId, ExprIdTable, ResolutionResult, SymbolId};
-use compose_syntax::ast::ty::TypeAnnotation;
+use compose_syntax::ast::ty::Type;
 use compose_syntax::ast::{
-    self, Arg, AssignOp, AstNode, BinOp, Expr, Ident, ParamKind, Pattern, Statement, UnOp,
+    self, Arg, AssignOp, AstNode, BinOp, Expr, FnItem, Ident, ParamKind, Pattern, Statement, UnOp,
 };
 use compose_syntax::{Label, Span, SyntaxKind, SyntaxNode};
 use ecow::EcoString;
@@ -21,71 +21,6 @@ use crate::namer::VarNamer;
 use crate::subst::Substitution;
 use crate::ty::{LiteralKind, Ty, TyVarGen, TypeVar};
 use crate::unify::Unifier;
-
-/// A type written in source code before it is lowered into [`Ty`].
-#[derive(Debug, Clone)]
-pub struct AstTy {
-    pub span: Span,
-    pub kind: AstTyKind,
-}
-
-#[derive(Debug, Clone)]
-pub enum AstTyKind {
-    Named(TypeName, Vec<AstTy>),
-    Fn(Vec<AstTy>, Box<AstTy>),
-    Dyn(crate::intern::InterfaceName),
-    Primitive(PrimAstTy),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum PrimAstTy {
-    Int,
-    Bool,
-    Float,
-    Str,
-    Unit,
-}
-
-/// A function declaration signature. The current parser does not produce this
-/// node yet, but keeping the model here lets future `fn` syntax reuse the same
-/// local checker.
-#[derive(Debug, Clone)]
-pub struct FnDecl {
-    pub name: SymbolId,
-    pub span: Span,
-    pub generic_params: Vec<GenericParam>,
-    pub params: Vec<(SymbolId, AstTy)>,
-    pub return_ty: AstTy,
-}
-
-#[derive(Debug, Clone)]
-pub struct GenericParam {
-    pub name: SymbolId,
-    pub bounds: Vec<BoundDecl>,
-    pub span: Span,
-}
-
-#[derive(Debug, Clone)]
-pub struct BoundDecl {
-    pub interface: crate::intern::InterfaceName,
-    pub args: Vec<AstTy>,
-    pub span: Span,
-}
-
-#[derive(Debug, Clone)]
-pub struct MethodSig {
-    pub name: SymbolId,
-    pub generic_params: Vec<GenericParam>,
-    pub self_ty: Ty,
-    pub params: Vec<Ty>,
-    pub return_ty: Ty,
-    pub interface: Option<crate::intern::InterfaceName>,
-}
-
-/// Looks up method signatures by resolved method symbol.
-pub trait MethodTable {
-    fn lookup(&self, method: &SymbolId) -> Option<&MethodSig>;
-}
 
 /// Type data attached to an expression through side tables.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -218,6 +153,14 @@ struct ExpectedTy {
 }
 
 #[derive(Debug, Clone)]
+struct FnItemSignature {
+    ty: Ty,
+    params: Vec<Ty>,
+    return_ty: Ty,
+    declared_return_ty: Option<Ty>,
+}
+
+#[derive(Debug, Clone)]
 struct ExprOutcome {
     ty: Ty,
     exits: bool,
@@ -245,6 +188,7 @@ struct TypeChecker<'a> {
     operator_checks: Vec<OperatorCheck>,
     semicolon_coercions: Vec<SemicolonCoercion>,
     unit_contexts: Vec<UnitContext>,
+    fn_item_signatures: HashMap<SymbolId, FnItemSignature>,
 }
 
 impl<'a> TypeChecker<'a> {
@@ -278,18 +222,22 @@ impl<'a> TypeChecker<'a> {
             operator_checks: Vec::new(),
             semicolon_coercions: Vec::new(),
             unit_contexts: Vec::new(),
+            fn_item_signatures: HashMap::new(),
         }
     }
 
     fn check_root(&mut self, root: &SyntaxNode) -> TypeCheckResult {
         let mut env = TyEnv::default();
 
-        for child in root.children() {
-            let Some(statement) = child.cast::<Statement<'_>>() else {
-                continue;
-            };
-            self.infer_statement(statement, &mut env);
-        }
+        let items = root
+            .children()
+            .filter_map(SyntaxNode::cast)
+            .collect::<Vec<_>>();
+        let statements = root
+            .children()
+            .filter_map(SyntaxNode::cast)
+            .collect::<Vec<_>>();
+        self.infer_code(&items, &statements, &mut env);
 
         let constraints = self.constraints.clone();
         let interface_table = self.world.library().type_info.interface_table().clone();
@@ -509,6 +457,24 @@ impl<'a> TypeChecker<'a> {
             .any(|ty| {
                 ty_depends_on_poisoned_narrowing(ty, substitution, graph, poisoned_narrowing_spans)
             })
+    }
+
+    fn declare_fn_items(&mut self, items: &[FnItem<'_>], env: &mut TyEnv) {
+        for item in items {
+            self.declare_fn_item_signature(*item, env);
+        }
+    }
+
+    fn infer_code(&mut self, items: &[FnItem<'_>], statements: &[Statement<'_>], env: &mut TyEnv) {
+        self.declare_fn_items(items, env);
+
+        for item in items {
+            self.infer_fn_item(*item, env);
+        }
+
+        for statement in statements {
+            self.infer_statement(*statement, env);
+        }
     }
 
     fn infer_statement(&mut self, statement: Statement<'_>, env: &mut TyEnv) -> Ty {
@@ -943,9 +909,10 @@ impl<'a> TypeChecker<'a> {
         }
 
         let callee_ty = self.infer_expr(call.callee(), env);
-        let arg_tys = call
-            .args()
-            .items()
+        let args = call.args().items().collect::<Vec<_>>();
+        let arg_tys = args
+            .iter()
+            .copied()
             .map(|arg| self.infer_arg(arg, env))
             .collect::<Vec<_>>();
         let ret_ty = self.var_gen.fresh_ty();
@@ -956,35 +923,19 @@ impl<'a> TypeChecker<'a> {
             ret,
         } = callee_ty.clone()
         {
-            for (index, arg_ty) in arg_tys.iter().take(params.len()).cloned().enumerate() {
-                let Some(arg) = call.args().items().nth(index) else {
-                    break;
-                };
+            for (index, (arg, arg_ty)) in args.iter().zip(arg_tys.iter()).enumerate() {
+                let expected = params
+                    .get(index)
+                    .cloned()
+                    .unwrap_or_else(|| (*variadic).clone());
                 self.emit_call_arg_constraint(
-                    arg_ty,
-                    params[index].clone(),
+                    arg_ty.clone(),
+                    expected,
                     call.span(),
                     arg.span(),
                     index,
                 );
             }
-
-            for (index, (arg, arg_ty)) in call
-                .args()
-                .items()
-                .zip(arg_tys.iter().cloned())
-                .enumerate()
-                .skip(params.len())
-            {
-                self.emit_call_arg_constraint(
-                    arg_ty,
-                    (*variadic).clone(),
-                    call.span(),
-                    arg.span(),
-                    index,
-                );
-            }
-
             return *ret;
         }
 
@@ -1339,6 +1290,117 @@ impl<'a> TypeChecker<'a> {
         fn_ty
     }
 
+    fn declare_fn_item_signature(&mut self, item: ast::FnItem<'_>, env: &mut TyEnv) {
+        let Some(symbol) = self.symbol_for_span(item.name().span()) else {
+            return;
+        };
+
+        let mut type_params = HashMap::new();
+
+        for type_arg in item.type_args().items() {
+            self.bind_fn_type_param(type_arg, &mut type_params);
+        }
+
+        let mut params = Vec::new();
+        for param in item.params().children() {
+            let ty = param
+                .type_annotation()
+                .map(|annotation| self.type_from_annotation_with_params(annotation, &type_params))
+                .unwrap_or_else(|| self.var_gen.fresh_ty());
+            params.push(ty);
+        }
+
+        let declared_return_ty = item
+            .return_type()
+            .map(|annotation| self.type_from_annotation_with_params(annotation, &type_params));
+        let return_ty = declared_return_ty
+            .clone()
+            .unwrap_or_else(|| self.var_gen.fresh_ty());
+        let fn_ty = Ty::Fn(params.clone(), Box::new(return_ty.clone()));
+
+        env.insert(symbol, fn_ty.clone());
+        self.fn_item_signatures.insert(
+            symbol,
+            FnItemSignature {
+                ty: fn_ty,
+                params,
+                return_ty,
+                declared_return_ty,
+            },
+        );
+    }
+
+    fn infer_fn_item(&mut self, item: ast::FnItem<'_>, env: &mut TyEnv) -> Ty {
+        let Some(symbol) = self.symbol_for_span(item.name().span()) else {
+            return Ty::Error;
+        };
+
+        if !self.fn_item_signatures.contains_key(&symbol) {
+            self.declare_fn_item_signature(item, env);
+        }
+
+        let Some(signature) = self.fn_item_signatures.get(&symbol).cloned() else {
+            return Ty::Error;
+        };
+
+        let mut child = env.child();
+        child.insert(symbol, signature.ty.clone());
+
+        for (param, ty) in item.params().children().zip(signature.params.iter()) {
+            match param.kind() {
+                ParamKind::Pos(pattern) => {
+                    self.bind_pattern(pattern, ty.clone(), &mut child);
+                }
+                ParamKind::Named(named) => {
+                    let default_ty = self.infer_expr(named.expr(), env);
+                    self.emit_eq(
+                        ty.clone(),
+                        default_ty,
+                        ConstraintOrigin::Annotation {
+                            annotated_span: named.name().span(),
+                        },
+                        named.span(),
+                    );
+                    if let Some(symbol) = self.symbol_for_span(named.name().span()) {
+                        child.insert(symbol, ty.clone());
+                    }
+                }
+            }
+        }
+
+        let previous_return = self.current_return_ty.replace(signature.return_ty.clone());
+        let expected = signature.declared_return_ty.as_ref().map(|ty| ExpectedTy {
+            ty: ty.clone(),
+            origin: ConstraintOrigin::ReturnType {
+                fn_span: item.span(),
+                return_expr_span: item.body().span(),
+            },
+            span: item.body().span(),
+        });
+        let body_outcome = self.infer_block_outcome_with_expected(
+            item.body().to_untyped(),
+            item.body().span(),
+            &mut child,
+            expected,
+        );
+        self.current_return_ty = previous_return;
+
+        if signature.declared_return_ty.is_none() && !body_outcome.exits {
+            self.emit_eq(
+                signature.return_ty.clone(),
+                body_outcome.ty,
+                ConstraintOrigin::ReturnType {
+                    fn_span: item.span(),
+                    return_expr_span: item.body().span(),
+                },
+                item.body().span(),
+            );
+        }
+
+        self.record_expr(item.span(), signature.ty.clone(), signature.ty.clone());
+        signature.ty
+    }
+
     fn infer_match(
         &mut self,
         match_expr: ast::MatchExpression<'_>,
@@ -1435,8 +1497,12 @@ impl<'a> TypeChecker<'a> {
         env: &mut TyEnv,
         expected: Option<ExpectedTy>,
     ) -> BlockOutcome {
-        let items = statements_with_semicolons(node);
-        if items.is_empty() {
+        let fn_items = node
+            .children()
+            .filter_map(SyntaxNode::cast)
+            .collect::<Vec<_>>();
+        let statements = statements_with_semicolons(node);
+        if fn_items.is_empty() && statements.is_empty() {
             return BlockOutcome {
                 ty: Ty::Unit,
                 exits: false,
@@ -1444,11 +1510,17 @@ impl<'a> TypeChecker<'a> {
         }
 
         let mut child = env.child();
+        self.declare_fn_items(&fn_items, &mut child);
+
+        for fn_item in fn_items {
+            self.infer_fn_item(fn_item, &mut child);
+        }
+
         let mut result = Ty::Unit;
         let mut exits = false;
 
-        for (index, item) in items.iter().enumerate() {
-            let is_tail = index + 1 == items.len();
+        for (index, item) in statements.iter().enumerate() {
+            let is_tail = index + 1 == statements.len();
             match item.statement {
                 Statement::Expr(expr) => {
                     let expr_outcome = if is_tail && item.semicolon.is_none() {
@@ -1640,11 +1712,57 @@ impl<'a> TypeChecker<'a> {
         self.type_from_name(ident.as_str(), Vec::new())
     }
 
-    fn type_from_annotation(&mut self, annotation: TypeAnnotation<'_>) -> Ty {
+    fn type_from_annotation(&mut self, annotation: Type<'_>) -> Ty {
         let args = annotation
             .args()
-            .map(|arg| self.type_from_annotation(arg))
-            .collect::<Vec<_>>();
+            .map(|args| {
+                args.items()
+                    .map(|arg| self.type_from_annotation(arg))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_else(Vec::new);
+        self.type_from_name(annotation.ident().as_str(), args)
+    }
+
+    fn bind_fn_type_param(
+        &mut self,
+        annotation: Type<'_>,
+        type_params: &mut HashMap<SymbolId, Ty>,
+    ) {
+        if let Some(symbol_id) = self.symbol_for_span(annotation.ident().span()) {
+            type_params.entry(symbol_id).or_insert_with(|| {
+                let var =
+                    self.fresh_named_var(annotation.ident().span(), annotation.ident().as_str());
+                Ty::Var(var)
+            });
+        }
+
+        if let Some(args) = annotation.args() {
+            for arg in args.items() {
+                self.bind_fn_type_param(arg, type_params);
+            }
+        }
+    }
+
+    fn type_from_annotation_with_params(
+        &mut self,
+        annotation: Type<'_>,
+        type_params: &HashMap<SymbolId, Ty>,
+    ) -> Ty {
+        if let Some(symbol_id) = self.symbol_for_span(annotation.ident().span()) {
+            if let Some(ty) = type_params.get(&symbol_id) {
+                return ty.clone();
+            }
+        }
+
+        let args = annotation
+            .args()
+            .map(|args| {
+                args.items()
+                    .map(|arg| self.type_from_annotation_with_params(arg, type_params))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_else(Vec::new);
         self.type_from_name(annotation.ident().as_str(), args)
     }
 
@@ -1899,8 +2017,8 @@ fn synthetic_symbol_id(name: &str) -> SymbolId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use compose_library::diag::{FileError, FileResult};
     use compose_library::Library;
+    use compose_library::diag::{FileError, FileResult};
     use compose_resolve::NameResolver;
     use compose_syntax::{FileId, Source};
     use std::collections::HashMap;
@@ -2287,6 +2405,67 @@ mod tests {
                 .iter()
                 .any(|diag| diag.message.contains("mismatched types")),
             "expected returned local to constrain the call result, got {:#?}",
+            result.diagnostics
+        );
+    }
+
+    #[test]
+    fn fn_item_uses_declared_param_and_return_types() {
+        let result = check(
+            r#"
+            fn add(a: Int, b: Int) -> Int {
+                a + b
+            }
+
+            let out: Int = add(1, 2);
+            "#,
+        );
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "expected fn item call to type check, got {:#?}",
+            result.diagnostics
+        );
+    }
+
+    #[test]
+    fn generic_fn_item_type_param_flows_to_call_result() {
+        let result = check(
+            r#"
+            fn id<T>(value: T) -> T {
+                value
+            }
+
+            let out: Int = id(1);
+            "#,
+        );
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "expected generic fn item type param to flow through call, got {:#?}",
+            result.diagnostics
+        );
+    }
+
+    #[test]
+    fn fn_item_signature_is_available_before_definition_in_block() {
+        let result = check(
+            r#"
+            let out: Int = {
+                let result = add(1, 2);
+
+                fn add(a: Int, b: Int) -> Int {
+                    a + b
+                }
+
+                result
+            };
+            "#,
+        );
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "expected fn item to be available throughout its block, got {:#?}",
             result.diagnostics
         );
     }

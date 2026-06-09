@@ -4,8 +4,8 @@ use crate::diagnostic::{
     Diagnostic, Label, LabelStyle, SpannedNote, Subdiagnostic, Suggestion, SuggestionPart,
 };
 use crate::files::{Error, Files, Location};
-use crate::term::renderer::{Locus, MultiLabel, Renderer, SingleLabel};
 use crate::term::Config;
+use crate::term::renderer::{Locus, MultiLabel, Renderer, SingleLabel};
 
 /// Calculate the number of decimal digits in `n`.
 // TODO: simplify after https://github.com/rust-lang/rust/issues/70887 resolves
@@ -510,11 +510,10 @@ where
                         multiline_suggestions += 1;
 
                         // for now, output a normal multi-line label and skip rendering the replacement
-                        let labels =
-                            vec![
-                                Label::secondary(file_id, start_line_offset..end_line_offset)
-                                    .with_message(message),
-                            ];
+                        let labels = vec![
+                            Label::secondary(file_id, start_line_offset..end_line_offset)
+                                .with_message(message),
+                        ];
                         let (outer_padding, labeled_files) = self.label_files(files, &labels)?;
                         self.render_source_snippets(outer_padding, files, labeled_files, renderer)?;
                         continue;

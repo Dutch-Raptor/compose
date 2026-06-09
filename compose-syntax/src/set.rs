@@ -40,29 +40,29 @@ pub(crate) use syntax_set;
 
 pub const STMT: SyntaxSet = syntax_set![LetKW].union(ATOMIC_EXPR);
 
-pub const ARG_RECOVER: SyntaxSet = syntax_set![
-    Comma,
-    RightParen,
-    LineBreak,
-];
+pub const ARG_RECOVER: SyntaxSet = syntax_set![Comma, RightParen, LineBreak,];
 
 pub const UNARY_OP: SyntaxSet = syntax_set![Plus, Minus, Bang, Tilde, Star];
 
 pub const BINARY_OP: SyntaxSet = syntax_set![
     // Basic arithmetic
-    Plus, Minus, Star, Slash, Percent, 
-    
-    // Bitwise
-    Hat, Amp, Pipe,
-    
-    // Comparison
-    Gt, GtEq, Lt, LtEq, EqEq, BangEq,
-    
-    // Logical
+    Plus, Minus, Star, Slash, Percent, // Bitwise
+    Hat, Amp, Pipe, // Comparison
+    Gt, GtEq, Lt, LtEq, EqEq, BangEq, // Logical
     PipePipe, AmpAmp,
 ];
 
-pub const ASSIGN_OP: SyntaxSet = syntax_set![Eq, MinusEq, PlusEq, StarEq, SlashEq, AmpersandEq, HatEq, PipeEq, AmpersandEq,];
+pub const ASSIGN_OP: SyntaxSet = syntax_set![
+    Eq,
+    MinusEq,
+    PlusEq,
+    StarEq,
+    SlashEq,
+    AmpersandEq,
+    HatEq,
+    PipeEq,
+    AmpersandEq,
+];
 
 pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
     Ident,
@@ -87,24 +87,12 @@ pub const ATOMIC_EXPR: SyntaxSet = syntax_set![
 
 pub const EXPR: SyntaxSet = ATOMIC_EXPR.union(UNARY_OP);
 
-pub const PATTERN_LEAF: SyntaxSet = syntax_set![
-    Underscore,
-    Ident,
-    Int,
-    Float,
-    Str,
-    Bool,
-];
+pub const PATTERN_LEAF: SyntaxSet = syntax_set![Underscore, Ident, Int, Float, Str, Bool,];
 
 pub const LITERAL: SyntaxSet = syntax_set![Int, Float, Str, Bool];
 
-pub const PATTERN: SyntaxSet = syntax_set![
-    LeftBrace,
-    LeftParen,
-    LeftBracket,
-    Underscore,
-    Ident,
-].union(LITERAL);
+pub const PATTERN: SyntaxSet =
+    syntax_set![LeftBrace, LeftParen, LeftBracket, Underscore, Ident,].union(LITERAL);
 
 pub const DESTRUCTURING_ITEM: SyntaxSet = PATTERN.add(SyntaxKind::Dots);
 

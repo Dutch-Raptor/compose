@@ -7,7 +7,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{parse_quote, FnArg, ItemFn, Result, ReturnType, Type};
+use syn::{FnArg, ItemFn, Result, ReturnType, Type, parse_quote};
 
 pub fn func(stream: TokenStream, item: &ItemFn) -> Result<TokenStream> {
     let func = parse(stream, item)?;

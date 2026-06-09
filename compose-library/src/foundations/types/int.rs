@@ -1,6 +1,6 @@
+use compose_library::Value;
 use compose_library::bail;
 use compose_library::diag::StrResult;
-use compose_library::Value;
 use compose_macros::{cast, func};
 use compose_macros::{scope, ty};
 

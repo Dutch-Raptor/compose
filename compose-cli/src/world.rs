@@ -37,7 +37,10 @@ impl SystemWorld {
     /// assumes the folder containing the file is the root
     pub fn from_file(path: impl AsRef<Path>) -> FileResult<Self> {
         let path = path.as_ref();
-        let root = path.parent().unwrap().to_path_buf()
+        let root = path
+            .parent()
+            .unwrap()
+            .to_path_buf()
             .canonicalize()
             .map_err(|e| FileError::from_io(e, path))?;
 
@@ -70,7 +73,6 @@ impl SystemWorld {
             library: Library::default(),
         }
     }
-    
 
     pub fn edit_source(&self, file_id: FileId, editor: impl FnOnce(&mut Source)) {
         let mut sources = self.sources.lock().unwrap();
@@ -110,7 +112,10 @@ impl World for SystemWorld {
         &self.library
     }
 
-    fn write(&self, f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>) -> std::io::Result<()> {
+    fn write(
+        &self,
+        f: &mut dyn FnMut(&mut dyn Write) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
         f(&mut std::io::stdout())
     }
 

@@ -1,10 +1,10 @@
 use crate::kind::SyntaxKind;
+use crate::parser::Parser;
 use crate::parser::expressions::code_expression;
 use crate::parser::pattern::pattern;
 use crate::parser::statements::code;
-use crate::parser::Parser;
-use crate::set::syntax_set;
 use crate::set;
+use crate::set::syntax_set;
 use compose_error_codes::E0005_IF_EXPRESSION_BODIES_REQUIRE_BRACES;
 use compose_utils::trace_fn;
 use std::collections::HashSet;
@@ -291,4 +291,3 @@ mod tests {
         );
     }
 }
-

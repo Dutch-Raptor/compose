@@ -285,8 +285,8 @@ mod tests {
             ```
         "#};
 
-        let output =
-            transform_markdown(input, &Config::new().with_no_color()).expect("failed to transform markdown");
+        let output = transform_markdown(input, &Config::new().with_no_color())
+            .expect("failed to transform markdown");
 
         assert_eq!(
             output.trim(),
@@ -332,8 +332,8 @@ mod tests {
             ```
         "#};
 
-        let output =
-            transform_markdown(input, &Config::new().with_no_color()).expect("failed to transform markdown");
+        let output = transform_markdown(input, &Config::new().with_no_color())
+            .expect("failed to transform markdown");
 
         assert_eq!(
             output.trim(),

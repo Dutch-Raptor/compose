@@ -606,7 +606,7 @@ impl<'s> Parser<'s> {
     }
 
     fn before_trivia(&self) -> Marker {
-        Marker(self.nodes.len() - self.token.n_trivia)
+        Marker(self.nodes.len().saturating_sub(self.token.n_trivia))
     }
 
     fn had_leading_newline(&self) -> bool {

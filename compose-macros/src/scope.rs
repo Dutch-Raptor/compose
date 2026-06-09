@@ -1,7 +1,7 @@
-use crate::util::{bail, foundations, BareType};
+use crate::util::{BareType, bail, foundations};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use syn::{parse_quote, ImplItem, ImplItemConst, ImplItemFn, ItemImpl, Result};
+use syn::{ImplItem, ImplItemConst, ImplItemFn, ItemImpl, Result, parse_quote};
 
 pub fn scope(_: TokenStream, item: syn::Item) -> Result<TokenStream> {
     let syn::Item::Impl(mut item) = item else {
@@ -56,7 +56,7 @@ pub fn scope(_: TokenStream, item: syn::Item) -> Result<TokenStream> {
                     #(#definitions;)*
                     scope
                 });
-                
+
                 &SCOPE
             }
         }
